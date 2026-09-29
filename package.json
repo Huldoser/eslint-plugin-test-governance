@@ -1,0 +1,19 @@
+{
+  "name": "eslint-plugin-test-governance",
+  "version": "0.0.0",
+  "private": true,
+  "description": "ESLint plugin that requires a ticket reference above skipped, fixme, @new and @unstable Playwright tests.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "eslint",
+    "eslintplugin",
+    "eslint-plugin",
+    "playwright",
+    "testing"
+  ],
+  "author": "Andrey",
+  "license": "MIT"
+}
