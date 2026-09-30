@@ -35,10 +35,11 @@ test('the recommended config works without options', async () => {
   });
   const [result] = await eslint.lintFiles(['tests/checkout.spec.ts']);
   expect(result.messages.map((m) => [m.line, m.ruleId])).toEqual([
-    [15, 'test-governance/require-ticket'],
-    [17, 'test-governance/require-ticket'],
-    [20, 'test-governance/marker-matches-state'],
-    [21, 'test-governance/require-ticket'],
+    [10, 'test-governance/require-ticket'],
+    [16, 'test-governance/require-ticket'],
+    [18, 'test-governance/require-ticket'],
+    [21, 'test-governance/marker-matches-state'],
+    [22, 'test-governance/require-ticket'],
   ]);
 });
 

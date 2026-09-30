@@ -28,6 +28,8 @@ export interface Marker {
   /** Set when the keyword matches a state's marker only when case is ignored. */
   caseOf?: StateDef;
   tickets: MarkerTicket[];
+  /** Text after the last ticket, such as a note or a stray separator, with its source range. */
+  extra?: { text: string; range: TSESTree.Range };
 }
 
 export interface TagOccurrence {
@@ -194,31 +196,45 @@ function commentBlock(sourceCode: SourceCode, anchor: Node, allowBlankLine: bool
   return block;
 }
 
-function parseTickets(text: string, state: StateDef): MarkerTicket[] {
+/**
+ * Parses `TICKET[, TICKET...]` from the text after a marker's colon. `offset` is the source position
+ * of `text[0]`. Anything after the last ticket, including a trailing comma, is returned as `extra`.
+ */
+function parseTickets(text: string, offset: number, state: StateDef): Pick<Marker, 'tickets' | 'extra'> {
   const tickets: MarkerTicket[] = [];
-  let rest = text.trim();
-  while (rest) {
-    const token = /^[^\s,]+/.exec(rest)?.[0];
+  let index = text.length - text.trimStart().length;
+  let lastEnd = 0;
+  for (;;) {
+    const token = /^[^\s,]+/.exec(text.slice(index))?.[0];
     if (!token) break;
+    // Punctuation right after a ticket (`WEB-1:` or `WEB-1.`) is not part of it.
     const ticket = token.replace(/[.:;]+$/, '');
     tickets.push({ text: ticket, result: state.ticket.check(ticket) });
-    rest = rest.slice(token.length);
-    const separator = /^\s*,\s*/.exec(rest)?.[0];
+    index += ticket.length;
+    lastEnd = index;
+    const separator = /^\s*,\s*/.exec(text.slice(index))?.[0];
     if (!separator) break;
-    rest = rest.slice(separator.length);
+    index += separator.length;
   }
-  return tickets;
+  const rest = text.slice(lastEnd).trimEnd();
+  if (tickets.length === 0 || rest.trim() === '') return { tickets };
+  return { tickets, extra: { text: rest.trim(), range: [offset + lastEnd, offset + lastEnd + rest.length] } };
 }
 
 function parseMarkers(comment: Comment, states: StateDef[]): Marker[] {
   const markers: Marker[] = [];
-  for (const line of comment.value.split(/\r?\n/)) {
-    const match = MARKER_LINE_RE.exec(line);
+  // `//` and `/*` are both two characters, so the comment's value starts two characters in.
+  let lineStart = comment.range[0] + 2;
+  for (const line of comment.value.split(/\n/)) {
+    const match = MARKER_LINE_RE.exec(line.replace(/\r$/, ''));
+    const start = lineStart;
+    lineStart += line.length + 1;
     if (!match) continue;
     const [, keyword, rest] = match;
     const state = states.find((s) => s.marker === keyword);
     if (state) {
-      markers.push({ comment, keyword, state, tickets: parseTickets(rest, state) });
+      const restOffset = start + match[0].length - rest.length;
+      markers.push({ comment, keyword, state, ...parseTickets(rest, restOffset, state) });
       continue;
     }
     const caseOf = states.find((s) => s.marker === keyword.toUpperCase());

@@ -35,6 +35,8 @@ export interface GovernanceOptions {
   requireTicketForConditional?: boolean;
   /** Let blank lines separate a marker from the test it belongs to. */
   allowBlankLine?: boolean;
+  /** Allow free text after the tickets, e.g. `// SKIP: WEB-1 flaky on CI`. Off by default: details belong in the ticket. */
+  allowNotes?: boolean;
   /** Report titles that aren't static text when a tag state is on, because their tags can't be read. */
   reportDynamicTitles?: boolean;
 }
@@ -54,6 +56,7 @@ export interface ResolvedOptions {
   states: StateDef[];
   requireTicketForConditional: boolean;
   allowBlankLine: boolean;
+  allowNotes: boolean;
   reportDynamicTitles: boolean;
 }
 
@@ -162,6 +165,7 @@ export function compileOptions(options: GovernanceOptions): ResolvedOptions {
     states,
     requireTicketForConditional: options.requireTicketForConditional ?? false,
     allowBlankLine: options.allowBlankLine ?? false,
+    allowNotes: options.allowNotes ?? false,
     reportDynamicTitles: options.reportDynamicTitles ?? false,
   };
 }
