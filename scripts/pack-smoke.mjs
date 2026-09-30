@@ -1,5 +1,6 @@
 // Packs the plugin, installs the tarball into a copy of the sample project, lints it with the
-// project's own eslint.config.js and compares the output with the snapshot the unit tests use.
+// project's eslint.config.js and again with eslint.config.commonjs.cjs, and compares both outputs with
+// the snapshot the unit tests use.
 // Usage: node scripts/pack-smoke.mjs [--eslint 9]
 import { execFileSync } from 'node:child_process';
 import { cpSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -25,17 +26,20 @@ try {
   );
 
   const { ESLint } = await import(pathToFileURL(path.join(project, 'node_modules/eslint/lib/api.js')).href);
-  const eslint = new ESLint({ cwd: project });
-  const actual = formatResults(await eslint.lintFiles(['tests']), project);
   const expected = readFileSync(path.join(root, 'tests/__snapshots__/sample-project.txt'), 'utf8');
+  console.log(`Packed ${filename}, linting with ESLint ${ESLint.version}.`);
 
-  console.log(`Packed ${filename}, linted with ESLint ${ESLint.version}.`);
-  if (actual !== expected) {
-    console.error('Output differs from tests/__snapshots__/sample-project.txt:\n');
-    console.error(actual);
-    process.exitCode = 1;
-  } else {
-    console.log(`Output matches the snapshot (${actual.trim().split('\n').length} messages).`);
+  // The ESM config, then the CommonJS one that loads the plugin with require().
+  for (const configFile of ['eslint.config.js', 'eslint.config.commonjs.cjs']) {
+    const eslint = new ESLint({ cwd: project, overrideConfigFile: configFile });
+    const actual = formatResults(await eslint.lintFiles(['tests']), project);
+    if (actual !== expected) {
+      console.error(`${configFile}: output differs from tests/__snapshots__/sample-project.txt:\n`);
+      console.error(actual);
+      process.exitCode = 1;
+    } else {
+      console.log(`${configFile}: output matches the snapshot (${actual.trim().split('\n').length} messages).`);
+    }
   }
 } finally {
   rmSync(work, { recursive: true, force: true });
