@@ -1,4 +1,4 @@
-import type { TSESLint } from '@typescript-eslint/utils';
+import type { ESLint, Rule } from 'eslint';
 import markerMatchesState from './rules/marker-matches-state.js';
 import noConflictingStates from './rules/no-conflicting-states.js';
 import noOrphanedMarker from './rules/no-orphaned-marker.js';
@@ -11,29 +11,39 @@ export type { TicketSpec } from './utils/tickets.js';
 const PLUGIN_NAME = 'test-governance';
 const VERSION = '0.0.0';
 
-export const rules = {
+export type RuleName = 'require-ticket' | 'marker-matches-state' | 'no-orphaned-marker' | 'no-conflicting-states';
+
+const ruleModules: Record<RuleName, { meta: { docs?: { recommended: 'error' | 'warn' } } }> = {
   'require-ticket': requireTicket,
   'marker-matches-state': markerMatchesState,
   'no-orphaned-marker': noOrphanedMarker,
   'no-conflicting-states': noConflictingStates,
 };
 
-type RuleName = keyof typeof rules;
+// Public types come from `eslint` itself, so users don't need typescript-eslint installed.
+export const rules = ruleModules as unknown as Record<RuleName, Rule.RuleModule>;
 
 const recommendedRules = Object.fromEntries(
-  (Object.keys(rules) as RuleName[]).map((name) => [`${PLUGIN_NAME}/${name}`, rules[name].meta.docs!.recommended]),
+  (Object.keys(ruleModules) as RuleName[]).map((name) => [`${PLUGIN_NAME}/${name}`, ruleModules[name].meta.docs!.recommended]),
 ) as Record<`${typeof PLUGIN_NAME}/${RuleName}`, 'error' | 'warn'>;
 
 export interface FlatConfig {
   name: string;
-  plugins: Record<string, unknown>;
+  plugins: Record<string, ESLint.Plugin>;
   rules: Record<string, 'error' | 'warn'>;
   settings?: Record<string, unknown>;
 }
 
-const plugin = {
+export interface TestGovernancePlugin extends ESLint.Plugin {
+  meta: { name: string; version: string; namespace: string };
+  rules: Record<RuleName, Rule.RuleModule>;
+  configs: { recommended: FlatConfig };
+  configure(options?: GovernanceOptions): FlatConfig;
+}
+
+const plugin: TestGovernancePlugin = {
   meta: { name: 'eslint-plugin-test-governance', version: VERSION, namespace: PLUGIN_NAME },
-  rules: rules as unknown as Record<string, TSESLint.LooseRuleDefinition>,
+  rules,
   configs: {} as { recommended: FlatConfig },
   /**
    * Returns the recommended config with shared options in `settings['test-governance']`,

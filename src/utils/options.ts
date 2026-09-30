@@ -1,4 +1,3 @@
-import type { JSONSchema4 } from '@typescript-eslint/utils/json-schema';
 import { compileTicketSpec, DEFAULT_PLACEHOLDERS, type TicketMatcher, type TicketSpec } from './tickets.js';
 
 export const SETTINGS_KEY = 'test-governance';
@@ -66,7 +65,7 @@ interface BuiltinDef {
   enabled: boolean;
 }
 
-const BUILTIN_STATES: Record<BuiltinStateName, BuiltinDef> = {
+export const BUILTIN_STATES: Record<BuiltinStateName, BuiltinDef> = {
   skip: { marker: 'SKIP', modifier: 'skip', enabled: true },
   fixme: { marker: 'FIXME', modifier: 'fixme', enabled: true },
   fail: { marker: 'FAIL', modifier: 'fail', enabled: false },
@@ -75,81 +74,8 @@ const BUILTIN_STATES: Record<BuiltinStateName, BuiltinDef> = {
   unstable: { marker: 'UNSTABLE', tag: '@unstable', lifecycle: true, enabled: false },
 };
 
-const MARKER_RE = /^[A-Z][A-Z0-9_-]*$/;
-const TAG_RE = /^@[\w-]+$/;
-
-const ticketSpecSchema: JSONSchema4 = {
-  type: 'object',
-  properties: {
-    preset: {
-      type: 'string',
-      enum: ['any', 'jira', 'github', 'gitlab', 'linear', 'azure-devops', 'numeric', 'pattern'],
-    },
-    projects: { type: 'array', items: { type: 'string' } },
-    teams: { type: 'array', items: { type: 'string' } },
-    host: { type: 'string' },
-    minLength: { type: 'integer', minimum: 1 },
-    maxLength: { type: 'integer', minimum: 1 },
-    pattern: { type: 'string' },
-    flags: { type: 'string' },
-  },
-  required: ['preset'],
-  additionalProperties: false,
-};
-
-const ticketSchema: JSONSchema4 = {
-  anyOf: [ticketSpecSchema, { type: 'array', items: ticketSpecSchema, minItems: 1 }],
-};
-
-const stateOverrideSchema: JSONSchema4 = {
-  anyOf: [
-    { type: 'boolean' },
-    {
-      type: 'object',
-      properties: {
-        enabled: { type: 'boolean' },
-        marker: { type: 'string', pattern: MARKER_RE.source },
-        ticket: ticketSchema,
-      },
-      additionalProperties: false,
-    },
-  ],
-};
-
-/** JSON schema shared by every rule; the same object is accepted in `settings['test-governance']`. */
-export const optionsSchema: JSONSchema4[] = [
-  {
-    type: 'object',
-    properties: {
-      testFunctions: { type: 'array', items: { type: 'string' } },
-      ticket: ticketSchema,
-      placeholders: { type: 'array', items: { type: 'string' } },
-      lifecycleTags: { type: 'boolean' },
-      states: {
-        type: 'object',
-        properties: Object.fromEntries(Object.keys(BUILTIN_STATES).map((name) => [name, stateOverrideSchema])),
-        additionalProperties: false,
-      },
-      customStates: {
-        type: 'object',
-        additionalProperties: {
-          type: 'object',
-          properties: {
-            when: { type: 'string', pattern: TAG_RE.source },
-            marker: { type: 'string', pattern: MARKER_RE.source },
-            ticket: ticketSchema,
-          },
-          required: ['when', 'marker'],
-          additionalProperties: false,
-        },
-      },
-      requireTicketForConditional: { type: 'boolean' },
-      allowBlankLine: { type: 'boolean' },
-      reportDynamicTitles: { type: 'boolean' },
-    },
-    additionalProperties: false,
-  },
-];
+export const MARKER_RE = /^[A-Z][A-Z0-9_-]*$/;
+export const TAG_RE = /^@[\w-]+$/;
 
 export class ConfigError extends Error {
   constructor(message: string) {

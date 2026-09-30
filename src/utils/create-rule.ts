@@ -1,6 +1,7 @@
 import type { TSESLint } from '@typescript-eslint/utils';
 import { analyze, type Analysis } from './analyze.js';
-import { optionsSchema, resolveOptions, type GovernanceOptions, type ResolvedOptions } from './options.js';
+import { resolveOptions, type GovernanceOptions, type ResolvedOptions } from './options.js';
+import { optionsSchema } from './schema.js';
 
 export const REPO_URL = 'https://github.com/Huldoser/eslint-plugin-test-governance';
 
