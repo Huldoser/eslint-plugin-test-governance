@@ -97,7 +97,7 @@ The defaults follow how most teams already work, so `recommended` is useful with
 | Marker format | `// SKIP: WEB-123 optional note` | Uppercase keyword and colon, like `TODO:`. Easy to grep. |
 | Placement | comment block directly above; other comments allowed; a blank line breaks it | Survives `eslint-disable-next-line` and Prettier. |
 | Ticket format | `any`: `PROJ-123`, `#123`, `owner/repo#123`, or an http(s) URL | Works for Jira, Linear, GitHub and GitLab out of the box. Narrow it with a preset. |
-| Placeholder tickets | rejected: `TODO`, `TBD`, `XXX-*`, `0`, `123`, `1234`, `12345` | A fake ticket is worse than none. |
+| Placeholder tickets | rejected: `TODO`, `TBD`, `XXX-*`, `0`, `123`, `1234`, `12345`, and any ticket numbered 0 (`PROJ-0`, `#0`) | A fake ticket is worse than none, and no tracker issues number 0. |
 | Describe blocks | a marker on a skipped or tagged describe covers its tests | One ticket per skipped suite. |
 | Severity | `require-ticket`, `marker-matches-state`, `no-orphaned-marker`: error; `no-conflicting-states`: warn | A marker must always match a real state, so a missing, wrong or leftover marker fails the lint. Tag spelling is cleanup. |
 
@@ -110,7 +110,7 @@ settings for that rule.
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | `ticket` | `TicketSpec \| TicketSpec[]` | `{ preset: 'any' }` | Accepted ticket formats. An array accepts a ticket that matches any entry. |
-| `placeholders` | `string[]` | see above | Tickets rejected as placeholders. `*` matches any characters. Case-insensitive; a leading `#` is ignored. |
+| `placeholders` | `string[]` | see above | Tickets rejected as placeholders. `*` matches any characters. Case-insensitive; a leading `#` is ignored. Tickets numbered 0 are always rejected. |
 | `lifecycleTags` | `boolean` | `false` | Turns on the `new` (`@new`) and `unstable` (`@unstable`) states. |
 | `states` | `{ [state]: boolean \| { enabled?, marker?, ticket? } }` | | Turns built-in states (`skip`, `fixme`, `fail`, `slow`, `new`, `unstable`) on or off, renames their marker, or gives them their own ticket format. |
 | `customStates` | `{ [name]: { when, marker, ticket? } }` | `{}` | Adds a state for a tag, e.g. `{ quarantine: { when: '@quarantine', marker: 'QUARANTINE' } }`. |

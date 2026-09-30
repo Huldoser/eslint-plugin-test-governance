@@ -33,6 +33,8 @@ const GITHUB_PATH_RE = /^\/[^/]+\/[^/]+\/(?:issues|pull)\/\d+\/?$/;
 const GITLAB_PATH_RE = /\/-\/(?:issues|merge_requests|work_items)\/\d+\/?$/;
 const LINEAR_PATH_RE = /^\/[^/]+\/issue\/([A-Z][A-Z0-9]*-\d+)(?:\/[^/]*)?$/;
 const AZURE_PATH_RE = /\/_workitems\/edit\/\d+\/?$/;
+// No tracker issues number 0, so PROJ-0, #0, AB#0, .../issues/0 and 000 are always placeholders.
+const ZERO_ID_RE = /(?:^|[-#/])0+\/?$/;
 
 type Predicate = (ticket: string) => boolean;
 
@@ -178,7 +180,7 @@ export function compileTicketSpec(specs: TicketSpec[], placeholders: string[]): 
   return {
     check(ticket) {
       const bare = ticket.replace(/^#/, '');
-      if (placeholderRes.some((re) => re.test(ticket) || re.test(bare))) return 'placeholder';
+      if (ZERO_ID_RE.test(ticket) || placeholderRes.some((re) => re.test(ticket) || re.test(bare))) return 'placeholder';
       return presets.some((preset) => preset.test(ticket)) ? 'ok' : 'format';
     },
     expected: presets.map((p) => p.expected).join('; or '),

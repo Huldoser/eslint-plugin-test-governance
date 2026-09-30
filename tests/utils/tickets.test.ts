@@ -87,6 +87,14 @@ describe('placeholders', () => {
   );
   it.each(['WEB-123', '#4821', 'XXXX-1'])('accepts %s', (ticket) => expect(matcher.check(ticket)).toBe('ok'));
 
+  it.each(['WEB-0', 'SDQA-000', '#00', 'acme/web#0', 'AB#0', 'https://github.com/acme/web/issues/0', 'https://x.io/browse/WEB-0/', '000'])(
+    'rejects %s, since no tracker issues number 0',
+    (ticket) => expect(compileTicketSpec([{ preset: 'any' }, { preset: 'azure-devops' }, { preset: 'numeric' }], []).check(ticket)).toBe('placeholder'),
+  );
+  it.each(['WEB-10', '#100', 'https://github.com/acme/web/issues/10', '1000'])('still accepts %s', (ticket) =>
+    expect(compileTicketSpec([{ preset: 'any' }, { preset: 'numeric' }], []).check(ticket)).toBe('ok'),
+  );
+
   it('uses a custom list with regex characters taken literally', () => {
     const custom = compileTicketSpec([{ preset: 'any' }], ['N/A', 'WEB-0*', '(none)']);
     expect(custom.check('N/A')).toBe('placeholder');

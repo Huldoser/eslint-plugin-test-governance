@@ -134,7 +134,7 @@ runRule('require-ticket', rule, {
       code: "// SKIP: WEB-1, nope\ntest.skip('a', async () => {});",
       errors: [{ messageId: 'invalidTicket', data: { ticket: 'nope', state: 'skip', expected: ANY } }],
     },
-    ...['TODO', 'tbd', 'XXX-1', '#123', '0', '12345'].map((ticket) => ({
+    ...['TODO', 'tbd', 'XXX-1', '#123', '0', '12345', 'SDQA-0'].map((ticket) => ({
       code: `// SKIP: ${ticket}\ntest.skip('a', async () => {});`,
       errors: [{ messageId: 'placeholderTicket' as const, data: { ticket } }],
     })),
