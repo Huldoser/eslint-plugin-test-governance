@@ -1,0 +1,65 @@
+name: Wrong or missed report
+description: A rule reports code it shouldn't, or misses code it should report.
+labels: [false-positive]
+body:
+  - type: dropdown
+    id: rule
+    attributes:
+      label: Rule
+      options:
+        - require-ticket
+        - marker-matches-state
+        - no-orphaned-marker
+        - no-conflicting-states
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What went wrong
+      options:
+        - Wrong report (false positive)
+        - Missed report (false negative)
+    validations:
+      required: true
+  - type: textarea
+    id: code
+    attributes:
+      label: Minimal code sample
+      description: The smallest test file that shows the problem.
+      render: ts
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Plugin config
+      description: The part of your eslint.config.js that sets up this plugin.
+      render: js
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual output
+      description: The messages ESLint printed, or "none".
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected output
+    validations:
+      required: true
+  - type: textarea
+    id: versions
+    attributes:
+      label: Versions
+      value: |
+        Plugin:
+        ESLint:
+        Node.js:
+        Parser (e.g. espree, @typescript-eslint/parser 8.71.0):
+    validations:
+      required: true

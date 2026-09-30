@@ -1,0 +1,40 @@
+name: Bug report
+description: A crash, a config that won't load, or an install problem.
+labels: [bug]
+body:
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Commands you ran and files involved. A link to a small repository helps most.
+      placeholder: |
+        1. npm install --save-dev eslint-plugin-test-governance
+        2. Add the config below
+        3. Run npx eslint tests
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: eslint.config.js
+      render: js
+  - type: textarea
+    id: error
+    attributes:
+      label: Error output
+      description: The full error and stack trace.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: versions
+    attributes:
+      label: Versions
+      value: |
+        Plugin:
+        ESLint:
+        Node.js:
+        Parser:
+        OS:
+    validations:
+      required: true

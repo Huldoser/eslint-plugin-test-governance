@@ -1,0 +1,38 @@
+name: Feature request
+description: Suggest a new rule, option or ticket format.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What does your team need that the plugin doesn't do today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed rule or option
+      description: Name, what it reports, and any options it would take.
+    validations:
+      required: true
+  - type: textarea
+    id: failing
+    attributes:
+      label: Code that should be reported
+      render: ts
+  - type: textarea
+    id: passing
+    attributes:
+      label: Code that should pass
+      render: ts
+  - type: input
+    id: ticket-system
+    attributes:
+      label: Ticket system
+      description: For a new ticket format preset, which tracker, and an example ticket ID or URL.
+      placeholder: e.g. YouTrack, PROJ-123, https://acme.youtrack.cloud/issue/PROJ-123
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
