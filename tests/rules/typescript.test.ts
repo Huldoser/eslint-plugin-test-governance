@@ -1,0 +1,31 @@
+import tsParser from '@typescript-eslint/parser';
+import { RuleTester } from 'eslint';
+import rule from '../../src/rules/require-ticket.js';
+import { settings } from '../helpers.js';
+
+// Syntax only the TypeScript parser understands.
+const tester = new RuleTester({ languageOptions: { parser: tsParser } });
+
+tester.run('require-ticket (TypeScript syntax)', rule as never, {
+  valid: [
+    "// SKIP: WEB-1\ntest.skip('a', async ({ page }: { page: Page }) => {});",
+  ],
+  invalid: [
+    {
+      code: [
+        "import { test as base } from '@playwright/test';",
+        'type Fixtures = { user: string };',
+        'export const a = base.extend<Fixtures>({ user: async ({}, use) => use("u") });',
+        'export const b = a.extend({}) as typeof a;',
+        'const c = b!.extend({}) satisfies typeof b;',
+        "c.skip('x', async () => {});",
+      ].join('\n'),
+      settings: settings({ testFunctions: [] }),
+      errors: [{ messageId: 'missingMarker' }],
+    },
+    {
+      code: "namespace Suite {\n  test.skip('a', async () => {});\n}",
+      errors: [{ messageId: 'missingMarker' }],
+    },
+  ],
+});

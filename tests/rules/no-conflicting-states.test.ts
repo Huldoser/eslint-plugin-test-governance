@@ -28,6 +28,12 @@ runRule('no-conflicting-states', rule, {
       settings: lifecycle,
       errors: [{ messageId: 'newAndUnstable', line: 2 }],
     },
+    // Both tags inherited: reported once, on the describe where they first meet.
+    {
+      code: "test.describe('s @new', () => {\n  test.describe('t @unstable', () => {\n    test.describe('u', () => { test('a', async () => {}); });\n  });\n});",
+      settings: lifecycle,
+      errors: [{ messageId: 'newAndUnstable', line: 2 }],
+    },
     {
       code: "test.describe('s @new', () => { test('a @unstable', async () => {}); });",
       settings: lifecycle,

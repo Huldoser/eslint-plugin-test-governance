@@ -1,6 +1,6 @@
 {
   "extends": "./tsconfig.json",
-  "compilerOptions": { "noEmit": true, "rootDir": ".", "declaration": false, "declarationMap": false },
+  "compilerOptions": { "noEmit": true, "types": ["node", "vitest/globals"], "allowJs": false, "rootDir": ".", "declaration": false, "declarationMap": false },
   "include": ["src", "tests", "vitest.config.ts"],
   "exclude": ["tests/fixtures"]
 }

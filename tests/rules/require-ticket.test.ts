@@ -51,6 +51,8 @@ runRule('require-ticket', rule, {
     { code: "test('checkout @newer', async () => {});", settings: lifecycle },
     { code: "test('checkout', { tag: [someTag, ...more] }, async () => {});", settings: lifecycle },
     { code: "test('checkout', { [key]: '@new', ...rest }, async () => {});", settings: lifecycle },
+    { code: "// NEW: WEB-1\ntest('checkout', { annotation: { type: 'x' }, tag: '@new' }, async () => {});", settings: lifecycle },
+    "const list = [, 1];\ntest('a', async () => { const [, b] = list; });",
     { code: "test(title, async () => {});", settings: lifecycle },
     {
       code: "// UNSTABLE: WEB-1\ntest.describe('flows @unstable', () => {\n  test('a @unstable', async () => {});\n  test('b', async () => {});\n});",
@@ -211,12 +213,17 @@ runRule('require-ticket', rule, {
       errors: [missing('skip', 'SKIP')],
     },
     {
+      code: "import { 'test' as named } from '@playwright/test';\nnamed.skip('a', async () => {});",
+      settings: settings({ testFunctions: [] }),
+      errors: [missing('skip', 'SKIP')],
+    },
+    {
       code: "import pwTest from '@playwright/test';\npwTest.skip('a', async () => {});",
       settings: settings({ testFunctions: [] }),
       errors: [missing('skip', 'SKIP')],
     },
     {
-      code: "import { test as base, expect } from '@playwright/test';\nimport other from 'other';\nexport const myTest = base.extend({}).extend({});\nconst x = 1, y = other.extend({});\nlet z;\nexport {};\nmyTest.skip('a', async () => {});\ny.skip('b', async () => {});",
+      code: "import { test as base, expect } from '@playwright/test';\nimport other from 'other';\nexport const myTest = base.extend({}).extend({});\nconst made = make(), deep = obj.a.extend({});\nconst x = 1, y = other.extend({});\nlet z;\nexport {};\nmyTest.skip('a', async () => {});\ny.skip('b', async () => {});",
       settings: settings({ testFunctions: [] }),
       errors: [missing('skip', 'SKIP')],
     },
