@@ -14,7 +14,7 @@ Without the comment, `test-governance/require-ticket` fails the lint. When the t
 skip removed, `no-orphaned-marker` flags the leftover comment. The markers are plain
 comments, so `grep -rn "SKIP:" tests/` lists every disabled test and its ticket.
 
-> **Status:** pre-release (0.0.0). Not yet published to npm.
+> **Status:** early release (0.x). Options may still change before 1.0.
 
 ## Install
 

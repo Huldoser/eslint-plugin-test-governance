@@ -9,7 +9,7 @@ export type { CustomState, GovernanceOptions, StateOverride } from './utils/opti
 export type { TicketSpec } from './utils/tickets.js';
 
 const PLUGIN_NAME = 'test-governance';
-const VERSION = '0.0.0';
+const VERSION = '0.1.0';
 
 export type RuleName = 'require-ticket' | 'marker-matches-state' | 'no-orphaned-marker' | 'no-conflicting-states';
 
