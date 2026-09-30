@@ -14,6 +14,10 @@ A leftover marker makes searches for open tickets lie. This rule reports:
 - a marker above a test, describe or skip call that is not in that marker's state, and
 - a marker that is not directly above a test, describe or skip call at all, so it has no effect.
 
+A comment that starts with a marker keyword but reads as a sentence, such as
+`// FIXME: this check is flaky on slow machines`, is an ordinary code comment and is not reported.
+The rule counts a comment as prose when its first word is not a valid ticket and more text follows.
+
 The rule offers a suggestion to delete the comment.
 
 ## Examples
@@ -39,6 +43,14 @@ Correct:
 <!-- example: valid settings={"lifecycleTags":true} -->
 ```js
 test('saved addresses', async () => {});
+```
+
+<!-- example: valid -->
+```js
+test('checkout', async ({ page }) => {
+  // FIXME: the banner sometimes covers the button on slow machines
+  await page.goto('/checkout');
+});
 ```
 
 <!-- example: valid -->

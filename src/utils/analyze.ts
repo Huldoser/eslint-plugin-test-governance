@@ -277,7 +277,24 @@ function collectTags(call: TSESTree.CallExpression, hasTitle: boolean): { tags: 
 
 function isUnconditional(call: TSESTree.CallExpression): boolean {
   const [first] = call.arguments;
-  return first === undefined || (first.type === 'Literal' && first.value === true);
+  return (first === undefined || (first.type === 'Literal' && first.value === true)) && !isGuarded(call);
+}
+
+const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression']);
+
+/**
+ * Whether the call only runs on some paths of its function: under an `if`, a `switch` case, a ternary
+ * or the right side of `&&`, `||` or `??`. `if (!enabled) test.skip()` is the same as
+ * `test.skip(!enabled)`.
+ */
+function isGuarded(call: TSESTree.CallExpression): boolean {
+  let child: Node = call;
+  for (let node: Node | undefined = call.parent; node && !FUNCTIONS.has(node.type); child = node, node = node.parent) {
+    if ((node.type === 'IfStatement' || node.type === 'ConditionalExpression') && child !== node.test) return true;
+    if (node.type === 'SwitchCase' && child !== node.test) return true;
+    if (node.type === 'LogicalExpression' && child === node.right) return true;
+  }
+  return false;
 }
 
 const cache = new WeakMap<object, WeakMap<ResolvedOptions, Analysis>>();
@@ -494,6 +511,15 @@ export function missingStates(subject: Subject): StateDef[] {
   return subject.states
     .filter((s) => s.required && evaluate(subject, s.state).kind === 'missing')
     .map((s) => s.state);
+}
+
+/**
+ * Whether a marker reads as an ordinary comment rather than a ticket reference, such as
+ * `// FIXME: this breaks on slow machines`: it starts with something that is not a ticket and goes on
+ * after it.
+ */
+export function isProse(marker: Marker): boolean {
+  return marker.extra !== undefined && marker.tickets[0].result !== 'ok';
 }
 
 /** Markers in the subject's own block for states that don't apply to it. */

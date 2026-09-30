@@ -92,7 +92,7 @@ The defaults follow how most teams already work, so `recommended` is useful with
 | --- | --- | --- |
 | States that need a ticket | `skip`, `fixme` | Every team skips tests. Chromium, GitLab and Slack all require a bug link on disabled tests. |
 | `@new`, `@unstable` | off; `lifecycleTags: true` turns both on | A promotion workflow is not universal. Teams that call it `@flaky` or `@quarantine` use `customStates`. |
-| Conditional skips (`test.skip(browserName === 'webkit', ...)`) | no ticket needed | These are usually permanent platform limits, not bugs. `requireTicketForConditional: true` changes this. |
+| Conditional skips (`test.skip(browserName === 'webkit', ...)`, `if (...) test.skip()`) | no ticket needed | These are usually permanent platform limits, not bugs. `requireTicketForConditional: true` changes this. |
 | `test.fail`, `test.slow` | off | They don't remove coverage. Turn them on with `states: { fail: true, slow: true }`. |
 | Marker format | `// SKIP: WEB-123` or `// SKIP: WEB-123, WEB-124` | Uppercase keyword and colon, like `TODO:`. Easy to grep. |
 | Notes after the ticket | not allowed; `allowNotes: true` allows them | The ticket is the source of truth. A note in a comment goes stale while the ticket stays current. |
@@ -115,7 +115,7 @@ settings for that rule.
 | `lifecycleTags` | `boolean` | `false` | Turns on the `new` (`@new`) and `unstable` (`@unstable`) states. |
 | `states` | `{ [state]: boolean \| { enabled?, marker?, ticket? } }` | | Turns built-in states (`skip`, `fixme`, `fail`, `slow`, `new`, `unstable`) on or off, renames their marker, or gives them their own ticket format. |
 | `customStates` | `{ [name]: { when, marker, ticket? } }` | `{}` | Adds a state for a tag, e.g. `{ quarantine: { when: '@quarantine', marker: 'QUARANTINE' } }`. |
-| `requireTicketForConditional` | `boolean` | `false` | Require a ticket for `test.skip(condition, ...)` too. |
+| `requireTicketForConditional` | `boolean` | `false` | Require a ticket for `test.skip(condition, ...)` and `if (...) test.skip()` too. |
 | `allowBlankLine` | `boolean` | `false` | Let blank lines separate a marker from its test. |
 | `allowNotes` | `boolean` | `false` | Allow free text after the tickets, e.g. `// SKIP: WEB-123 flaky on CI`. |
 | `testFunctions` | `string[]` | `['test']` | Names treated as Playwright's `test`. See below. |

@@ -1,4 +1,4 @@
-import { describeSubject, missingStates, strayMarkers, type Marker } from '../utils/analyze.js';
+import { describeSubject, isProse, missingStates, strayMarkers, type Marker } from '../utils/analyze.js';
 import { createRule } from '../utils/create-rule.js';
 import { removeComment } from '../utils/fix.js';
 
@@ -28,6 +28,8 @@ export default createRule({
       for (const marker of strayMarkers(subject)) markers.push({ marker, messageId: 'orphaned', subject: name });
     }
     for (const { marker, messageId, subject } of markers) {
+      // `// FIXME: explain why` is a normal code comment. Only a leftover ticket is an orphaned marker.
+      if (isProse(marker)) continue;
       context.report({
         loc: marker.comment.loc,
         messageId,
