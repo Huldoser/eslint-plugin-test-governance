@@ -22,7 +22,7 @@ comments, so `grep -rn "SKIP:" tests/` lists every disabled test and its ticket.
 npm install --save-dev eslint-plugin-test-governance
 ```
 
-Requires ESLint 9 or 10 with flat config, and Node.js 22 or later. For TypeScript specs, also install
+Requires ESLint 9 or 10 with flat config, and Node.js 22.12 or later. For TypeScript specs, also install
 `@typescript-eslint/parser` (or `typescript-eslint`).
 
 ## Usage
@@ -40,6 +40,11 @@ export default [
   },
 ];
 ```
+
+Any flat config file works. The package is ESM, and `require('eslint-plugin-test-governance')` in an
+`eslint.config.cjs` returns the plugin itself. With `defineConfig`, register the plugin and use
+`extends: ['test-governance/recommended']`. ESLint loads an `eslint.config.ts` through
+[`jiti`](https://github.com/unjs/jiti), so install it as a dev dependency too.
 
 To change the defaults, use `configure()`. It returns the same recommended config with your options
 stored in `settings['test-governance']`, which all four rules read:

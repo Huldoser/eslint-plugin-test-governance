@@ -5,7 +5,7 @@ use the issue forms.
 
 ## Setup
 
-Requires Node.js 22 or later.
+Requires Node.js 22.12 or later.
 
 ```sh
 git clone https://github.com/Huldoser/eslint-plugin-test-governance.git
