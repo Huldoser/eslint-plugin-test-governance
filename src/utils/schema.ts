@@ -68,6 +68,7 @@ export const optionsSchema: JSONSchema4[] = [
       },
       requireTicketForConditional: { type: 'boolean' },
       allowBlankLine: { type: 'boolean' },
+      allowNotes: { type: 'boolean' },
       reportDynamicTitles: { type: 'boolean' },
     },
     additionalProperties: false,
