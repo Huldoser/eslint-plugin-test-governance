@@ -60,6 +60,23 @@ runRule('no-orphaned-marker', rule, {
         },
       ],
     },
+    // Custom states are covered too.
+    {
+      code: "// NEEDS-DATA: WEB-1\ntest('a', async () => {});\nconst y = 2; // NEEDS-DATA: WEB-2",
+      settings: settings({ customStates: { 'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' } } }),
+      errors: [
+        {
+          messageId: 'orphaned',
+          data: { marker: 'NEEDS-DATA', state: 'needs-data', subject: 'this test' },
+          suggestions: [{ messageId: 'removeMarker', output: "test('a', async () => {});\nconst y = 2; // NEEDS-DATA: WEB-2" }],
+        },
+        {
+          messageId: 'detached',
+          data: { marker: 'NEEDS-DATA' },
+          suggestions: [{ messageId: 'removeMarker', output: "// NEEDS-DATA: WEB-1\ntest('a', async () => {});\nconst y = 2; " }],
+        },
+      ],
+    },
     {
       code: "const x = 1; // SKIP: WEB-1",
       errors: [{ messageId: 'detached', suggestions: [{ messageId: 'removeMarker', output: 'const x = 1; ' }] }],

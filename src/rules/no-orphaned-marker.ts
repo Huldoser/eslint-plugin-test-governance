@@ -5,11 +5,11 @@ import { removeComment } from '../utils/fix.js';
 export default createRule({
   name: 'no-orphaned-marker',
   meta: {
-    type: 'suggestion',
+    type: 'problem',
     hasSuggestions: true,
     docs: {
       description: 'Disallow marker comments that no longer match a test state',
-      recommended: 'warn',
+      recommended: 'error',
     },
     messages: {
       orphaned: "`{{marker}}:` is left over: {{subject}} is not in the '{{state}}' state.",

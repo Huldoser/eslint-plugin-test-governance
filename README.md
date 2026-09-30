@@ -79,7 +79,7 @@ than on the first lint.
 | :----------------------------------------------------------- | :-------------------------------------------------------------------------------- | :- | :- | :- | :- |
 | [marker-matches-state](docs/rules/marker-matches-state.md)   | Require the marker keyword to match the test's state                              | ✅  |    |    | 💡 |
 | [no-conflicting-states](docs/rules/no-conflicting-states.md) | Disallow state tags that contradict each other, differ in case or look like typos |    | ✅  | 🔧 |    |
-| [no-orphaned-marker](docs/rules/no-orphaned-marker.md)       | Disallow marker comments that no longer match a test state                        |    | ✅  |    | 💡 |
+| [no-orphaned-marker](docs/rules/no-orphaned-marker.md)       | Disallow marker comments that no longer match a test state                        | ✅  |    |    | 💡 |
 | [require-ticket](docs/rules/require-ticket.md)               | Require a ticket marker comment above skipped, fixme and tagged tests             | ✅  |    |    |    |
 
 <!-- end auto-generated rules list -->
@@ -99,7 +99,7 @@ The defaults follow how most teams already work, so `recommended` is useful with
 | Ticket format | `any`: `PROJ-123`, `#123`, `owner/repo#123`, or an http(s) URL | Works for Jira, Linear, GitHub and GitLab out of the box. Narrow it with a preset. |
 | Placeholder tickets | rejected: `TODO`, `TBD`, `XXX-*`, `0`, `123`, `1234`, `12345` | A fake ticket is worse than none. |
 | Describe blocks | a marker on a skipped or tagged describe covers its tests | One ticket per skipped suite. |
-| Severity | `require-ticket`, `marker-matches-state`: error; `no-orphaned-marker`, `no-conflicting-states`: warn | Missing tickets are the point; the other two are cleanup. |
+| Severity | `require-ticket`, `marker-matches-state`, `no-orphaned-marker`: error; `no-conflicting-states`: warn | A marker must always match a real state, so a missing, wrong or leftover marker fails the lint. Tag spelling is cleanup. |
 
 ## Options
 

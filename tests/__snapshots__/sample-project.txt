@@ -4,7 +4,7 @@ tests/checkout.spec.ts:20:3 error test-governance/marker-matches-state `SKIP:` d
 tests/checkout.spec.ts:21:3 error test-governance/require-ticket This test is in the 'fixme' state but has no `// FIXME: <ticket>` comment directly above it, e.g. `// FIXME: WEB-123`.
 tests/checkout.spec.ts:28:3 error test-governance/require-ticket This test is in the 'unstable' state but has no `// UNSTABLE: <ticket>` comment directly above it, e.g. `// UNSTABLE: WEB-123`.
 tests/checkout.spec.ts:30:3 error test-governance/require-ticket 'OPS-9' is not a valid ticket for the 'unstable' state. Expected a Jira key like WEB-123 in project WEB, QA, or a Jira URL.
-tests/checkout.spec.ts:33:3 warn  test-governance/no-orphaned-marker `NEW:` is left over: this test is not in the 'new' state.
+tests/checkout.spec.ts:33:3 error test-governance/no-orphaned-marker `NEW:` is left over: this test is not in the 'new' state.
 tests/checkout.spec.ts:36:8 warn  test-governance/no-conflicting-states `@New` should be written `@new`.
 tests/checkout.spec.ts:38:8 warn  test-governance/no-conflicting-states `@unstabel` looks like a typo of `@unstable`.
 tests/inventory.spec.js:9:1 error test-governance/require-ticket This describe block is in the 'needs-data' state but has no `// NEEDS-DATA: <ticket>` comment directly above it, e.g. `// NEEDS-DATA: WEB-123`.
