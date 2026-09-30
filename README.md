@@ -4,14 +4,14 @@ ESLint rules that keep a Playwright suite honest. Every skipped, fixme, `@new` o
 must point at the ticket that tracks it:
 
 ```ts
-// SKIP: WEB-123 payment sandbox is down
+// SKIP: WEB-123
 test.skip('pays with PayPal', async ({ page }) => {
   // ...
 });
 ```
 
 Without the comment, `test-governance/require-ticket` fails the lint. When the test is fixed and the
-skip removed, `no-orphaned-marker` reminds you to delete the comment too. The markers are plain
+skip removed, `no-orphaned-marker` flags the leftover comment. The markers are plain
 comments, so `grep -rn "SKIP:" tests/` lists every disabled test and its ticket.
 
 > **Status:** pre-release (0.0.0). Not yet published to npm.
@@ -80,7 +80,7 @@ than on the first lint.
 | [marker-matches-state](docs/rules/marker-matches-state.md)   | Require the marker keyword to match the test's state                              | ✅  |    |    | 💡 |
 | [no-conflicting-states](docs/rules/no-conflicting-states.md) | Disallow state tags that contradict each other, differ in case or look like typos |    | ✅  | 🔧 |    |
 | [no-orphaned-marker](docs/rules/no-orphaned-marker.md)       | Disallow marker comments that no longer match a test state                        | ✅  |    |    | 💡 |
-| [require-ticket](docs/rules/require-ticket.md)               | Require a ticket marker comment above skipped, fixme and tagged tests             | ✅  |    |    |    |
+| [require-ticket](docs/rules/require-ticket.md)               | Require a ticket marker comment above skipped, fixme and tagged tests             | ✅  |    |    | 💡 |
 
 <!-- end auto-generated rules list -->
 
@@ -94,7 +94,8 @@ The defaults follow how most teams already work, so `recommended` is useful with
 | `@new`, `@unstable` | off; `lifecycleTags: true` turns both on | A promotion workflow is not universal. Teams that call it `@flaky` or `@quarantine` use `customStates`. |
 | Conditional skips (`test.skip(browserName === 'webkit', ...)`) | no ticket needed | These are usually permanent platform limits, not bugs. `requireTicketForConditional: true` changes this. |
 | `test.fail`, `test.slow` | off | They don't remove coverage. Turn them on with `states: { fail: true, slow: true }`. |
-| Marker format | `// SKIP: WEB-123 optional note` | Uppercase keyword and colon, like `TODO:`. Easy to grep. |
+| Marker format | `// SKIP: WEB-123` or `// SKIP: WEB-123, WEB-124` | Uppercase keyword and colon, like `TODO:`. Easy to grep. |
+| Notes after the ticket | not allowed; `allowNotes: true` allows them | The ticket is the source of truth. A note in a comment goes stale while the ticket stays current. |
 | Placement | comment block directly above; other comments allowed; a blank line breaks it | Survives `eslint-disable-next-line` and Prettier. |
 | Ticket format | `any`: `PROJ-123`, `#123`, `owner/repo#123`, or an http(s) URL | Works for Jira, Linear, GitHub and GitLab out of the box. Narrow it with a preset. |
 | Placeholder tickets | rejected: `TODO`, `TBD`, `XXX-*`, `0`, `123`, `1234`, `12345`, and any ticket numbered 0 (`PROJ-0`, `#0`) | A fake ticket is worse than none, and no tracker issues number 0. |
@@ -116,6 +117,7 @@ settings for that rule.
 | `customStates` | `{ [name]: { when, marker, ticket? } }` | `{}` | Adds a state for a tag, e.g. `{ quarantine: { when: '@quarantine', marker: 'QUARANTINE' } }`. |
 | `requireTicketForConditional` | `boolean` | `false` | Require a ticket for `test.skip(condition, ...)` too. |
 | `allowBlankLine` | `boolean` | `false` | Let blank lines separate a marker from its test. |
+| `allowNotes` | `boolean` | `false` | Allow free text after the tickets, e.g. `// SKIP: WEB-123 flaky on CI`. |
 | `testFunctions` | `string[]` | `['test']` | Names treated as Playwright's `test`. See below. |
 | `reportDynamicTitles` | `boolean` | `false` | When a tag state is on, report titles that aren't static text, since their tags can't be read. |
 

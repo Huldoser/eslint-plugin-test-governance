@@ -13,13 +13,23 @@ runRule('require-ticket', rule, {
   valid: [
     "test('plain', async () => {});",
     "test.describe('suite', () => { test('a', async () => {}); });",
-    // SKIP: marker with free text after the ticket
-    "// SKIP: WEB-123 flaky on CI\ntest.skip('a', async () => {});",
+    "// SKIP: WEB-123\ntest.skip('a', async () => {});",
     "/* SKIP: WEB-123 */\ntest.skip('a', async () => {});",
     "/**\n * Waiting on the new checkout API.\n * SKIP: WEB-123\n */\ntest.skip('a', async () => {});",
     "// SKIP: WEB-1\n// eslint-disable-next-line no-empty-function\ntest.skip('a', async () => {});",
-    "// SKIP: WEB-1, WEB-2 both needed\ntest.skip('a', async () => {});",
-    "// SKIP: WEB-1: flaky\ntest.skip('a', async () => {});",
+    "// SKIP: WEB-1, WEB-2\ntest.skip('a', async () => {});",
+    "// SKIP: WEB-1,WEB-2\ntest.skip('a', async () => {});",
+    "// SKIP:   WEB-1  ,  WEB-2   \ntest.skip('a', async () => {});",
+    "// SKIP: https://acme.atlassian.net/browse/WEB-1?focusedCommentId=5#comment-5\ntest.skip('a', async () => {});",
+    "/*\r\n * Context for the skip.\r\n * SKIP: WEB-1\r\n */\r\ntest.skip('a', async () => {});",
+    // Notes after the ticket are allowed with allowNotes.
+    ...[
+      "// SKIP: WEB-123 flaky on CI\ntest.skip('a', async () => {});",
+      "// SKIP: WEB-1, WEB-2 both needed\ntest.skip('a', async () => {});",
+      "// SKIP: WEB-1: flaky\ntest.skip('a', async () => {});",
+    ].map((code) => ({ code, settings: settings({ allowNotes: true }) })),
+    // A note on a marker that doesn't belong here is no-orphaned-marker's job.
+    "// SKIP: WEB-1 left over\ntest('a', async () => {});",
     "// SKIP: https://jira.example.com/browse/WEB-1\ntest.skip('a', async () => {});",
     "// SKIP: #4821\ntest.skip('a', async () => {});",
     "// SKIP: acme/web#4821\ntest.skip('a', async () => {});",
@@ -138,6 +148,57 @@ runRule('require-ticket', rule, {
       code: `// SKIP: ${ticket}\ntest.skip('a', async () => {});`,
       errors: [{ messageId: 'placeholderTicket' as const, data: { ticket } }],
     })),
+    // Ticket-only markers: anything after the tickets is reported, with a suggestion to remove it.
+    ...[
+      ['// SKIP: WEB-123 flaky on CI', 'flaky on CI', '// SKIP: WEB-123'],
+      ['// SKIP: WEB-1: flaky', ': flaky', '// SKIP: WEB-1'],
+      ['// SKIP: WEB-1.', '.', '// SKIP: WEB-1'],
+      ['// SKIP: WEB-1,', ',', '// SKIP: WEB-1'],
+      ['// SKIP: WEB-1, WEB-2 ,', ',', '// SKIP: WEB-1, WEB-2'],
+      ['// SKIP: WEB-1 and WEB-2', 'and WEB-2', '// SKIP: WEB-1'],
+      ['/* SKIP: WEB-1 flaky */', 'flaky', '/* SKIP: WEB-1 */'],
+      ['/**\r\n * SKIP: WEB-1 see thread\r\n */', 'see thread', '/**\r\n * SKIP: WEB-1\r\n */'],
+    ].map(([marker, text, fixed]) => ({
+      code: `${marker}\ntest.skip('a', async () => {});`,
+      errors: [
+        {
+          messageId: 'extraText' as const,
+          data: { marker: 'SKIP', text },
+          suggestions: [{ messageId: 'removeExtraText' as const, data: { text }, output: `${fixed}\ntest.skip('a', async () => {});` }],
+        },
+      ],
+    })),
+    {
+      code: "// SKIP: WEB-123 flaky\ntest.skip('a', async () => {});",
+      errors: [{ messageId: 'extraText', line: 1, column: 17, endLine: 1, endColumn: 23, suggestions: [{ messageId: 'removeExtraText', output: "// SKIP: WEB-123\ntest.skip('a', async () => {});" }] }],
+    },
+    // Other separators make the ticket itself invalid.
+    ...['WEB-1;WEB-2', 'WEB-1/WEB-2'].map((ticket) => ({
+      code: `// SKIP: ${ticket}\ntest.skip('a', async () => {});`,
+      errors: [{ messageId: 'invalidTicket' as const, data: { ticket, state: 'skip', expected: ANY } }],
+    })),
+    // A broken ticket is reported first; its note waits until the ticket is fixed.
+    { code: "// SKIP: TODO later\ntest.skip('a', async () => {});", errors: [{ messageId: 'placeholderTicket' }] },
+    // Notes on a marker that isn't required (conditional skip) are still reported.
+    {
+      code: "test('a', async ({ browserName }) => {\n  // SKIP: WEB-1 webkit only\n  test.skip(browserName === 'webkit');\n});",
+      errors: [
+        {
+          messageId: 'extraText',
+          suggestions: [{ messageId: 'removeExtraText', output: "test('a', async ({ browserName }) => {\n  // SKIP: WEB-1\n  test.skip(browserName === 'webkit');\n});" }],
+        },
+      ],
+    },
+    // A note on a describe marker shared by several tests is reported once.
+    {
+      code: "// SKIP: WEB-1 whole suite\ntest.describe.skip('s', () => {\n  test.skip('a', async () => {});\n  test.skip('b', async () => {});\n});",
+      errors: [
+        {
+          messageId: 'extraText',
+          suggestions: [{ messageId: 'removeExtraText', output: "// SKIP: WEB-1\ntest.describe.skip('s', () => {\n  test.skip('a', async () => {});\n  test.skip('b', async () => {});\n});" }],
+        },
+      ],
+    },
     {
       code: "// skip: WEB-1\ntest.skip('a', async () => {});",
       errors: [{ messageId: 'markerCase', data: { marker: 'SKIP', found: 'skip' }, line: 1 }],
