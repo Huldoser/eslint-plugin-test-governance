@@ -69,3 +69,7 @@ plugin.configs.recommended = {
 export const configs = plugin.configs;
 export const configure = plugin.configure;
 export default plugin;
+// Makes `require('eslint-plugin-test-governance')` return the plugin itself rather than the module
+// namespace. With the namespace, a CommonJS config that registers the plugin next to
+// `configs.recommended` fails with "Cannot redefine plugin".
+export { plugin as 'module.exports' };
