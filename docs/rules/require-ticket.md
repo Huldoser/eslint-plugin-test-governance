@@ -4,6 +4,8 @@
 
 💼 This rule is enabled in the ✅ `recommended` [config](https://github.com/Huldoser/eslint-plugin-test-governance#usage).
 
+💡 This rule is manually fixable by [editor suggestions](https://eslint.org/docs/latest/use/core-concepts#rule-suggestions).
+
 <!-- end auto-generated rule header -->
 
 A skipped test is coverage you no longer have. This rule makes every test in a tracked state point
@@ -26,8 +28,8 @@ Tags on a `describe` apply to every test inside it.
 ## Marker format
 
 ```text
-// SKIP: WEB-123 optional note
-// SKIP: WEB-123, WEB-124 several tickets
+// SKIP: WEB-123
+// SKIP: WEB-123, WEB-124
 /* FIXME: https://github.com/acme/web/issues/4821 */
 ```
 
@@ -35,10 +37,29 @@ Tags on a `describe` apply to every test inside it.
   Other comments, such as `eslint-disable-next-line`, may sit in the same block. A blank line ends
   the block unless `allowBlankLine` is set.
 - The keyword is uppercase and followed by a colon. `// skip: WEB-1` is reported with a hint.
-- The first word after the colon is the ticket. Anything after the tickets is a free-text note.
+- After the colon come one or more tickets separated by commas, and nothing else. The ticket is the
+  source of truth, so the reason for a skip belongs in the ticket, not in the comment.
+  `// SKIP: WEB-123 flaky on CI` is reported, with a suggestion that removes the extra text. Teams
+  that want short notes can set `allowNotes: true`.
 - A marker on a skipped or tagged `describe` covers every test inside it.
 - A `test.skip()` inside a test body can have its marker above the call or above the test.
 - Ticket IDs in test titles (`'SDQA-52: logout'`) are never read as tickets.
+
+How ticket lists are read:
+
+| Marker | Result |
+| --- | --- |
+| `// SKIP: WEB-1, WEB-2` or `// SKIP: WEB-1,WEB-2` | two tickets |
+| `// SKIP:   WEB-1  ,  WEB-2  ` | two tickets; extra spaces are fine |
+| `// SKIP: https://acme.atlassian.net/browse/WEB-1?focusedCommentId=5#comment-5` | one ticket; query strings and fragments are part of a URL |
+| `// SKIP: WEB-1 flaky on CI`, `// SKIP: WEB-1: flaky` | extra text `flaky on CI` / `: flaky` |
+| `// SKIP: WEB-1,` or `// SKIP: WEB-1.` | extra text `,` / `.` |
+| `// SKIP: WEB-1 and WEB-2` | extra text `and WEB-2`; separate tickets with commas |
+| `// SKIP: WEB-1;WEB-2`, `// SKIP: WEB-1/WEB-2` | invalid ticket, since only commas separate tickets |
+| `// SKIP: flaky on CI` | invalid ticket `flaky`: the first word must be a ticket |
+
+In a block comment, only the marker line is checked, so a JSDoc block can explain the skip on other
+lines. Extra text is reported only once the tickets on that line are valid.
 
 Conditional skips such as `test.skip(browserName === 'webkit', 'Not supported')` usually describe a
 permanent platform limit, so they need no ticket unless you set `requireTicketForConditional: true`.
@@ -64,6 +85,12 @@ test.skip('pays with PayPal', async ({ page }) => {});
 test.skip('pays with PayPal', async ({ page }) => {});
 ```
 
+<!-- example: invalid -->
+```js
+// SKIP: WEB-481 payment sandbox is down
+test.skip('pays with PayPal', async ({ page }) => {});
+```
+
 <!-- example: invalid settings={"lifecycleTags":true} -->
 ```js
 test('one-click reorder @new', async ({ page }) => {});
@@ -73,7 +100,7 @@ Correct:
 
 <!-- example: valid -->
 ```js
-// SKIP: WEB-481 payment sandbox is down
+// SKIP: WEB-481
 test.skip('pays with PayPal', async ({ page }) => {});
 ```
 
@@ -91,6 +118,12 @@ test.describe.fixme('tax rules', () => {
 test('opens the dashboard', async ({ page, browserName }) => {
   test.skip(browserName === 'webkit', 'Layout differs on WebKit by design');
 });
+```
+
+<!-- example: valid settings={"allowNotes":true} -->
+```js
+// SKIP: WEB-481 payment sandbox is down
+test.skip('pays with PayPal', async ({ page }) => {});
 ```
 
 <!-- example: valid settings={"lifecycleTags":true} -->

@@ -1,10 +1,11 @@
-import { describeSubject, evaluate } from '../utils/analyze.js';
+import { appliesTo, describeSubject, evaluate } from '../utils/analyze.js';
 import { createRule } from '../utils/create-rule.js';
 
 export default createRule({
   name: 'require-ticket',
   meta: {
     type: 'problem',
+    hasSuggestions: true,
     docs: {
       description: 'Require a ticket marker comment above skipped, fixme and tagged tests',
       recommended: 'error',
@@ -16,6 +17,9 @@ export default createRule({
       invalidTicket: "'{{ticket}}' is not a valid ticket for the '{{state}}' state. Expected {{expected}}.",
       placeholderTicket: "'{{ticket}}' is a placeholder, not a real ticket. Link the ticket that tracks this test.",
       markerCase: 'Write the marker keyword in uppercase: `{{marker}}:` instead of `{{found}}:`.',
+      extraText:
+        'Only ticket IDs are allowed after `{{marker}}:`, separated by commas. Put details in the ticket instead of `{{text}}`.',
+      removeExtraText: 'Remove `{{text}}`.',
       dynamicTitle: "This title isn't static text, so its tags can't be checked. Use a string or template literal.",
     },
   },
@@ -63,6 +67,30 @@ export default createRule({
             });
             break;
         }
+      }
+
+      // Markers are ticket-only unless notes are allowed. A marker with a broken ticket is
+      // already reported above, so its extra text waits until the ticket is fixed.
+      if (options.allowNotes) continue;
+      for (const marker of subject.markers) {
+        const { extra, state } = marker;
+        if (!extra || !state || !appliesTo(subject, state.name)) continue;
+        if (marker.tickets.some((t) => t.result !== 'ok') || !reportOnce(`extra:${extra.range[0]}`)) continue;
+        context.report({
+          loc: {
+            start: context.sourceCode.getLocFromIndex(extra.range[0]),
+            end: context.sourceCode.getLocFromIndex(extra.range[1]),
+          },
+          messageId: 'extraText',
+          data: { marker: state.marker, text: extra.text },
+          suggest: [
+            {
+              messageId: 'removeExtraText',
+              data: { text: extra.text },
+              fix: (fixer) => fixer.removeRange(extra.range),
+            },
+          ],
+        });
       }
     }
   },

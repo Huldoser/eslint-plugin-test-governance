@@ -6,6 +6,7 @@ test.describe('Checkout', () => {
     await expect(page).toHaveTitle(/Checkout/);
   });
 
+  // Markers hold tickets only, so the note after WEB-481 is reported.
   // SKIP: WEB-481 payment sandbox is down
   test.skip('SDQA-11: pays with PayPal', async ({ page }) => {
     await page.goto('/checkout');
