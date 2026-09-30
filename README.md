@@ -167,13 +167,6 @@ so keep it free of nested quantifiers.
 Not covered in this version: tests generated in loops with dynamic titles, fixtures imported from
 other modules under a name not in `testFunctions`, and Playwright annotations as markers.
 
-## Roadmap
-
-- **v1.1:** accept Playwright annotations (`annotation: { type: 'skip', description: 'WEB-123' }`) as
-  markers, with an autofix that converts between comments and annotations.
-- **v1.2:** a `test-governance` CLI that reports every tracked test with its ticket, owner and age,
-  and finds new tests missing `@new` by diffing against the base branch.
-- **v2:** ticket status checks (Jira, GitHub, Linear).
 
 ## Development
 
