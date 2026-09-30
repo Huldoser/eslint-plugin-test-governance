@@ -63,6 +63,8 @@ lines. Extra text is reported only once the tickets on that line are valid.
 
 Conditional skips such as `test.skip(browserName === 'webkit', 'Not supported')` usually describe a
 permanent platform limit, so they need no ticket unless you set `requireTicketForConditional: true`.
+A runtime skip under an `if`, a `switch` case, a ternary or `&&` counts as conditional too, since
+`if (!enabled) test.skip()` does the same as `test.skip(!enabled)`.
 
 ## Examples
 

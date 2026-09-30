@@ -43,6 +43,13 @@ runRule('require-ticket', rule, {
     "test('a', async ({ browserName }) => { test.skip(browserName === 'webkit', 'Not supported'); });",
     "test.describe('s', () => { test.skip(({ browserName }) => browserName === 'webkit', 'n/a'); });",
     "test('a', async ({ page }, testInfo) => { testInfo.skip(process.env.CI === undefined); });",
+    // A runtime skip under an `if`, `switch`, ternary or `&&` is conditional too.
+    "test('a', async ({ features }) => { if (!features.email) test.skip(); });",
+    "test('a', async ({ page }, testInfo) => { if (process.env.CI) { testInfo.fixme(); } });",
+    "test('a', async () => { if (process.env.CI) {} else test.skip(); });",
+    "test('a', async () => { process.env.CI ? test.skip() : undefined; });",
+    "test('a', async () => { process.env.CI && test.skip(); });",
+    "test('a', async () => { switch (process.env.BROWSER) { case 'webkit': test.skip(); } });",
     // Runtime skips: marker above the call or above the enclosing test.
     "test('a', async () => {\n  // SKIP: WEB-1\n  test.skip();\n});",
     "// SKIP: WEB-1\ntest('a', async () => {\n  test.skip();\n});",
@@ -217,6 +224,24 @@ runRule('require-ticket', rule, {
     { code: "test('a', async () => {\n  test.skip();\n});", errors: [missing('skip', 'SKIP', 'This skip call')] },
     { code: "test('a', async () => { test.skip(true, 'broken'); });", errors: [missing('skip', 'SKIP', 'This skip call')] },
     { code: 'test.skip();', errors: [missing('skip', 'SKIP', 'This skip call')] },
+    // A guard outside the enclosing function doesn't make the call conditional.
+    {
+      code: "if (process.env.CI) {\n  test('a', async () => { test.skip(); });\n}",
+      errors: [missing('skip', 'SKIP', 'This skip call')],
+    },
+    // The call is the condition itself, so it always runs.
+    { code: "test('a', async () => { if (test.skip()) {} });", errors: [missing('skip', 'SKIP', 'This skip call')] },
+    { code: "test('a', async () => { test.skip() ? 1 : 2; });", errors: [missing('skip', 'SKIP', 'This skip call')] },
+    { code: "test('a', async () => { test.skip() || done(); });", errors: [missing('skip', 'SKIP', 'This skip call')] },
+    {
+      code: "test('a', async () => { switch (mode) { case test.skip(): break; } });",
+      errors: [missing('skip', 'SKIP', 'This skip call')],
+    },
+    {
+      code: "test('a', async ({ features }) => { if (!features.email) test.skip(); });",
+      settings: settings({ requireTicketForConditional: true }),
+      errors: [missing('skip', 'SKIP', 'This skip call')],
+    },
     {
       code: "test('a', async ({ page }, testInfo) => { testInfo.fixme(); });",
       errors: [missing('fixme', 'FIXME', 'This fixme call')],

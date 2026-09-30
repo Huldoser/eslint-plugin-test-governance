@@ -18,8 +18,27 @@ runRule('no-orphaned-marker', rule, {
     "// SKIP: WEB-1\ntest.describe.skip('s', () => {\n  // SKIP: WEB-1\n  test('a', async () => {});\n});",
     // A mismatch next to a missing marker is marker-matches-state's job.
     "// SKIP: WEB-1\ntest.fixme('a', async () => {});",
+    // An ordinary comment that happens to start with a marker keyword is not a leftover ticket.
+    "test('a', async ({ page }) => {\n  // FIXME: this check is flaky on slow machines\n  await page.goto('/');\n});",
+    "// FIXME: how to restrict it to frames only\nconst matchers = {};",
+    "// SKIP: flaky on CI, see WEB-1\ntest('a', async () => {});",
   ],
   invalid: [
+    // A lone word or a malformed ticket still reads as a marker.
+    {
+      code: '// FIXME: later\nconst x = 1;',
+      errors: [{ messageId: 'detached', suggestions: [{ messageId: 'removeMarker', output: 'const x = 1;' }] }],
+    },
+    {
+      code: "// SKIP: web-12\ntest('a', async () => {});",
+      errors: [
+        {
+          messageId: 'orphaned',
+          data: { marker: 'SKIP', state: 'skip', subject: 'this test' },
+          suggestions: [{ messageId: 'removeMarker', output: "test('a', async () => {});" }],
+        },
+      ],
+    },
     {
       code: "// NEW: WEB-12 promoted last sprint\ntest('checkout', async () => {});",
       settings: lifecycle,
