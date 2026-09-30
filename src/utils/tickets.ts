@@ -74,7 +74,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
       };
     case 'jira': {
       const { projects, host } = spec;
-      const keyOk = (key: string): boolean => inList(KEY_RE.exec(key)?.[1] ?? '', projects);
+      const keyOk = (key: string): boolean => inList(key.slice(0, key.lastIndexOf('-')), projects);
       return {
         test: (t) => {
           if (KEY_RE.test(t)) return keyOk(t);
@@ -113,7 +113,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
     }
     case 'linear': {
       const { teams } = spec;
-      const keyOk = (key: string): boolean => inList(KEY_RE.exec(key)?.[1] ?? '', teams);
+      const keyOk = (key: string): boolean => inList(key.slice(0, key.lastIndexOf('-')), teams);
       return {
         test: (t) => {
           if (KEY_RE.test(t)) return keyOk(t);

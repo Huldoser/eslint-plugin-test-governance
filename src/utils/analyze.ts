@@ -228,8 +228,8 @@ function parseMarkers(comment: Comment, states: StateDef[]): Marker[] {
 }
 
 function scanTags(node: TSESTree.Literal | TSESTree.TemplateLiteral, out: TagOccurrence[]): void {
-  const texts =
-    node.type === 'Literal' ? [String(node.value)] : node.quasis.map((quasi) => quasi.value.cooked ?? '');
+  // `cooked` is only null in tagged templates, which are never titles.
+  const texts = node.type === 'Literal' ? [String(node.value)] : node.quasis.map((quasi) => quasi.value.cooked!);
   for (const text of texts) {
     for (const match of text.matchAll(TAG_RE)) out.push({ tag: match[0], node });
   }
@@ -411,6 +411,8 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
         pushedInfo = true;
       }
     }
+    // Parsers provide visitor keys for every node type they produce; the fallback is only defensive.
+    /* v8 ignore next */
     for (const key of keys[node.type] ?? []) {
       const child = (node as unknown as Record<string, unknown>)[key];
       if (Array.isArray(child)) {
