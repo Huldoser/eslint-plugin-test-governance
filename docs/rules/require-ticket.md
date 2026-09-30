@@ -1,0 +1,107 @@
+# Require a ticket marker comment above skipped, fixme and tagged tests (`test-governance/require-ticket`)
+
+📝 Require a ticket marker comment above skipped, fixme and tagged tests.
+
+💼 This rule is enabled in the ✅ `recommended` [config](https://github.com/Huldoser/eslint-plugin-test-governance#usage).
+
+<!-- end auto-generated rule header -->
+
+A skipped test is coverage you no longer have. This rule makes every test in a tracked state point
+at the ticket that explains it, so disabled tests show up in planning instead of disappearing.
+
+A test is in a state when it is:
+
+| State | Put there by | Marker | On by default |
+| --- | --- | --- | --- |
+| `skip` | `test.skip('title', fn)`, `test.describe.skip`, `test.skip()` in a body, `testInfo.skip()` | `// SKIP:` | yes |
+| `fixme` | `test.fixme(...)`, `test.describe.fixme`, `testInfo.fixme()` | `// FIXME:` | yes |
+| `new` | the `@new` tag | `// NEW:` | with `lifecycleTags: true` |
+| `unstable` | the `@unstable` tag | `// UNSTABLE:` | with `lifecycleTags: true` |
+| `fail`, `slow` | `test.fail(...)`, `test.slow()` | `// FAIL:`, `// SLOW:` | no |
+| custom | any tag you list in `customStates` | your keyword | when configured |
+
+Tags are read from the title (`'checkout @new'`) and from `{ tag: '@new' }` or `{ tag: ['@new', '@smoke'] }`.
+Tags on a `describe` apply to every test inside it.
+
+## Marker format
+
+```text
+// SKIP: WEB-123 optional note
+// SKIP: WEB-123, WEB-124 several tickets
+/* FIXME: https://github.com/acme/web/issues/4821 */
+```
+
+- The marker goes in the comment block directly above the test, describe or `test.skip()` call.
+  Other comments, such as `eslint-disable-next-line`, may sit in the same block. A blank line ends
+  the block unless `allowBlankLine` is set.
+- The keyword is uppercase and followed by a colon. `// skip: WEB-1` is reported with a hint.
+- The first word after the colon is the ticket. Anything after the tickets is a free-text note.
+- A marker on a skipped or tagged `describe` covers every test inside it.
+- A `test.skip()` inside a test body can have its marker above the call or above the test.
+- Ticket IDs in test titles (`'SDQA-52: logout'`) are never read as tickets.
+
+Conditional skips such as `test.skip(browserName === 'webkit', 'Not supported')` usually describe a
+permanent platform limit, so they need no ticket unless you set `requireTicketForConditional: true`.
+
+## Examples
+
+Incorrect:
+
+<!-- example: invalid -->
+```js
+test.skip('pays with PayPal', async ({ page }) => {});
+```
+
+<!-- example: invalid -->
+```js
+// SKIP: flaky on CI
+test.skip('pays with PayPal', async ({ page }) => {});
+```
+
+<!-- example: invalid -->
+```js
+// SKIP: TODO
+test.skip('pays with PayPal', async ({ page }) => {});
+```
+
+<!-- example: invalid settings={"lifecycleTags":true} -->
+```js
+test('one-click reorder @new', async ({ page }) => {});
+```
+
+Correct:
+
+<!-- example: valid -->
+```js
+// SKIP: WEB-481 payment sandbox is down
+test.skip('pays with PayPal', async ({ page }) => {});
+```
+
+<!-- example: valid -->
+```js
+// FIXME: WEB-12
+test.describe.fixme('tax rules', () => {
+  test('per region', async () => {});
+  test('per product', async () => {});
+});
+```
+
+<!-- example: valid -->
+```js
+test('opens the dashboard', async ({ page, browserName }) => {
+  test.skip(browserName === 'webkit', 'Layout differs on WebKit by design');
+});
+```
+
+<!-- example: valid settings={"lifecycleTags":true} -->
+```js
+// NEW: WEB-77
+test('one-click reorder', { tag: '@new' }, async ({ page }) => {});
+```
+
+## Options
+
+This rule reads the shared options described in the [README](../../README.md#options), usually set once
+with `testGovernance.configure({...})`. It also accepts the same object as a rule option, which
+overrides the shared settings for this rule only.
+
