@@ -43,6 +43,7 @@ reached, remove it rather than excluding it.
 
 ## Commits and pull requests
 
+- Add a line under `[Unreleased]` in `CHANGELOG.md` for any change users will notice.
 - Keep each commit to one logical change, with a short imperative subject line
   ("Reject tickets numbered zero"), and a body explaining why when it isn't obvious.
 - Pull requests are squash-merged, so the PR title becomes the commit subject on `main`.
@@ -53,11 +54,13 @@ reached, remove it rather than excluding it.
 For the maintainer:
 
 1. Open a pull request that bumps the version in `package.json` and `package-lock.json`
-   (`npm version <x.y.z> --no-git-tag-version` does both), and merge it. The plugin reads its
-   `meta.version` from `package.json`.
+   (`npm version <x.y.z> --no-git-tag-version` does both) and renames the `[Unreleased]` section
+   of `CHANGELOG.md` to `[x.y.z] - <date>`, and merge it. The plugin reads its `meta.version` from
+   `package.json`.
 2. Tag the merge commit and push the tag: `git tag v<x.y.z> && git push origin v<x.y.z>`.
-3. The Release workflow checks that the tag matches the package version, runs the checks above,
-   stages the version on npm with provenance and creates the GitHub release with generated notes.
+3. The Release workflow checks that the tag matches the package version and that the changelog has
+   an entry for it, runs the checks above, stages the version on npm with provenance and creates the
+   GitHub release with that changelog entry as its notes.
 4. Approve the staged version under Staged Packages on npmjs.com (2FA required). It becomes the
    `latest` version on npm.
 
