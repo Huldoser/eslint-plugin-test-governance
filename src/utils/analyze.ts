@@ -1,12 +1,19 @@
 import type { TSESLint, TSESTree } from '@typescript-eslint/utils';
 import type { ResolvedOptions, StateDef } from './options.js';
-import type { TicketCheck } from './tickets.js';
+import type { TicketCheck, TicketMatcher } from './tickets.js';
 
 type Node = TSESTree.Node;
 type Comment = TSESTree.Comment;
 type SourceCode = Readonly<TSESLint.SourceCode>;
 
 const PLAYWRIGHT_MODULES = new Set(['@playwright/test', 'playwright/test']);
+/** Other test runners. A name imported from one of these is never Playwright's `test`. */
+const OTHER_FRAMEWORKS = new Set(['vitest', '@jest/globals', 'node:test', 'bun:test', 'mocha', 'ava', 'tap', 'uvu']);
+
+/** `@playwright/test` and the component-testing packages such as `@playwright/experimental-ct-react`. */
+function isPlaywrightModule(source: string): boolean {
+  return PLAYWRIGHT_MODULES.has(source) || source.startsWith('@playwright/experimental-ct-');
+}
 const TEST_MODIFIERS = new Set(['only', 'skip', 'fixme', 'fail', 'slow']);
 const DESCRIBE_MODIFIERS = new Set(['only', 'skip', 'fixme', 'serial', 'parallel']);
 const RUNTIME_MODIFIERS = new Set(['skip', 'fixme', 'fail', 'slow']);
@@ -77,6 +84,8 @@ export interface Analysis {
   subjects: Subject[];
   /** Markers that are not in the comment block of any test, describe or runtime call. */
   detachedMarkers: StateMarker[];
+  /** Whether the file uses Playwright at all: a Playwright import or a call to a test function. */
+  isTestFile: boolean;
 }
 
 export type Evaluation =
@@ -87,7 +96,7 @@ export type Evaluation =
   | { kind: 'bad-ticket'; marker: Marker; ticket: MarkerTicket };
 
 interface Chain {
-  root: string;
+  root: TSESTree.Identifier;
   path: string[];
 }
 
@@ -106,7 +115,7 @@ function chainOf(node: Node): Chain | undefined {
     path.unshift(name);
     current = current.object;
   }
-  return current.type === 'Identifier' ? { root: current.name, path } : undefined;
+  return current.type === 'Identifier' ? { root: current, path } : undefined;
 }
 
 function unwrap(node: Node): Node {
@@ -125,22 +134,32 @@ function isFunction(node: Node | undefined): node is TSESTree.FunctionLike {
   return node?.type === 'ArrowFunctionExpression' || node?.type === 'FunctionExpression';
 }
 
-/** Collects the local names that refer to Playwright's `test`. */
+/** Collects the top-level names that refer to Playwright's `test`. */
 function collectTestNames(program: TSESTree.Program, configured: Set<string>): Set<string> {
   const names = new Set(configured);
+  const mergeTests = new Set<string>();
   const isTestExpression = (node: Node): boolean => {
     const target = unwrap(node);
     if (target.type === 'Identifier') return names.has(target.name);
-    if (target.type !== 'CallExpression' || target.callee.type !== 'MemberExpression') return false;
+    if (target.type !== 'CallExpression') return false;
+    // mergeTests(dbTest, a11yTest)
+    if (target.callee.type === 'Identifier') return mergeTests.has(target.callee.name);
+    if (target.callee.type !== 'MemberExpression') return false;
     return memberName(target.callee) === 'extend' && isTestExpression(target.callee.object);
   };
 
   for (const statement of program.body) {
     if (statement.type === 'ImportDeclaration') {
-      if (!PLAYWRIGHT_MODULES.has(statement.source.value)) continue;
-      for (const spec of statement.specifiers) {
-        if (spec.type === 'ImportDefaultSpecifier') names.add(spec.local.name);
-        else if (spec.type === 'ImportSpecifier' && importedName(spec) === 'test') names.add(spec.local.name);
+      const source = statement.source.value;
+      if (OTHER_FRAMEWORKS.has(source)) {
+        for (const spec of statement.specifiers) names.delete(spec.local.name);
+      } else if (isPlaywrightModule(source)) {
+        for (const spec of statement.specifiers) {
+          if (spec.type === 'ImportDefaultSpecifier') names.add(spec.local.name);
+          else if (spec.type === 'ImportSpecifier' && importedName(spec) === 'test') names.add(spec.local.name);
+          else if (spec.type === 'ImportSpecifier' && importedName(spec) === 'mergeTests')
+            mergeTests.add(spec.local.name);
+        }
       }
       continue;
     }
@@ -151,16 +170,13 @@ function collectTestNames(program: TSESTree.Program, configured: Set<string>): S
       if (!init) continue;
       if (declarator.id.type === 'Identifier' && init.type === 'CallExpression' && isTestExpression(init)) {
         names.add(declarator.id.name);
-      } else if (declarator.id.type === 'ObjectPattern' && isPlaywrightRequire(init)) {
+      } else if (declarator.id.type === 'ObjectPattern') {
+        const source = requireSource(init);
+        if (source === undefined) continue;
         for (const prop of declarator.id.properties) {
-          if (
-            prop.type === 'Property' &&
-            prop.key.type === 'Identifier' &&
-            prop.key.name === 'test' &&
-            prop.value.type === 'Identifier'
-          ) {
-            names.add(prop.value.name);
-          }
+          if (prop.type !== 'Property' || prop.key.type !== 'Identifier' || prop.value.type !== 'Identifier') continue;
+          if (OTHER_FRAMEWORKS.has(source)) names.delete(prop.value.name);
+          else if (isPlaywrightModule(source) && prop.key.name === 'test') names.add(prop.value.name);
         }
       }
     }
@@ -172,14 +188,26 @@ function importedName(spec: TSESTree.ImportSpecifier): string {
   return spec.imported.type === 'Identifier' ? spec.imported.name : spec.imported.value;
 }
 
-function isPlaywrightRequire(node: Node): boolean {
-  return (
-    node.type === 'CallExpression' &&
-    node.callee.type === 'Identifier' &&
-    node.callee.name === 'require' &&
-    node.arguments[0]?.type === 'Literal' &&
-    PLAYWRIGHT_MODULES.has(String(node.arguments[0].value))
-  );
+/** The module name of `require('...')`, or undefined for anything else. */
+function requireSource(node: Node): string | undefined {
+  if (node.type !== 'CallExpression' || node.callee.type !== 'Identifier' || node.callee.name !== 'require')
+    return undefined;
+  const first = node.arguments.at(0);
+  return first?.type === 'Literal' && typeof first.value === 'string' ? first.value : undefined;
+}
+
+/**
+ * Whether `id` refers to a variable declared inside a function or block, such as a local helper that
+ * happens to be called `test`. Top-level variables, imports, parameters and globals still count.
+ */
+function isLocalVariable(sourceCode: SourceCode, id: TSESTree.Identifier): boolean {
+  for (let scope: TSESLint.Scope.Scope | null = sourceCode.getScope(id); scope; scope = scope.upper) {
+    const variable = scope.set.get(id.name);
+    if (!variable) continue;
+    if (scope.type === 'module' || scope.type === 'global') return false;
+    return variable.defs.some((def) => def.type === 'Variable');
+  }
+  return false;
 }
 
 const STATEMENT_CONTAINERS = new Set(['Program', 'BlockStatement', 'StaticBlock', 'SwitchCase', 'TSModuleBlock']);
@@ -213,7 +241,7 @@ function commentBlock(sourceCode: SourceCode, anchor: Node, allowBlankLine: bool
  * Parses `TICKET[, TICKET...]` from the text after a marker's colon. `offset` is the source position
  * of `text[0]`. Anything after the last ticket, including a trailing comma, is returned as `extra`.
  */
-function parseTickets(text: string, offset: number, state: StateDef): Pick<Marker, 'tickets' | 'extra'> {
+export function parseTickets(text: string, offset: number, matcher: TicketMatcher): Pick<Marker, 'tickets' | 'extra'> {
   const tickets: MarkerTicket[] = [];
   let index = text.length - text.trimStart().length;
   let lastEnd = 0;
@@ -222,7 +250,7 @@ function parseTickets(text: string, offset: number, state: StateDef): Pick<Marke
     if (!token) break;
     // Punctuation right after a ticket (`WEB-1:` or `WEB-1.`) is not part of it.
     const ticket = token.replace(/[.:;]+$/, '');
-    tickets.push({ text: ticket, result: state.ticket.check(ticket) });
+    tickets.push({ text: ticket, result: matcher.check(ticket) });
     index += ticket.length;
     lastEnd = index;
     const separator = /^\s*,\s*/.exec(text.slice(index))?.[0];
@@ -247,7 +275,7 @@ function parseMarkers(comment: Comment, states: StateDef[]): Marker[] {
     const state = states.find((s) => s.marker === keyword);
     if (state) {
       const restOffset = start + match[0].length - rest.length;
-      markers.push({ comment, keyword, state, ...parseTickets(rest, restOffset, state) });
+      markers.push({ comment, keyword, state, ...parseTickets(rest, restOffset, state.ticket) });
       continue;
     }
     const caseOf = states.find((s) => s.marker === keyword.toUpperCase());
@@ -333,6 +361,9 @@ export function analyze(sourceCode: SourceCode, options: ResolvedOptions): Analy
 function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis {
   const { states } = options;
   const testNames = collectTestNames(sourceCode.ast, options.testFunctions);
+  let usesTest = sourceCode.ast.body.some(
+    (statement) => statement.type === 'ImportDeclaration' && isPlaywrightModule(statement.source.value),
+  );
   const subjects: Subject[] = [];
   const claimed = new Set<Comment>();
   const stack: Subject[] = [];
@@ -390,7 +421,8 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const last = args.at(-1);
     let testInfo: string | undefined;
 
-    if (chain && testNames.has(chain.root)) {
+    if (chain && testNames.has(chain.root.name) && !isLocalVariable(sourceCode, chain.root)) {
+      usesTest = true;
       const { path } = chain;
       if (isFunction(last)) {
         const param = last.params.at(1);
@@ -420,7 +452,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
           (object.type === 'CallExpression' &&
             (() => {
               const inner = chainOf(object.callee);
-              return inner !== undefined && testNames.has(inner.root) && inner.path.join('.') === 'info';
+              return inner !== undefined && testNames.has(inner.root.name) && inner.path.join('.') === 'info';
             })());
         if (isTestInfo) return { subject: runtimeSubject(call, name) };
       }
@@ -482,7 +514,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     .flatMap((comment) => parseMarkers(comment, states))
     .filter(isStateMarker);
 
-  return { subjects, detachedMarkers };
+  return { subjects, detachedMarkers, isTestFile: usesTest };
 }
 
 /** Whether `subject` is in `stateName` at all, required or not, including inherited and runtime states. */
@@ -535,9 +567,32 @@ export function isProse(marker: Marker): boolean {
   return marker.extra !== undefined && marker.tickets[0].result !== 'ok';
 }
 
-/** Markers in the subject's own block for states that don't apply to it. */
-export function strayMarkers(subject: Subject): StateMarker[] {
-  return subject.markers.filter(isStateMarker).filter((m) => !appliesTo(subject, m.state.name));
+/**
+ * Whether a marker is really an ordinary work comment such as `// FIXME: refactor this`: its keyword
+ * is also a work-comment keyword and it doesn't start with a valid ticket. `require-ticket-in-comments`
+ * reports those; the marker rules leave them alone.
+ */
+export function isWorkComment(marker: Marker, options: ResolvedOptions): boolean {
+  return options.workCommentKeywords.has(marker.keyword.toUpperCase()) && marker.tickets.at(0)?.result !== 'ok';
+}
+
+/** Markers in the subject's own block for states that don't apply to it, leaving out work comments. */
+export function strayMarkers(subject: Subject, options: ResolvedOptions): StateMarker[] {
+  return subject.markers
+    .filter(isStateMarker)
+    .filter((m) => !appliesTo(subject, m.state.name) && !isWorkComment(m, options));
+}
+
+/**
+ * Where to report a problem with a test or describe: from the callee to the end of the title
+ * (`test.skip('pays with PayPal'`), so editors underline the declaration rather than the whole body.
+ * Runtime calls such as `test.skip()` are short, so they are reported whole.
+ */
+export function headLoc(subject: Subject): TSESTree.SourceLocation {
+  const { node } = subject;
+  if (subject.kind === 'runtime') return node.loc;
+  const title = node.arguments.length > 1 ? node.arguments[0] : undefined;
+  return { start: node.callee.loc.start, end: (title ?? node.callee).loc.end };
 }
 
 export function describeSubject(subject: Subject): string {

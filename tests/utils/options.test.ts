@@ -45,30 +45,37 @@ describe('compileOptions', () => {
   });
 
   it.each([
-    [{ customStates: { x: { when: 'blocked', marker: 'BLOCKED' } } }, /customStates.x.when must be a tag like "@x"/],
-    [{ customStates: { x: { when: '@x', marker: 'blocked' } } }, /marker for state "x" must be uppercase/],
-    [{ states: { skip: { marker: 'Skip' } } }, /marker for state "skip" must be uppercase/],
+    [
+      { customStates: { x: { when: 'blocked', marker: 'BLOCKED' } } },
+      /customStates\.x\.when must be a tag such as @needs-data \(got "blocked"\)/,
+    ],
+    [
+      { customStates: { x: { when: '@x', marker: 'blocked' } } },
+      /customStates\.x\.marker must be an uppercase keyword/,
+    ],
+    [{ states: { skip: { marker: 'Skip' } } }, /states\.skip\.marker must be an uppercase keyword/],
+    [{ lifecycleTag: true }, /lifecycleTag is not a known option; did you mean "lifecycleTags"\?/],
+    [{ ticket: { preset: 'numeric', minLength: 5, maxLength: 3 } }, /minLength \(5\) is greater than maxLength \(3\)/],
+    [{ ticket: { preset: 'pattern' } }, /"pattern" ticket preset needs a `pattern` regex string/],
     [{ customStates: { x: { when: '@x', marker: 'SKIP' } } }, /two states use the marker "SKIP"/],
     [{ lifecycleTags: true, customStates: { x: { when: '@new', marker: 'X' } } }, /two states use the tag "@new"/],
   ])('rejects %j', (options, message) => {
-    expect(() => compileOptions(options)).toThrow(ConfigError);
-    expect(() => compileOptions(options)).toThrow(message);
+    expect(() => compileOptions(options as never)).toThrow(ConfigError);
+    expect(() => compileOptions(options as never)).toThrow(message);
   });
 });
 
 describe('resolveOptions', () => {
-  it('merges rule options over shared settings and caches the result', () => {
+  it('compiles shared settings once per settings object', () => {
     const settings = { 'test-governance': { lifecycleTags: true, allowBlankLine: true } };
-    const merged = resolveOptions(settings, { allowBlankLine: false });
-    expect(merged.allowBlankLine).toBe(false);
-    expect(merged.states.map((s) => s.name)).toContain('new');
-    expect(resolveOptions(settings, { allowBlankLine: false })).toBe(merged);
-    expect(resolveOptions(settings, undefined)).not.toBe(merged);
-    expect(resolveOptions(settings, undefined).allowBlankLine).toBe(true);
+    const resolved = resolveOptions(settings);
+    expect(resolved.allowBlankLine).toBe(true);
+    expect(resolved.states.map((s) => s.name)).toContain('new');
+    expect(resolveOptions(settings)).toBe(resolved);
   });
 
   it('works without settings', () => {
-    expect(resolveOptions(undefined, undefined).states).toHaveLength(2);
-    expect(resolveOptions({}, undefined)).toBe(resolveOptions({ other: 1 }, undefined));
+    expect(resolveOptions(undefined).states).toHaveLength(2);
+    expect(resolveOptions({})).toBe(resolveOptions({ other: 1 }));
   });
 });

@@ -1,4 +1,4 @@
-import type { TagOccurrence } from '../utils/analyze.js';
+import { headLoc, type TagOccurrence } from '../utils/analyze.js';
 import { createRule } from '../utils/create-rule.js';
 import { isTagState } from '../utils/options.js';
 import { editDistance, typoThreshold } from '../utils/distance.js';
@@ -52,7 +52,11 @@ export default createRule({
         }
       }
       if (has(newTag) && subject.skipped && (ownNew || subject.parent?.skipped !== true)) {
-        context.report({ node: ownNew?.node ?? subject.node, messageId: 'newSkipped', data: { new: newTag } });
+        context.report({
+          ...(ownNew ? { node: ownNew.node } : { loc: headLoc(subject) }),
+          messageId: 'newSkipped',
+          data: { new: newTag },
+        });
       }
     }
 

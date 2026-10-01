@@ -3,6 +3,7 @@ import type { ESLint, Rule } from 'eslint';
 import markerMatchesState from './rules/marker-matches-state.js';
 import noConflictingStates from './rules/no-conflicting-states.js';
 import noOrphanedMarker from './rules/no-orphaned-marker.js';
+import requireTicketInComments from './rules/require-ticket-in-comments.js';
 import requireTicket from './rules/require-ticket.js';
 import { compileOptions, SETTINGS_KEY, type GovernanceOptions } from './utils/options.js';
 
@@ -13,13 +14,19 @@ const PLUGIN_NAME = 'test-governance';
 // Read at load time so the reported version always matches the published package.
 const { version: VERSION } = createRequire(import.meta.url)('../package.json') as { version: string };
 
-export type RuleName = 'require-ticket' | 'marker-matches-state' | 'no-orphaned-marker' | 'no-conflicting-states';
+export type RuleName =
+  | 'require-ticket'
+  | 'marker-matches-state'
+  | 'no-orphaned-marker'
+  | 'no-conflicting-states'
+  | 'require-ticket-in-comments';
 
 const ruleModules: Record<RuleName, { meta: { docs: { recommended: 'error' | 'warn' } } }> = {
   'require-ticket': requireTicket,
   'marker-matches-state': markerMatchesState,
   'no-orphaned-marker': noOrphanedMarker,
   'no-conflicting-states': noConflictingStates,
+  'require-ticket-in-comments': requireTicketInComments,
 };
 
 // Public types come from `eslint` itself, so users don't need typescript-eslint installed.

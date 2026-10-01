@@ -2,7 +2,9 @@ import { expect, test } from '../fixtures';
 
 test.describe('Checkout', () => {
   test('SDQA-10: pays with a saved card @smoke', async ({ page }) => {
+    // TODO: WEB-490
     await page.goto('/checkout');
+    // FIXME: the title check is flaky on mobile
     await expect(page).toHaveTitle(/Checkout/);
   });
 

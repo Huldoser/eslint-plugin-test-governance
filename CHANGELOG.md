@@ -6,6 +6,31 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- New rule `require-ticket-in-comments`, on as an error in `recommended`: `FIXME` and `TODO` comments
+  in test files must start with a ticket, such as `// TODO: WEB-123`. The `comments` option sets
+  the keywords (`{ keywords: ['FIXME'] }` allows free-form `TODO`s) and `comments: false` turns the
+  check off.
+- `configure()` and `settings['test-governance']` are validated. A typo such as `lifecycleTag` or an
+  unknown ticket preset fails with a clear message and a "did you mean" hint instead of being
+  ignored or crashing with a `TypeError`.
+- Tests from Playwright's component-testing packages (`@playwright/experimental-ct-*`) and fixtures
+  combined with `mergeTests()` are recognised.
+
+### Changed
+
+- **Breaking:** rules no longer take options of their own. All options live in
+  `settings['test-governance']` (set by `configure()`), so every rule reads the same settings and
+  they can't disagree. Move any rule options into `configure({...})`.
+- A missing marker is reported on the test's head, `test.skip('title'`, instead of underlining the
+  whole test body in editors.
+- `test` imported from another test runner (`vitest`, `@jest/globals`, `node:test`, `bun:test`,
+  `mocha`, `ava`, `tap`, `uvu`), or a local variable called `test` inside a function, is no longer
+  treated as Playwright's `test`.
+- `no-orphaned-marker` leaves `FIXME` and `TODO` comments to `require-ticket-in-comments`, and none
+  of the comment checks run in files that don't use Playwright, such as application code.
+
 ## [0.1.1] - 2026-10-01
 
 ### Added

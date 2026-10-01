@@ -1,3 +1,5 @@
+import { ConfigError } from './errors.js';
+
 export type TicketSpec =
   | { preset: 'any' }
   | { preset: 'jira'; projects?: string[]; host?: string }
@@ -147,6 +149,9 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
     case 'numeric': {
       const min = spec.minLength ?? 1;
       const max = spec.maxLength ?? 20;
+      if (min > max) {
+        throw new ConfigError(`numeric ticket minLength (${min}) is greater than maxLength (${max}).`);
+      }
       return {
         test: (t) => DIGITS_RE.test(t) && t.length >= min && t.length <= max,
         expected: min === max ? `a ${min}-digit number` : `a number with ${min} to ${max} digits`,
@@ -154,13 +159,15 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
       };
     }
     case 'pattern': {
+      // The schema can't tie `pattern` to this preset, so check it here.
+      if ((spec as { pattern?: unknown }).pattern === undefined) {
+        throw new ConfigError('the "pattern" ticket preset needs a `pattern` regex string.');
+      }
       let re: RegExp;
       try {
         re = new RegExp(`^(?:${spec.pattern})$`, spec.flags);
       } catch (error) {
-        throw new Error(
-          `eslint-plugin-test-governance: invalid ticket pattern "${spec.pattern}": ${(error as Error).message}`,
-        );
+        throw new ConfigError(`invalid ticket pattern "${spec.pattern}": ${(error as Error).message}`);
       }
       return { test: (t) => re.test(t), expected: `a ticket matching /${spec.pattern}/`, example: 'TICKET' };
     }

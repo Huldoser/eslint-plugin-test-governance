@@ -78,6 +78,16 @@ runRule('require-ticket', rule, {
       code: "// UNSTABLE: WEB-1\ntest.describe('flows @unstable', () => {\n  test('a @unstable', async () => {});\n  test('b', async () => {});\n});",
       settings: lifecycle,
     },
+    // Other test runners: `test` from these modules is not Playwright's.
+    "import { test } from 'vitest';\ntest.skip('adds', () => {});",
+    "import { test, it } from '@jest/globals';\ntest.skip('adds', () => {});\nit.skip('subtracts', () => {});",
+    "import test from 'node:test';\ntest.skip('adds', () => {});",
+    "const { test } = require('bun:test');\ntest.skip('adds', () => {});",
+    // A local variable that happens to be called `test` is not Playwright's.
+    "function check() {\n  const test = { skip(name, fn) { fn(); } };\n  test.skip('not playwright', () => {});\n}",
+    "{\n  let test = helpers;\n  test.skip('not playwright', () => {});\n}",
+    // mergeTests() of something that isn't a test, and calls that aren't mergeTests().
+    "import { test as base } from '@playwright/test';\nconst t = combine(base), u = factory()(), { a } = config, { b } = load('x');\nt.skip('a', async () => {});\nu.skip('b', async () => {});",
     // Tickets are never read from titles, even when they look like one.
     "test('SDQA-52: Successful logout', async () => {});",
     // fail and slow are off by default.
@@ -122,11 +132,24 @@ runRule('require-ticket', rule, {
       code: "// SKIP: 4821\ntest.skip('a', async () => {});",
       settings: settings({ ticket: { preset: 'numeric' }, placeholders: [] }),
     },
-    { code: "test('a', async () => { test.skip(); });", options: [{ states: { skip: false } }] },
+    { code: "test('a', async () => { test.skip(); });", settings: settings({ states: { skip: false } }) },
     { code: 'test(title, async () => {});', settings: settings({ reportDynamicTitles: true }) },
   ],
   invalid: [
     { code: "test.skip('a', async () => {});", errors: [missing('skip', 'SKIP')] },
+    // Only the head of the declaration is reported, not the whole body.
+    {
+      code: "test.skip('pays with PayPal', async ({ page }) => {\n  await page.goto('/');\n  await page.click('#pay');\n});",
+      errors: [{ ...missing('skip', 'SKIP'), line: 1, column: 1, endLine: 1, endColumn: 29 }],
+    },
+    {
+      code: "test.describe.fixme(() => {\n  test('a', async () => {});\n});",
+      errors: [{ ...missing('fixme', 'FIXME', 'This describe block'), line: 1, column: 1, endLine: 1, endColumn: 20 }],
+    },
+    {
+      code: "test('a', async () => {\n  test.skip(true, 'broken');\n});",
+      errors: [{ ...missing('skip', 'SKIP', 'This skip call'), line: 2, column: 3, endLine: 2, endColumn: 28 }],
+    },
     { code: "test.fixme('a', async () => {});", errors: [missing('fixme', 'FIXME')] },
     {
       code: "test.describe.skip('s', () => { test('a', async () => {}); });",
@@ -331,6 +354,28 @@ runRule('require-ticket', rule, {
       settings: settings({ testFunctions: [] }),
       errors: [missing('skip', 'SKIP')],
     },
+    // Playwright component testing.
+    {
+      code: "import { test as ct } from '@playwright/experimental-ct-react';\nct.skip('renders', async ({ mount }) => {});",
+      settings: settings({ testFunctions: [] }),
+      errors: [missing('skip', 'SKIP')],
+    },
+    // Fixtures combined with mergeTests().
+    {
+      code: "import { mergeTests, test as base } from '@playwright/test';\nconst db = base.extend({});\nexport const test2 = mergeTests(db, other);\ntest2.skip('a', async () => {});",
+      settings: settings({ testFunctions: [] }),
+      errors: [missing('skip', 'SKIP')],
+    },
+    // A parameter named `test` is usually Playwright's test passed to a helper, so it still counts.
+    {
+      code: "export function definePaymentTests(test) {\n  test.skip('pays', async () => {});\n}",
+      errors: [missing('skip', 'SKIP')],
+    },
+    // A require() that can't be resolved leaves the configured name alone.
+    {
+      code: "const { test } = require(fixturesPath);\nconst { other } = require(`x`);\ntest.skip('a', async () => {});",
+      errors: [missing('skip', 'SKIP')],
+    },
     {
       code: "import { 'test' as named } from '@playwright/test';\nnamed.skip('a', async () => {});",
       settings: settings({ testFunctions: [] }),
@@ -391,7 +436,7 @@ runRule('require-ticket', rule, {
     },
     {
       code: "test.skip('a', async () => {});",
-      options: [{ ticket: { preset: 'linear', teams: ['ENG'] } }],
+      settings: settings({ ticket: { preset: 'linear', teams: ['ENG'] } }),
       errors: [missing('skip', 'SKIP', 'This test', 'ENG-123')],
     },
     {

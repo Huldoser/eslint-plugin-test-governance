@@ -14,9 +14,15 @@ A leftover marker makes searches for open tickets lie. This rule reports:
 - a marker above a test, describe or skip call that is not in that marker's state, and
 - a marker that is not directly above a test, describe or skip call at all, so it has no effect.
 
-A comment that starts with a marker keyword but reads as a sentence, such as
-`// FIXME: this check is flaky on slow machines`, is an ordinary code comment and is not reported.
-The rule counts a comment as prose when its first word is not a valid ticket and more text follows.
+`FIXME:` and `TODO:` are also everyday work comments, so this rule leaves them to
+[`require-ticket-in-comments`](require-ticket-in-comments.md), which requires a ticket in them anywhere
+in a test file. A `// FIXME: WEB-12` above a helper is a tracked work comment, not a stray marker. A
+`// FIXME: refactor this` gets one clear error from that rule rather than a confusing one from this.
+
+Other markers that read as a sentence, such as `// SKIP: this one is flaky`, are left alone too: the rule
+counts a comment as prose when its first word is not a valid ticket and more text follows.
+
+Files that don't use Playwright, such as application code, are not checked.
 
 The rule offers a suggestion to delete the comment.
 
@@ -35,7 +41,7 @@ test('saved addresses', async () => {});
 
 ```js
 test('checkout', async ({ page }) => {
-  // FIXME: WEB-81
+  // SKIP: WEB-81
   await page.goto('/checkout');
 });
 ```
