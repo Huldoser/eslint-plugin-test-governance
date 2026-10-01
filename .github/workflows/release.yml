@@ -47,7 +47,7 @@ jobs:
             import plugin from './dist/index.js';
             const expected = process.env.GITHUB_REF_NAME.slice(1);
             if (plugin.meta.version !== expected) {
-              console.error('::error::src/index.ts VERSION is ' + plugin.meta.version + ', expected ' + expected);
+              console.error('::error::meta.version is ' + plugin.meta.version + ', expected ' + expected);
               process.exit(1);
             }"
       - run: npm stage publish --provenance --access public

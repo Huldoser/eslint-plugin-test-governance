@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import type { ESLint, Rule } from 'eslint';
 import markerMatchesState from './rules/marker-matches-state.js';
 import noConflictingStates from './rules/no-conflicting-states.js';
@@ -9,7 +10,8 @@ export type { CustomState, GovernanceOptions, StateOverride } from './utils/opti
 export type { TicketSpec } from './utils/tickets.js';
 
 const PLUGIN_NAME = 'test-governance';
-const VERSION = '0.1.0';
+// Read at load time so the reported version always matches the published package.
+const { version: VERSION } = createRequire(import.meta.url)('../package.json') as { version: string };
 
 export type RuleName = 'require-ticket' | 'marker-matches-state' | 'no-orphaned-marker' | 'no-conflicting-states';
 

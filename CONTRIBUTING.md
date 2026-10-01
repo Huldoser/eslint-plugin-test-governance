@@ -52,11 +52,12 @@ reached, remove it rather than excluding it.
 
 For the maintainer:
 
-1. Open a pull request that bumps the version in `package.json`, `package-lock.json` (`npm version
-   <x.y.z> --no-git-tag-version` does both) and `VERSION` in `src/index.ts`, and merge it.
+1. Open a pull request that bumps the version in `package.json` and `package-lock.json`
+   (`npm version <x.y.z> --no-git-tag-version` does both), and merge it. The plugin reads its
+   `meta.version` from `package.json`.
 2. Tag the merge commit and push the tag: `git tag v<x.y.z> && git push origin v<x.y.z>`.
-3. The Release workflow checks that the tag matches both versions, runs the checks above, stages the
-   version on npm with provenance and creates the GitHub release with generated notes.
+3. The Release workflow checks that the tag matches the package version, runs the checks above,
+   stages the version on npm with provenance and creates the GitHub release with generated notes.
 4. Approve the staged version under Staged Packages on npmjs.com (2FA required). It becomes the
    `latest` version on npm.
 
