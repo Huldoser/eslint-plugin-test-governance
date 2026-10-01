@@ -31,6 +31,8 @@ jobs:
       id-token: write # trusted publishing and provenance
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # full history, to check the tag is on main
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -46,8 +48,17 @@ jobs:
             echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
             exit 1
           fi
+      - name: Check the tag is on main
+        run: |
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD; then
+            echo "::error::Tag $GITHUB_REF_NAME points at $GITHUB_SHA, which is not on main. Tag a commit on main."
+            exit 1
+          fi
       - name: Check the changelog has an entry for this version
         run: node scripts/changelog-section.mjs "$GITHUB_REF_NAME" > /dev/null
+      - run: npm run lint
+      - run: npm run format:check
       - run: npm run typecheck
       - run: npm run test:coverage
       - run: npm run test:pack
