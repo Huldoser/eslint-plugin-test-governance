@@ -41,14 +41,21 @@ export interface GovernanceOptions {
   reportDynamicTitles?: boolean;
 }
 
-export interface StateDef {
+export type Modifier = 'skip' | 'fixme' | 'fail' | 'slow';
+
+interface StateBase {
   name: string;
   marker: string;
-  /** Modifier (`test.skip`) for modifier states. */
-  modifier?: 'skip' | 'fixme' | 'fail' | 'slow';
-  /** Tag (`@new`) for tag states. */
-  tag?: string;
   ticket: TicketMatcher;
+}
+
+/** A state is entered either through a modifier (`test.skip`) or through a tag (`@new`), never both. */
+export type StateDef = StateBase & ({ modifier: Modifier; tag?: undefined } | { tag: string; modifier?: undefined });
+
+export type TagStateDef = Extract<StateDef, { tag: string }>;
+
+export function isTagState(state: StateDef): state is TagStateDef {
+  return state.tag !== undefined;
 }
 
 export interface ResolvedOptions {
@@ -60,13 +67,9 @@ export interface ResolvedOptions {
   reportDynamicTitles: boolean;
 }
 
-interface BuiltinDef {
-  marker: string;
-  modifier?: StateDef['modifier'];
-  tag?: string;
-  lifecycle?: boolean;
-  enabled: boolean;
-}
+type BuiltinDef = { marker: string; lifecycle?: boolean; enabled: boolean } & (
+  { modifier: Modifier; tag?: undefined } | { tag: string; modifier?: undefined }
+);
 
 export const BUILTIN_STATES: Record<BuiltinStateName, BuiltinDef> = {
   skip: { marker: 'SKIP', modifier: 'skip', enabled: true },
@@ -128,13 +131,12 @@ export function compileOptions(options: GovernanceOptions): ResolvedOptions {
     const override: StateOverride = typeof raw === 'boolean' ? { enabled: raw } : (raw ?? {});
     const enabled = override.enabled ?? (def.lifecycle ? (options.lifecycleTags ?? def.enabled) : def.enabled);
     if (!enabled) continue;
-    states.push({
+    const base = {
       name,
       marker: checkMarker(override.marker ?? def.marker, name),
-      modifier: def.modifier,
-      tag: def.tag,
       ticket: override.ticket === undefined ? defaultMatcher : compile(override.ticket),
-    });
+    };
+    states.push(def.modifier === undefined ? { ...base, tag: def.tag } : { ...base, modifier: def.modifier });
   }
 
   for (const [name, custom] of Object.entries(options.customStates ?? {})) {
@@ -172,7 +174,9 @@ export function compileOptions(options: GovernanceOptions): ResolvedOptions {
 
 function checkMarker(marker: string, state: string): string {
   if (!MARKER_RE.test(marker)) {
-    throw new ConfigError(`the marker for state "${state}" must be uppercase letters, digits, "-" or "_", got "${marker}".`);
+    throw new ConfigError(
+      `the marker for state "${state}" must be uppercase letters, digits, "-" or "_", got "${marker}".`,
+    );
   }
   return marker;
 }

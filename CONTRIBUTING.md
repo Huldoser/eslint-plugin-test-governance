@@ -15,14 +15,21 @@ npm install
 
 ## Checks
 
-Every pull request runs these in CI on Node 22 and 24 with ESLint 9 and 10:
+Every pull request runs these in CI (tests on Node 22 and 24 with ESLint 9 and 10):
 
 ```sh
+npm run lint           # ESLint, including type-aware rules and eslint-plugin-eslint-plugin
+npm run format:check   # Prettier (run `npm run format` to fix)
 npm run typecheck      # TypeScript, including the tests
 npm run test:coverage  # all tests; fails below 100% coverage of src/rules and src/utils
 npm run test:pack      # packs the plugin and lints tests/fixtures/sample-project with the tarball
 npm run docs:check     # the README rules list and rule doc headers are up to date
 ```
+
+Code is formatted with Prettier and linted with typescript-eslint's strict type-checked rules. Editors that
+support EditorConfig, ESLint and Prettier pick up the settings automatically; VS Code suggests the extensions.
+Prefer fixing a lint error over disabling the rule. When a line really needs an exception, use
+`eslint-disable-next-line <rule> -- <reason>`.
 
 Coverage must stay at 100% for statements, branches, functions and lines. If a branch can't be
 reached, remove it rather than excluding it.

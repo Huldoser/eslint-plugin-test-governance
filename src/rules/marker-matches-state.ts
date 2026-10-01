@@ -1,4 +1,4 @@
-import { describeSubject, missingStates, strayMarkers } from '../utils/analyze.js';
+import { describeSubject, isStateMarker, missingStates, strayMarkers } from '../utils/analyze.js';
 import { createRule } from '../utils/create-rule.js';
 import { indentOf, keywordRange } from '../utils/fix.js';
 
@@ -36,14 +36,15 @@ export default createRule({
           suggest: missing.map((state) => ({
             messageId: 'renameMarker' as const,
             data: { expected: state.marker },
-            fix: (fixer) => fixer.replaceTextRange(keywordRange(sourceCode, marker.comment, marker.keyword), state.marker),
+            fix: (fixer) =>
+              fixer.replaceTextRange(keywordRange(sourceCode, marker.comment, marker.keyword), state.marker),
           })),
         });
       }
       if (stray.length > 0) continue;
 
       // One marker written for a test that is in two states.
-      const present = subject.markers.find((m) => m.state !== undefined && m.state !== missing[0]);
+      const present = subject.markers.filter(isStateMarker).find((m) => m.state !== missing[0]);
       if (!present) continue;
       for (const state of missing) {
         const tickets = present.tickets.map((t) => t.text).join(', ');
@@ -52,7 +53,7 @@ export default createRule({
           messageId: 'sharedMarker',
           data: {
             found: present.keyword,
-            foundState: present.state!.name,
+            foundState: present.state.name,
             expected: state.marker,
             state: state.name,
             subject: subjectName,

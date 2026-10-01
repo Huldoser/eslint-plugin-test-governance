@@ -2,7 +2,7 @@ import path from 'node:path';
 import tsParser from '@typescript-eslint/parser';
 import { ESLint, type Linter } from 'eslint';
 import testGovernance from '../src/index.js';
-// @ts-expect-error plain JS helper shared with scripts/pack-smoke.mjs
+// Plain JS so scripts/pack-smoke.mjs can share it; types are in format.d.mts.
 import { formatResults } from './fixtures/format.mjs';
 
 const cwd = path.resolve(import.meta.dirname, 'fixtures/sample-project');
@@ -31,7 +31,10 @@ test('the recommended config works without options', async () => {
   const eslint = new ESLint({
     cwd,
     overrideConfigFile: true,
-    overrideConfig: [{ files: ['**/*.ts'], languageOptions: { parser: tsParser } }, testGovernance.configs.recommended] as Linter.Config[],
+    overrideConfig: [
+      { files: ['**/*.ts'], languageOptions: { parser: tsParser } },
+      testGovernance.configs.recommended,
+    ] as Linter.Config[],
   });
   const [result] = await eslint.lintFiles(['tests/checkout.spec.ts']);
   expect(result.messages.map((m) => [m.line, m.ruleId])).toEqual([

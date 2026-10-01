@@ -8,7 +8,9 @@ function escapeRegExp(text: string): string {
 
 /** Range of `keyword` where it is used as a marker (`KEYWORD:`) inside `comment`. */
 export function keywordRange(sourceCode: SourceCode, comment: TSESTree.Comment, keyword: string): TSESTree.Range {
-  const text = sourceCode.getText(comment as unknown as TSESTree.Node);
+  const text = sourceCode.getText(comment);
+  // Only called with a keyword that was parsed from this comment, so it always matches.
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
   const match = new RegExp(`(^|[^\\w-])(${escapeRegExp(keyword)})\\s*:`).exec(text)!;
   const start = comment.range[0] + match.index + match[1].length;
   return [start, start + keyword.length];
@@ -28,13 +30,18 @@ export function removeComment(sourceCode: SourceCode, comment: TSESTree.Comment)
 /** Indentation of the line `comment` starts on. */
 export function indentOf(sourceCode: SourceCode, comment: TSESTree.Comment): string {
   const line = sourceCode.lines[comment.loc.start.line - 1];
-  return /^\s*/.exec(line)![0];
+  return line.slice(0, line.length - line.trimStart().length);
 }
 
 /** Range of the `index`-th occurrence of `tag` in the source text of `node`. */
-export function tagRange(sourceCode: SourceCode, node: TSESTree.Node, tag: string, index: number): TSESTree.Range | undefined {
+export function tagRange(
+  sourceCode: SourceCode,
+  node: TSESTree.Node,
+  tag: string,
+  index: number,
+): TSESTree.Range | undefined {
   const text = sourceCode.getText(node);
   const re = new RegExp(`(?<![\\w@])${escapeRegExp(tag)}(?![\\w-])`, 'g');
-  const match = [...text.matchAll(re)][index];
+  const match = [...text.matchAll(re)].at(index);
   return match === undefined ? undefined : [node.range[0] + match.index, node.range[0] + match.index + tag.length];
 }
