@@ -17,3 +17,4 @@
 - [ ] Tests added or updated (`npm run test:coverage` stays at 100%)
 - [ ] Docs updated (`docs/rules/*.md`, README) and `npm run docs` run if rules changed
 - [ ] `npm run typecheck` passes
+- [ ] `CHANGELOG.md` updated under `[Unreleased]` if users will notice the change

@@ -1,11 +1,18 @@
 name: Release
 
-# Pushing a tag such as v0.1.1 stages that version on npm and creates the GitHub release.
-# A maintainer then approves the staged version on npmjs.com with 2FA, which makes it public.
+# Pushing a tag such as v0.1.1 stages that version on npm and creates the GitHub release, with the
+# version's CHANGELOG.md section as its notes. A maintainer then approves the staged version on
+# npmjs.com with 2FA, which makes it public. Running the workflow by hand with an existing tag only
+# creates that tag's GitHub release.
 
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to create a GitHub release for, e.g. v0.1.0 (nothing is published to npm)
+        required: true
 
 permissions:
   contents: read
@@ -17,6 +24,7 @@ concurrency:
 jobs:
   publish:
     name: Stage on npm
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -38,6 +46,8 @@ jobs:
             echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
             exit 1
           fi
+      - name: Check the changelog has an entry for this version
+        run: node scripts/changelog-section.mjs "$GITHUB_REF_NAME" > /dev/null
       - run: npm run typecheck
       - run: npm run test:coverage
       - run: npm run test:pack
@@ -55,10 +65,19 @@ jobs:
   github-release:
     name: Create GitHub release
     needs: publish
+    # On a tag push, only after the version is staged; when run by hand, on its own.
+    if: always() && (needs.publish.result == 'success' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
     steps:
-      - run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes
+      # The changelog on the checked-out branch or tag also holds the entries of older versions.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: node scripts/changelog-section.mjs "$TAG" > notes.md
+      - run: gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" --notes-file notes.md
         env:
           GH_TOKEN: ${{ github.token }}
