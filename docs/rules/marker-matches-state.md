@@ -20,12 +20,14 @@ that reuses the same ticket.
 Incorrect:
 
 <!-- example: invalid -->
+
 ```js
 // SKIP: WEB-500
 test.fixme('splits shipping', async () => {});
 ```
 
 <!-- example: invalid settings={"lifecycleTags":true} -->
+
 ```js
 // SKIP: WEB-500
 test.skip('splits shipping @unstable', async () => {});
@@ -34,12 +36,14 @@ test.skip('splits shipping @unstable', async () => {});
 Correct:
 
 <!-- example: valid -->
+
 ```js
 // FIXME: WEB-500
 test.fixme('splits shipping', async () => {});
 ```
 
 <!-- example: valid settings={"lifecycleTags":true} -->
+
 ```js
 // SKIP: WEB-500
 // UNSTABLE: WEB-500
@@ -49,4 +53,3 @@ test.skip('splits shipping @unstable', async () => {});
 ## Options
 
 Uses the shared options described in the [README](../../README.md#options).
-

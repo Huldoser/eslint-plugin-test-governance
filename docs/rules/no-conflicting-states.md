@@ -24,11 +24,13 @@ every tag state that is on, including custom states.
 Incorrect:
 
 <!-- example: invalid settings={"lifecycleTags":true} -->
+
 ```js
 test('filters by category @new @unstable', async () => {});
 ```
 
 <!-- example: invalid settings={"lifecycleTags":true} -->
+
 ```js
 // SKIP: WEB-9
 // NEW: WEB-9
@@ -36,11 +38,13 @@ test.skip('filters by category @new', async () => {});
 ```
 
 <!-- example: invalid settings={"lifecycleTags":true} -->
+
 ```js
 test('invoice download @New', async () => {});
 ```
 
 <!-- example: invalid settings={"lifecycleTags":true} -->
+
 ```js
 test('loyalty points @unstabel', async () => {});
 ```
@@ -48,6 +52,7 @@ test('loyalty points @unstabel', async () => {});
 Correct:
 
 <!-- example: valid settings={"lifecycleTags":true} -->
+
 ```js
 test('filters by category @unstable', async () => {});
 ```
@@ -55,4 +60,3 @@ test('filters by category @unstable', async () => {});
 ## Options
 
 Uses the shared options described in the [README](../../README.md#options).
-

@@ -68,9 +68,12 @@ runRule('require-ticket', rule, {
     { code: "test('checkout @newer', async () => {});", settings: lifecycle },
     { code: "test('checkout', { tag: [someTag, ...more] }, async () => {});", settings: lifecycle },
     { code: "test('checkout', { [key]: '@new', ...rest }, async () => {});", settings: lifecycle },
-    { code: "// NEW: WEB-1\ntest('checkout', { annotation: { type: 'x' }, tag: '@new' }, async () => {});", settings: lifecycle },
+    {
+      code: "// NEW: WEB-1\ntest('checkout', { annotation: { type: 'x' }, tag: '@new' }, async () => {});",
+      settings: lifecycle,
+    },
     "const list = [, 1];\ntest('a', async () => { const [, b] = list; });",
-    { code: "test(title, async () => {});", settings: lifecycle },
+    { code: 'test(title, async () => {});', settings: lifecycle },
     {
       code: "// UNSTABLE: WEB-1\ntest.describe('flows @unstable', () => {\n  test('a @unstable', async () => {});\n  test('b', async () => {});\n});",
       settings: lifecycle,
@@ -89,9 +92,9 @@ runRule('require-ticket', rule, {
     "test.describe.configure({ mode: 'serial' });",
     "test.step('a', async () => { other.skip(); });",
     "test.skip.each('a', async () => {});",
-    "fn()();",
+    'fn()();',
     "test.info().annotations.push({ type: 'x' });",
-    "helper().skip();",
+    'helper().skip();',
     "test('a', async (fixtures, info) => { other.skip(); });",
     { code: "// SKIP: WEB-1\n\ntest.skip('a', async () => {});", settings: settings({ allowBlankLine: true }) },
     {
@@ -141,7 +144,7 @@ runRule('require-ticket', rule, {
     // The test-case ID in the title is not a ticket.
     { code: "test.skip('SDQA-52: Successful logout', async () => {});", errors: [missing('skip', 'SKIP')] },
     { code: "// SKIP:\ntest.skip('a', async () => {});", errors: [{ messageId: 'missingTicket' }] },
-    { code: '/* SKIP: */\ntest.skip(\'a\', async () => {});', errors: [{ messageId: 'missingTicket' }] },
+    { code: "/* SKIP: */\ntest.skip('a', async () => {});", errors: [{ messageId: 'missingTicket' }] },
     { code: "// SKIP: , WEB-1\ntest.skip('a', async () => {});", errors: [{ messageId: 'missingTicket' }] },
     {
       code: "// SKIP: flaky on CI\ntest.skip('a', async () => {});",
@@ -171,13 +174,28 @@ runRule('require-ticket', rule, {
         {
           messageId: 'extraText' as const,
           data: { marker: 'SKIP', text },
-          suggestions: [{ messageId: 'removeExtraText' as const, data: { text }, output: `${fixed}\ntest.skip('a', async () => {});` }],
+          suggestions: [
+            {
+              messageId: 'removeExtraText' as const,
+              data: { text },
+              output: `${fixed}\ntest.skip('a', async () => {});`,
+            },
+          ],
         },
       ],
     })),
     {
       code: "// SKIP: WEB-123 flaky\ntest.skip('a', async () => {});",
-      errors: [{ messageId: 'extraText', line: 1, column: 17, endLine: 1, endColumn: 23, suggestions: [{ messageId: 'removeExtraText', output: "// SKIP: WEB-123\ntest.skip('a', async () => {});" }] }],
+      errors: [
+        {
+          messageId: 'extraText',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 23,
+          suggestions: [{ messageId: 'removeExtraText', output: "// SKIP: WEB-123\ntest.skip('a', async () => {});" }],
+        },
+      ],
     },
     // Other separators make the ticket itself invalid.
     ...['WEB-1;WEB-2', 'WEB-1/WEB-2'].map((ticket) => ({
@@ -192,7 +210,13 @@ runRule('require-ticket', rule, {
       errors: [
         {
           messageId: 'extraText',
-          suggestions: [{ messageId: 'removeExtraText', output: "test('a', async ({ browserName }) => {\n  // SKIP: WEB-1\n  test.skip(browserName === 'webkit');\n});" }],
+          suggestions: [
+            {
+              messageId: 'removeExtraText',
+              output:
+                "test('a', async ({ browserName }) => {\n  // SKIP: WEB-1\n  test.skip(browserName === 'webkit');\n});",
+            },
+          ],
         },
       ],
     },
@@ -202,7 +226,13 @@ runRule('require-ticket', rule, {
       errors: [
         {
           messageId: 'extraText',
-          suggestions: [{ messageId: 'removeExtraText', output: "// SKIP: WEB-1\ntest.describe.skip('s', () => {\n  test.skip('a', async () => {});\n  test.skip('b', async () => {});\n});" }],
+          suggestions: [
+            {
+              messageId: 'removeExtraText',
+              output:
+                "// SKIP: WEB-1\ntest.describe.skip('s', () => {\n  test.skip('a', async () => {});\n  test.skip('b', async () => {});\n});",
+            },
+          ],
         },
       ],
     },
@@ -222,7 +252,10 @@ runRule('require-ticket', rule, {
     { code: "// FIXME: WEB-1\ntest.skip('a', async () => {});", errors: [missing('skip', 'SKIP')] },
     // Unconditional runtime skips.
     { code: "test('a', async () => {\n  test.skip();\n});", errors: [missing('skip', 'SKIP', 'This skip call')] },
-    { code: "test('a', async () => { test.skip(true, 'broken'); });", errors: [missing('skip', 'SKIP', 'This skip call')] },
+    {
+      code: "test('a', async () => { test.skip(true, 'broken'); });",
+      errors: [missing('skip', 'SKIP', 'This skip call')],
+    },
     { code: 'test.skip();', errors: [missing('skip', 'SKIP', 'This skip call')] },
     // A guard outside the enclosing function doesn't make the call conditional.
     {
@@ -247,7 +280,7 @@ runRule('require-ticket', rule, {
       errors: [missing('fixme', 'FIXME', 'This fixme call')],
     },
     {
-      code: "test.beforeEach(async ({ page }, info) => { info.skip(); });",
+      code: 'test.beforeEach(async ({ page }, info) => { info.skip(); });',
       errors: [missing('skip', 'SKIP', 'This skip call')],
     },
     {
@@ -272,7 +305,7 @@ runRule('require-ticket', rule, {
       errors: [missing('new', 'NEW')],
     },
     {
-      code: "test(`checkout ${step} @new`, async () => {});",
+      code: 'test(`checkout ${step} @new`, async () => {});',
       settings: lifecycle,
       errors: [missing('new', 'NEW')],
     },
@@ -338,7 +371,11 @@ runRule('require-ticket', rule, {
       errors: [
         {
           messageId: 'invalidTicket',
-          data: { ticket: 'WEB-1', state: 'fixme', expected: 'a GitHub issue like #4821 or owner/repo#4821, or an issue URL on github.com' },
+          data: {
+            ticket: 'WEB-1',
+            state: 'fixme',
+            expected: 'a GitHub issue like #4821 or owner/repo#4821, or an issue URL on github.com',
+          },
         },
       ],
     },
@@ -360,7 +397,10 @@ runRule('require-ticket', rule, {
     {
       code: 'test(title, async () => {});\ntest.describe(name, () => {});',
       settings: settings({ lifecycleTags: true, reportDynamicTitles: true }),
-      errors: [{ messageId: 'dynamicTitle', column: 6 }, { messageId: 'dynamicTitle', column: 15 }],
+      errors: [
+        { messageId: 'dynamicTitle', column: 6 },
+        { messageId: 'dynamicTitle', column: 15 },
+      ],
     },
   ],
 });

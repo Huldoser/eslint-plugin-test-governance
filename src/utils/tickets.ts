@@ -69,8 +69,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
   switch (spec.preset) {
     case 'any':
       return {
-        test: (t) =>
-          KEY_RE.test(t) || ISSUE_NUMBER_RE.test(t) || GITLAB_REF_RE.test(t) || parseUrl(t) !== undefined,
+        test: (t) => KEY_RE.test(t) || ISSUE_NUMBER_RE.test(t) || GITLAB_REF_RE.test(t) || parseUrl(t) !== undefined,
         expected: 'a ticket key like PROJ-123, an issue like #4821 or owner/repo#4821, or a URL',
         example: 'PROJ-123',
       };
@@ -159,7 +158,9 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
       try {
         re = new RegExp(`^(?:${spec.pattern})$`, spec.flags);
       } catch (error) {
-        throw new Error(`eslint-plugin-test-governance: invalid ticket pattern "${spec.pattern}": ${(error as Error).message}`);
+        throw new Error(
+          `eslint-plugin-test-governance: invalid ticket pattern "${spec.pattern}": ${(error as Error).message}`,
+        );
       }
       return { test: (t) => re.test(t), expected: `a ticket matching /${spec.pattern}/`, example: 'TICKET' };
     }
@@ -180,7 +181,8 @@ export function compileTicketSpec(specs: TicketSpec[], placeholders: string[]): 
   return {
     check(ticket) {
       const bare = ticket.replace(/^#/, '');
-      if (ZERO_ID_RE.test(ticket) || placeholderRes.some((re) => re.test(ticket) || re.test(bare))) return 'placeholder';
+      if (ZERO_ID_RE.test(ticket) || placeholderRes.some((re) => re.test(ticket) || re.test(bare)))
+        return 'placeholder';
       return presets.some((preset) => preset.test(ticket)) ? 'ok' : 'format';
     },
     expected: presets.map((p) => p.expected).join('; or '),

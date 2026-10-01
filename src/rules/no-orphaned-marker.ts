@@ -1,4 +1,4 @@
-import { describeSubject, isProse, missingStates, strayMarkers, type Marker } from '../utils/analyze.js';
+import { describeSubject, isProse, missingStates, strayMarkers, type StateMarker } from '../utils/analyze.js';
 import { createRule } from '../utils/create-rule.js';
 import { removeComment } from '../utils/fix.js';
 
@@ -19,7 +19,7 @@ export default createRule({
   },
   check(context, analysis) {
     const { sourceCode } = context;
-    const markers: { marker: Marker; messageId: 'orphaned' | 'detached'; subject: string }[] =
+    const markers: { marker: StateMarker; messageId: 'orphaned' | 'detached'; subject: string }[] =
       analysis.detachedMarkers.map((marker) => ({ marker, messageId: 'detached', subject: '' }));
     for (const subject of analysis.subjects) {
       // A stray marker next to a missing one is a mismatch, reported by marker-matches-state.
@@ -33,7 +33,7 @@ export default createRule({
       context.report({
         loc: marker.comment.loc,
         messageId,
-        data: { marker: marker.keyword, state: marker.state!.name, subject },
+        data: { marker: marker.keyword, state: marker.state.name, subject },
         suggest: [{ messageId: 'removeMarker', fix: () => removeComment(sourceCode, marker.comment) }],
       });
     }

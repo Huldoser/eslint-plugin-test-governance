@@ -32,6 +32,13 @@ export interface Marker {
   extra?: { text: string; range: TSESTree.Range };
 }
 
+/** A marker whose keyword is exactly a state's marker. */
+export type StateMarker = Marker & { state: StateDef };
+
+export function isStateMarker(marker: Marker): marker is StateMarker {
+  return marker.state !== undefined;
+}
+
 export interface TagOccurrence {
   tag: string;
   node: TSESTree.Literal | TSESTree.TemplateLiteral;
@@ -69,7 +76,7 @@ export interface Subject {
 export interface Analysis {
   subjects: Subject[];
   /** Markers that are not in the comment block of any test, describe or runtime call. */
-  detachedMarkers: Marker[];
+  detachedMarkers: StateMarker[];
 }
 
 export type Evaluation =
@@ -137,8 +144,7 @@ function collectTestNames(program: TSESTree.Program, configured: Set<string>): S
       }
       continue;
     }
-    const declaration =
-      statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+    const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
     if (declaration?.type !== 'VariableDeclaration') continue;
     for (const declarator of declaration.declarations) {
       const init = declarator.init && unwrap(declarator.init);
@@ -147,7 +153,12 @@ function collectTestNames(program: TSESTree.Program, configured: Set<string>): S
         names.add(declarator.id.name);
       } else if (declarator.id.type === 'ObjectPattern' && isPlaywrightRequire(init)) {
         for (const prop of declarator.id.properties) {
-          if (prop.type === 'Property' && prop.key.type === 'Identifier' && prop.key.name === 'test' && prop.value.type === 'Identifier') {
+          if (
+            prop.type === 'Property' &&
+            prop.key.type === 'Identifier' &&
+            prop.key.name === 'test' &&
+            prop.value.type === 'Identifier'
+          ) {
             names.add(prop.value.name);
           }
         }
@@ -158,7 +169,7 @@ function collectTestNames(program: TSESTree.Program, configured: Set<string>): S
 }
 
 function importedName(spec: TSESTree.ImportSpecifier): string {
-  return spec.imported.type === 'Identifier' ? spec.imported.name : String(spec.imported.value);
+  return spec.imported.type === 'Identifier' ? spec.imported.name : spec.imported.value;
 }
 
 function isPlaywrightRequire(node: Node): boolean {
@@ -176,6 +187,8 @@ const STATEMENT_CONTAINERS = new Set(['Program', 'BlockStatement', 'StaticBlock'
 /** The statement a call belongs to; its marker block sits above that statement. */
 function anchorOf(call: TSESTree.CallExpression): Node {
   let node: Node = call;
+  // A call always sits inside a statement container, so the walk stops before it runs out of parents.
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
   while (!STATEMENT_CONTAINERS.has(node.parent!.type)) node = node.parent!;
   return node;
 }
@@ -189,7 +202,7 @@ function commentBlock(sourceCode: SourceCode, anchor: Node, allowBlankLine: bool
     const comment = comments[i];
     if (!allowBlankLine && nextLine - comment.loc.end.line > 1) break;
     const before = sourceCode.getTokenBefore(comment, { includeComments: false });
-    if (before && before.loc.end.line === comment.loc.start.line) break;
+    if (before?.loc.end.line === comment.loc.start.line) break;
     block.unshift(comment);
     nextLine = comment.loc.start.line;
   }
@@ -244,8 +257,12 @@ function parseMarkers(comment: Comment, states: StateDef[]): Marker[] {
 }
 
 function scanTags(node: TSESTree.Literal | TSESTree.TemplateLiteral, out: TagOccurrence[]): void {
-  // `cooked` is only null in tagged templates, which are never titles.
-  const texts = node.type === 'Literal' ? [String(node.value)] : node.quasis.map((quasi) => quasi.value.cooked!);
+  const texts =
+    node.type === 'Literal'
+      ? [String(node.value)]
+      : // `cooked` is only null in tagged templates, which are never titles.
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
+        node.quasis.map((quasi) => quasi.value.cooked!);
   for (const text of texts) {
     for (const match of text.matchAll(TAG_RE)) out.push({ tag: match[0], node });
   }
@@ -276,7 +293,7 @@ function collectTags(call: TSESTree.CallExpression, hasTitle: boolean): { tags: 
 }
 
 function isUnconditional(call: TSESTree.CallExpression): boolean {
-  const [first] = call.arguments;
+  const first = call.arguments.at(0);
   return (first === undefined || (first.type === 'Literal' && first.value === true)) && !isGuarded(call);
 }
 
@@ -336,7 +353,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const ownTags = new Set(tagInfo.tags.map((t) => t.tag));
     const sources: StateSource[] = [];
     for (const state of states) {
-      const matches = state.modifier !== undefined ? modifiers.includes(state.modifier) : ownTags.has(state.tag!);
+      const matches = state.modifier !== undefined ? modifiers.includes(state.modifier) : ownTags.has(state.tag);
       if (matches) sources.push({ state, required });
     }
     const inherited = new Set<string>();
@@ -376,7 +393,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     if (chain && testNames.has(chain.root)) {
       const { path } = chain;
       if (isFunction(last)) {
-        const param = last.params[1];
+        const param = last.params.at(1);
         if (param?.type === 'Identifier') testInfo = param.name;
       }
       const isDeclaration = args.length >= 2 && isFunction(last) && !isFunction(args[0]);
@@ -463,7 +480,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     .getAllComments()
     .filter((comment) => !claimed.has(comment))
     .flatMap((comment) => parseMarkers(comment, states))
-    .filter((marker) => marker.state !== undefined);
+    .filter(isStateMarker);
 
   return { subjects, detachedMarkers };
 }
@@ -497,20 +514,16 @@ export function evaluate(subject: Subject, state: StateDef): Evaluation {
     const marker = subject.markers.find((m) => m.caseOf === state);
     return marker ? { kind: 'case', marker } : { kind: 'missing' };
   }
-  let firstProblem: Evaluation | undefined;
-  for (const marker of markers) {
-    const bad = marker.tickets.find((t) => t.result !== 'ok');
-    if (marker.tickets.length > 0 && !bad) return { kind: 'ok' };
-    firstProblem ??= bad ? { kind: 'bad-ticket', marker, ticket: bad } : { kind: 'no-ticket', marker };
-  }
-  return firstProblem!;
+  if (markers.some((m) => m.tickets.length > 0 && m.tickets.every((t) => t.result === 'ok'))) return { kind: 'ok' };
+  // Report the problem with the closest marker.
+  const [marker] = markers;
+  const bad = marker.tickets.find((t) => t.result !== 'ok');
+  return bad ? { kind: 'bad-ticket', marker, ticket: bad } : { kind: 'no-ticket', marker };
 }
 
 /** Required states on `subject` that have no marker at all (not even a broken one). */
 export function missingStates(subject: Subject): StateDef[] {
-  return subject.states
-    .filter((s) => s.required && evaluate(subject, s.state).kind === 'missing')
-    .map((s) => s.state);
+  return subject.states.filter((s) => s.required && evaluate(subject, s.state).kind === 'missing').map((s) => s.state);
 }
 
 /**
@@ -523,8 +536,8 @@ export function isProse(marker: Marker): boolean {
 }
 
 /** Markers in the subject's own block for states that don't apply to it. */
-export function strayMarkers(subject: Subject): Marker[] {
-  return subject.markers.filter((m) => m.state !== undefined && !appliesTo(subject, m.state.name));
+export function strayMarkers(subject: Subject): StateMarker[] {
+  return subject.markers.filter(isStateMarker).filter((m) => !appliesTo(subject, m.state.name));
 }
 
 export function describeSubject(subject: Subject): string {

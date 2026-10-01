@@ -7,7 +7,7 @@ runRule('no-orphaned-marker', rule, {
   valid: [
     "// SKIP: WEB-1\ntest.skip('a', async () => {});",
     "// Plain comment\ntest('a', async () => {});",
-    "// skip: lowercase is not a marker here\nconst x = 1;",
+    '// skip: lowercase is not a marker here\nconst x = 1;',
     // With lifecycleTags off, NEW: isn't a known marker.
     "// NEW: WEB-1\ntest('a', async () => {});",
     { code: "// NEW: WEB-1\ntest('a @new', async () => {});", settings: lifecycle },
@@ -20,7 +20,7 @@ runRule('no-orphaned-marker', rule, {
     "// SKIP: WEB-1\ntest.fixme('a', async () => {});",
     // An ordinary comment that happens to start with a marker keyword is not a leftover ticket.
     "test('a', async ({ page }) => {\n  // FIXME: this check is flaky on slow machines\n  await page.goto('/');\n});",
-    "// FIXME: how to restrict it to frames only\nconst matchers = {};",
+    '// FIXME: how to restrict it to frames only\nconst matchers = {};',
     "// SKIP: flaky on CI, see WEB-1\ntest('a', async () => {});",
   ],
   invalid: [
@@ -56,7 +56,12 @@ runRule('no-orphaned-marker', rule, {
         {
           messageId: 'orphaned',
           data: { marker: 'SKIP', state: 'skip', subject: 'this describe block' },
-          suggestions: [{ messageId: 'removeMarker', output: "test.describe('s', () => {\n  test.describe('inner', () => {});\n});" }],
+          suggestions: [
+            {
+              messageId: 'removeMarker',
+              output: "test.describe('s', () => {\n  test.describe('inner', () => {});\n});",
+            },
+          ],
         },
       ],
     },
@@ -75,7 +80,9 @@ runRule('no-orphaned-marker', rule, {
         {
           messageId: 'detached',
           data: { marker: 'FIXME' },
-          suggestions: [{ messageId: 'removeMarker', output: "test('a', async ({ page }) => {\n  await page.goto('/');\n});" }],
+          suggestions: [
+            { messageId: 'removeMarker', output: "test('a', async ({ page }) => {\n  await page.goto('/');\n});" },
+          ],
         },
       ],
     },
@@ -87,17 +94,21 @@ runRule('no-orphaned-marker', rule, {
         {
           messageId: 'orphaned',
           data: { marker: 'NEEDS-DATA', state: 'needs-data', subject: 'this test' },
-          suggestions: [{ messageId: 'removeMarker', output: "test('a', async () => {});\nconst y = 2; // NEEDS-DATA: WEB-2" }],
+          suggestions: [
+            { messageId: 'removeMarker', output: "test('a', async () => {});\nconst y = 2; // NEEDS-DATA: WEB-2" },
+          ],
         },
         {
           messageId: 'detached',
           data: { marker: 'NEEDS-DATA' },
-          suggestions: [{ messageId: 'removeMarker', output: "// NEEDS-DATA: WEB-1\ntest('a', async () => {});\nconst y = 2; " }],
+          suggestions: [
+            { messageId: 'removeMarker', output: "// NEEDS-DATA: WEB-1\ntest('a', async () => {});\nconst y = 2; " },
+          ],
         },
       ],
     },
     {
-      code: "const x = 1; // SKIP: WEB-1",
+      code: 'const x = 1; // SKIP: WEB-1',
       errors: [{ messageId: 'detached', suggestions: [{ messageId: 'removeMarker', output: 'const x = 1; ' }] }],
     },
     {
