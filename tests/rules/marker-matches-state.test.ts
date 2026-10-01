@@ -43,7 +43,8 @@ runRule('marker-matches-state', rule, {
           suggestions: [
             {
               messageId: 'renameMarker',
-              output: "/*\n * Context first. FIXME: is not a marker here\n * SKIP : WEB-1\n */\ntest.fixme('a', async () => {});",
+              output:
+                "/*\n * Context first. FIXME: is not a marker here\n * SKIP : WEB-1\n */\ntest.fixme('a', async () => {});",
             },
           ],
         },
@@ -55,7 +56,9 @@ runRule('marker-matches-state', rule, {
         {
           messageId: 'wrongMarker',
           data: { found: 'FIXME', expected: 'SKIP', state: 'skip', subject: 'this skip call' },
-          suggestions: [{ messageId: 'renameMarker', output: "test('a', async () => {\n  // SKIP: WEB-1\n  test.skip();\n});" }],
+          suggestions: [
+            { messageId: 'renameMarker', output: "test('a', async () => {\n  // SKIP: WEB-1\n  test.skip();\n});" },
+          ],
         },
       ],
     },
@@ -67,8 +70,16 @@ runRule('marker-matches-state', rule, {
           messageId: 'wrongMarker',
           data: { found: 'UNSTABLE', expected: 'SKIP', state: 'skip', subject: 'this describe block' },
           suggestions: [
-            { messageId: 'renameMarker', data: { expected: 'SKIP' }, output: "// SKIP: WEB-1\ntest.describe.skip('s @new', () => {});" },
-            { messageId: 'renameMarker', data: { expected: 'NEW' }, output: "// NEW: WEB-1\ntest.describe.skip('s @new', () => {});" },
+            {
+              messageId: 'renameMarker',
+              data: { expected: 'SKIP' },
+              output: "// SKIP: WEB-1\ntest.describe.skip('s @new', () => {});",
+            },
+            {
+              messageId: 'renameMarker',
+              data: { expected: 'NEW' },
+              output: "// NEW: WEB-1\ntest.describe.skip('s @new', () => {});",
+            },
           ],
         },
       ],
@@ -94,7 +105,13 @@ runRule('marker-matches-state', rule, {
     {
       code: "test.describe('s', () => {\n  /* NEW: WEB-1 */\n  test.fixme('a @new', async () => {});\n});",
       settings: lifecycle,
-      errors: [{ messageId: 'sharedMarker', data: { found: 'NEW', foundState: 'new', expected: 'FIXME', state: 'fixme', subject: 'this test' }, suggestions: [] }],
+      errors: [
+        {
+          messageId: 'sharedMarker',
+          data: { found: 'NEW', foundState: 'new', expected: 'FIXME', state: 'fixme', subject: 'this test' },
+          suggestions: [],
+        },
+      ],
     },
     {
       code: "// SKIP:\ntest.skip('a @new', async () => {});",

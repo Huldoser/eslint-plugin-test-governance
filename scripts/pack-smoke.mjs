@@ -13,7 +13,8 @@ const root = path.resolve(import.meta.dirname, '..');
 const eslintArg = process.argv.indexOf('--eslint');
 const eslintVersion = eslintArg === -1 ? '10' : process.argv[eslintArg + 1];
 const work = mkdtempSync(path.join(tmpdir(), 'test-governance-pack-'));
-const run = (cmd, args, cwd) => execFileSync(cmd, args, { cwd, stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8' });
+const run = (cmd, args, cwd) =>
+  execFileSync(cmd, args, { cwd, stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8' });
 
 try {
   const [{ filename }] = JSON.parse(run('npm', ['pack', '--json', '--pack-destination', work], root));
@@ -21,7 +22,14 @@ try {
   cpSync(path.join(root, 'tests/fixtures/sample-project'), project, { recursive: true });
   run(
     'npm',
-    ['install', '--no-audit', '--no-fund', path.join(work, filename), `eslint@${eslintVersion}`, '@typescript-eslint/parser'],
+    [
+      'install',
+      '--no-audit',
+      '--no-fund',
+      path.join(work, filename),
+      `eslint@${eslintVersion}`,
+      '@typescript-eslint/parser',
+    ],
     project,
   );
 

@@ -13,14 +13,20 @@ export interface RuleDocs {
   url: string;
 }
 
-export type Rule<MessageIds extends string> = TSESLint.RuleModule<MessageIds, RuleOptions, RuleDocs>;
+export type Rule<MessageIds extends string> = TSESLint.RuleModule<MessageIds, RuleOptions, RuleDocs> & {
+  meta: { docs: RuleDocs };
+};
 
 export interface RuleDefinition<MessageIds extends string> {
   name: string;
   meta: Omit<TSESLint.RuleMetaData<MessageIds, RuleDocs, RuleOptions>, 'docs' | 'schema' | 'defaultOptions'> & {
     docs: Omit<RuleDocs, 'url'>;
   };
-  check(context: Readonly<TSESLint.RuleContext<MessageIds, RuleOptions>>, analysis: Analysis, options: ResolvedOptions): void;
+  check(
+    context: Readonly<TSESLint.RuleContext<MessageIds, RuleOptions>>,
+    analysis: Analysis,
+    options: ResolvedOptions,
+  ): void;
 }
 
 /**

@@ -25,12 +25,14 @@ The rule offers a suggestion to delete the comment.
 Incorrect:
 
 <!-- example: invalid settings={"lifecycleTags":true} -->
+
 ```js
 // NEW: WEB-80 promoted last sprint
 test('saved addresses', async () => {});
 ```
 
 <!-- example: invalid -->
+
 ```js
 test('checkout', async ({ page }) => {
   // FIXME: WEB-81
@@ -41,11 +43,13 @@ test('checkout', async ({ page }) => {
 Correct:
 
 <!-- example: valid settings={"lifecycleTags":true} -->
+
 ```js
 test('saved addresses', async () => {});
 ```
 
 <!-- example: valid -->
+
 ```js
 test('checkout', async ({ page }) => {
   // FIXME: the banner sometimes covers the button on slow machines
@@ -54,6 +58,7 @@ test('checkout', async ({ page }) => {
 ```
 
 <!-- example: valid -->
+
 ```js
 // FIXME: WEB-81
 test.fixme('checkout', async ({ page }) => {
@@ -64,4 +69,3 @@ test.fixme('checkout', async ({ page }) => {
 ## Options
 
 Uses the shared options described in the [README](../../README.md#options).
-

@@ -21,11 +21,9 @@ describe('compileOptions', () => {
   });
 
   it('lets states override lifecycleTags and defaults', () => {
-    expect(stateNames({ lifecycleTags: true, states: { unstable: false, fail: true, skip: { enabled: false } } })).toEqual([
-      'fixme',
-      'fail',
-      'new',
-    ]);
+    expect(
+      stateNames({ lifecycleTags: true, states: { unstable: false, fail: true, skip: { enabled: false } } }),
+    ).toEqual(['fixme', 'fail', 'new']);
   });
 
   it('adds custom states after the built-ins', () => {

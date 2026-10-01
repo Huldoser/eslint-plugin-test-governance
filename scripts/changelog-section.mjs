@@ -14,7 +14,13 @@ const changelog = readFileSync(path.resolve(import.meta.dirname, '../CHANGELOG.m
 const lines = changelog.split('\n');
 const start = lines.findIndex((line) => line.startsWith(`## [${version}]`));
 const end = lines.findIndex((line, i) => i > start && (line.startsWith('## ') || /^\[[^\]]+\]: /.test(line)));
-const body = start === -1 ? '' : lines.slice(start + 1, end === -1 ? undefined : end).join('\n').trim();
+const body =
+  start === -1
+    ? ''
+    : lines
+        .slice(start + 1, end === -1 ? undefined : end)
+        .join('\n')
+        .trim();
 
 if (!body) {
   console.error(`CHANGELOG.md has no entry for ${version}. Add a "## [${version}] - <date>" section.`);

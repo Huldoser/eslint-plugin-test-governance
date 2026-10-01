@@ -35,7 +35,11 @@ export default createRule({
       for (const { state, required } of subject.states) {
         if (!required) continue;
         const result = evaluate(subject, state);
-        if (result.kind !== 'ok' && result.kind !== 'missing' && !reportOnce(`${result.marker.comment.range[0]}:${state.name}`)) {
+        if (
+          result.kind !== 'ok' &&
+          result.kind !== 'missing' &&
+          !reportOnce(`${result.marker.comment.range[0]}:${state.name}`)
+        ) {
           continue;
         }
         const data = { state: state.name, marker: state.marker, example: state.ticket.example };
