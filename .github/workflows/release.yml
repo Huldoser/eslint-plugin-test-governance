@@ -1,0 +1,64 @@
+name: Release
+
+# Pushing a tag such as v0.1.1 stages that version on npm and creates the GitHub release.
+# A maintainer then approves the staged version on npmjs.com with 2FA, which makes it public.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Stage on npm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # trusted publishing and provenance
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false # never restore a cache in a release build
+      # Staged publishing through trusted publishing needs a newer npm than Node ships with.
+      - run: npm install -g npm@11.21.0
+      - run: npm ci
+      - name: Check the tag matches the package version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+      - run: npm run typecheck
+      - run: npm run test:coverage
+      - run: npm run test:pack
+      - name: Check the plugin reports the same version
+        run: |
+          node --input-type=module -e "
+            import plugin from './dist/index.js';
+            const expected = process.env.GITHUB_REF_NAME.slice(1);
+            if (plugin.meta.version !== expected) {
+              console.error('::error::meta.version is ' + plugin.meta.version + ', expected ' + expected);
+              process.exit(1);
+            }"
+      - run: npm stage publish --provenance --access public
+
+  github-release:
+    name: Create GitHub release
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}

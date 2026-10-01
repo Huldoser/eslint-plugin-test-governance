@@ -48,5 +48,18 @@ reached, remove it rather than excluding it.
 - Pull requests are squash-merged, so the PR title becomes the commit subject on `main`.
 - Changes to `main` go through pull requests and need an approving review from the maintainer.
 
+## Releasing
+
+For the maintainer:
+
+1. Open a pull request that bumps the version in `package.json` and `package-lock.json`
+   (`npm version <x.y.z> --no-git-tag-version` does both), and merge it. The plugin reads its
+   `meta.version` from `package.json`.
+2. Tag the merge commit and push the tag: `git tag v<x.y.z> && git push origin v<x.y.z>`.
+3. The Release workflow checks that the tag matches the package version, runs the checks above,
+   stages the version on npm with provenance and creates the GitHub release with generated notes.
+4. Approve the staged version under Staged Packages on npmjs.com (2FA required). It becomes the
+   `latest` version on npm.
+
 By contributing, you agree that your contributions are licensed under the [MIT License](LICENSE)
 and that you'll follow the [Code of Conduct](CODE_OF_CONDUCT.md).
