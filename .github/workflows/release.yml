@@ -55,8 +55,13 @@ jobs:
             echo "::error::Tag $GITHUB_REF_NAME points at $GITHUB_SHA, which is not on main. Tag a commit on main."
             exit 1
           fi
-      - name: Check the changelog has an entry for this version
-        run: node scripts/changelog-section.mjs "$GITHUB_REF_NAME" > /dev/null
+      - name: Check the changelog has an entry for this version and nothing unreleased
+        run: |
+          node scripts/changelog-section.mjs "$GITHUB_REF_NAME" > /dev/null
+          if node scripts/changelog-section.mjs Unreleased > /dev/null 2>&1; then
+            echo "::error::CHANGELOG.md has entries under [Unreleased], so $GITHUB_REF_NAME would ship changes its notes leave out. Tag the commit that released them, or move them into the version's section."
+            exit 1
+          fi
       - run: npm run lint
       - run: npm run format:check
       - run: npm run typecheck
