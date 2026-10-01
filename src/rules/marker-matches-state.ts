@@ -20,12 +20,12 @@ export default createRule({
       addMarker: 'Add `// {{expected}}: {{tickets}}` with the same ticket.',
     },
   },
-  check(context, analysis) {
+  check(context, analysis, options) {
     const { sourceCode } = context;
     for (const subject of analysis.subjects) {
       const missing = missingStates(subject);
       if (missing.length === 0) continue;
-      const stray = strayMarkers(subject);
+      const stray = strayMarkers(subject, options);
       const subjectName = describeSubject(subject).replace(/^This/, 'this');
 
       for (const marker of stray) {

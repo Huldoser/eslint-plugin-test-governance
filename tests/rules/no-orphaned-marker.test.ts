@@ -20,15 +20,24 @@ runRule('no-orphaned-marker', rule, {
     "// SKIP: WEB-1\ntest.fixme('a', async () => {});",
     // An ordinary comment that happens to start with a marker keyword is not a leftover ticket.
     "test('a', async ({ page }) => {\n  // FIXME: this check is flaky on slow machines\n  await page.goto('/');\n});",
+    // FIXME and TODO are work comments; require-ticket-in-comments checks them, not this rule.
+    "test('a', async ({ page }) => {\n  // FIXME: WEB-1\n  await page.goto('/');\n});",
+    "// FIXME: later\nconst x = 1;\ntest('a', async () => {});",
+    "// TODO: WEB-5\ntest('a', async () => {});",
+    "// FIXME:\ntest('a', async () => {});",
+    // Files without Playwright tests are not checked at all.
+    'const x = 1; // SKIP: WEB-1',
+    "import { helper } from './helper';\n// SKIP: WEB-1\nhelper();",
+    // A Playwright import alone makes it a test file.
+    {
+      code: "import { expect } from '@playwright/test';\n// FIXME: WEB-1\nexpect(1).toBe(1);",
+    },
+
     '// FIXME: how to restrict it to frames only\nconst matchers = {};',
     "// SKIP: flaky on CI, see WEB-1\ntest('a', async () => {});",
   ],
   invalid: [
-    // A lone word or a malformed ticket still reads as a marker.
-    {
-      code: '// FIXME: later\nconst x = 1;',
-      errors: [{ messageId: 'detached', suggestions: [{ messageId: 'removeMarker', output: 'const x = 1;' }] }],
-    },
+    // A malformed ticket still reads as a marker.
     {
       code: "// SKIP: web-12\ntest('a', async () => {});",
       errors: [
@@ -75,11 +84,11 @@ runRule('no-orphaned-marker', rule, {
       ],
     },
     {
-      code: "test('a', async ({ page }) => {\n  // FIXME: WEB-1\n  await page.goto('/');\n});",
+      code: "test('a', async ({ page }) => {\n  // SKIP: WEB-1\n  await page.goto('/');\n});",
       errors: [
         {
           messageId: 'detached',
-          data: { marker: 'FIXME' },
+          data: { marker: 'SKIP' },
           suggestions: [
             { messageId: 'removeMarker', output: "test('a', async ({ page }) => {\n  await page.goto('/');\n});" },
           ],
@@ -108,8 +117,13 @@ runRule('no-orphaned-marker', rule, {
       ],
     },
     {
-      code: 'const x = 1; // SKIP: WEB-1',
-      errors: [{ messageId: 'detached', suggestions: [{ messageId: 'removeMarker', output: 'const x = 1; ' }] }],
+      code: "test('a', async () => {});\nconst x = 1; // SKIP: WEB-1",
+      errors: [
+        {
+          messageId: 'detached',
+          suggestions: [{ messageId: 'removeMarker', output: "test('a', async () => {});\nconst x = 1; " }],
+        },
+      ],
     },
     {
       code: "// SKIP: WEB-1\n\ntest.skip('a', async () => {});",

@@ -146,6 +146,5 @@ test('one-click reorder', { tag: '@new' }, async ({ page }) => {});
 
 ## Options
 
-This rule reads the shared options described in the [README](../../README.md#options), usually set once
-with `testGovernance.configure({...})`. It also accepts the same object as a rule option, which
-overrides the shared settings for this rule only.
+This rule has no options of its own. It reads the shared options described in the
+[README](../../README.md#options), usually set once with `testGovernance.configure({...})`.
