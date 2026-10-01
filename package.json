@@ -18,7 +18,7 @@
     "url": "git+https://github.com/Huldoser/eslint-plugin-test-governance.git"
   },
   "license": "MIT",
-  "author": "Andrey",
+  "author": "Andrey Rychkov",
   "type": "module",
   "exports": {
     ".": {
