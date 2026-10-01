@@ -32,7 +32,8 @@
   "files": [
     "dist",
     "!dist/**/*.map",
-    "docs"
+    "docs",
+    "CHANGELOG.md"
   ],
   "engines": {
     "node": ">=22.12"
