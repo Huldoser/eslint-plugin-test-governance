@@ -1,6 +1,6 @@
 {
   "name": "eslint-plugin-test-governance",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "ESLint rules that require a ticket comment above skipped, fixme and tagged Playwright tests.",
   "keywords": [
     "eslint",
