@@ -1,7 +1,6 @@
 {
   "name": "eslint-plugin-test-governance",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.2.0",
   "description": "ESLint rules that require a ticket comment above skipped, fixme and tagged Playwright tests.",
   "keywords": [
     "eslint",
@@ -23,7 +22,7 @@
     "url": "git+https://github.com/Huldoser/eslint-plugin-test-governance.git"
   },
   "license": "MIT",
-  "author": "Andrey",
+  "author": "Andrey Rychkov",
   "type": "module",
   "exports": {
     ".": {
@@ -37,20 +36,25 @@
   "files": [
     "dist",
     "!dist/**/*.map",
-    "docs"
+    "docs",
+    "CHANGELOG.md"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=22.12"
   },
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.test.json",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:pack": "node scripts/pack-smoke.mjs",
     "docs": "npm run build && eslint-doc-generator",
     "docs:check": "npm run build && eslint-doc-generator --check",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "peerDependencies": {
     "eslint": "^9.0.0 || ^10.0.0"
@@ -61,8 +65,13 @@
     "@typescript-eslint/utils": "^8.71.0",
     "@vitest/coverage-v8": "^5.0.2",
     "eslint": "^10.11.0",
+    "eslint-config-prettier": "^10.1.8",
     "eslint-doc-generator": "^3.7.1",
+    "eslint-plugin-eslint-plugin": "^7.6.2",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.9",
     "typescript": "6.0",
+    "typescript-eslint": "^8.71.0",
     "vitest": "^5.0.2"
   }
 }

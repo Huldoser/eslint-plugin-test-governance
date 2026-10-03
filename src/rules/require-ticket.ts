@@ -1,4 +1,4 @@
-import { appliesTo, describeSubject, evaluate } from '../utils/analyze.js';
+import { appliesTo, describeSubject, evaluate, headLoc } from '../utils/analyze.js';
 import { createRule } from '../utils/create-rule.js';
 
 export default createRule({
@@ -35,7 +35,11 @@ export default createRule({
       for (const { state, required } of subject.states) {
         if (!required) continue;
         const result = evaluate(subject, state);
-        if (result.kind !== 'ok' && result.kind !== 'missing' && !reportOnce(`${result.marker.comment.range[0]}:${state.name}`)) {
+        if (
+          result.kind !== 'ok' &&
+          result.kind !== 'missing' &&
+          !reportOnce(`${result.marker.comment.range[0]}:${state.name}`)
+        ) {
           continue;
         }
         const data = { state: state.name, marker: state.marker, example: state.ticket.example };
@@ -44,7 +48,7 @@ export default createRule({
             break;
           case 'missing':
             context.report({
-              node: subject.node,
+              loc: headLoc(subject),
               messageId: 'missingMarker',
               data: { ...data, subject: describeSubject(subject) },
             });

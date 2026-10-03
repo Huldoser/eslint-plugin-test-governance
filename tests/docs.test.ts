@@ -5,7 +5,7 @@ import { Linter } from 'eslint';
 import testGovernance from '../src/index.js';
 
 const docsDir = path.resolve(import.meta.dirname, '../docs/rules');
-const EXAMPLE_RE = /<!-- example: (valid|invalid)(?: settings=(\{.*?\}))? -->\n```(js|ts)\n([\s\S]*?)```/g;
+const EXAMPLE_RE = /<!-- example: (valid|invalid)(?: settings=(\{.*?\}))? -->\n+```(js|ts)\n([\s\S]*?)```/g;
 
 // Every example in the rule docs runs, so a "correct" example can never start failing silently.
 describe.each(readdirSync(docsDir).filter((f) => f.endsWith('.md')))('%s', (file) => {
@@ -30,7 +30,7 @@ describe.each(readdirSync(docsDir).filter((f) => f.endsWith('.md')))('%s', (file
             languageOptions: lang === 'ts' ? { parser: tsParser } : {},
             plugins: { 'test-governance': testGovernance },
             rules: { [`test-governance/${rule}`]: 'error' },
-            settings: { 'test-governance': settings ? JSON.parse(settings) : {} },
+            settings: { 'test-governance': settings ? (JSON.parse(settings) as Record<string, unknown>) : {} },
           },
         ],
         `example.spec.${lang}`,

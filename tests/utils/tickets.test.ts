@@ -9,7 +9,15 @@ interface Table {
 const tables: Record<string, Table> = {
   any: {
     spec: { preset: 'any' },
-    accepts: ['WEB-123', 'AB_C-9', '#4821', 'acme/web#4821', 'group/sub/project#7', 'https://example.com/x', 'http://jira/browse/WEB-1'],
+    accepts: [
+      'WEB-123',
+      'AB_C-9',
+      '#4821',
+      'acme/web#4821',
+      'group/sub/project#7',
+      'https://example.com/x',
+      'http://jira/browse/WEB-1',
+    ],
     rejects: ['web-123', 'W-1', 'WEB-', '4821', 'flaky', 'ftp://example.com/x', 'https://', 'acme#4821'],
   },
   jira: {
@@ -20,7 +28,13 @@ const tables: Record<string, Table> = {
       'https://acme.atlassian.net/browse/WEB-123/',
       'https://acme.atlassian.net/jira/software/projects/WEB/boards/1?selectedIssue=WEB-123',
     ],
-    rejects: ['#4821', 'web-123', 'https://acme.atlassian.net/browse/web-1', 'https://acme.atlassian.net/boards/1', 'https://acme.atlassian.net/x?selectedIssue=nope'],
+    rejects: [
+      '#4821',
+      'web-123',
+      'https://acme.atlassian.net/browse/web-1',
+      'https://acme.atlassian.net/boards/1',
+      'https://acme.atlassian.net/x?selectedIssue=nope',
+    ],
   },
   'jira with projects and host': {
     spec: { preset: 'jira', projects: ['WEB', 'QA'], host: 'jira.acme.io' },
@@ -29,8 +43,20 @@ const tables: Record<string, Table> = {
   },
   github: {
     spec: { preset: 'github' },
-    accepts: ['#4821', 'acme/web#4821', 'acme/web.js#1', 'https://github.com/acme/web/issues/4821', 'https://github.com/acme/web/pull/7/'],
-    rejects: ['WEB-1', 'acme#1', 'https://github.com/acme/web', 'https://gitlab.com/acme/web/issues/1', 'https://github.com/acme/web/issues/x'],
+    accepts: [
+      '#4821',
+      'acme/web#4821',
+      'acme/web.js#1',
+      'https://github.com/acme/web/issues/4821',
+      'https://github.com/acme/web/pull/7/',
+    ],
+    rejects: [
+      'WEB-1',
+      'acme#1',
+      'https://github.com/acme/web',
+      'https://gitlab.com/acme/web/issues/1',
+      'https://github.com/acme/web/issues/x',
+    ],
   },
   'github enterprise': {
     spec: { preset: 'github', host: 'git.acme.io' },
@@ -39,18 +65,38 @@ const tables: Record<string, Table> = {
   },
   gitlab: {
     spec: { preset: 'gitlab' },
-    accepts: ['#4821', 'group/project#1', 'group/sub/project#1', 'https://gitlab.com/group/sub/project/-/issues/9', 'https://gitlab.com/g/p/-/work_items/9'],
+    accepts: [
+      '#4821',
+      'group/project#1',
+      'group/sub/project#1',
+      'https://gitlab.com/group/sub/project/-/issues/9',
+      'https://gitlab.com/g/p/-/work_items/9',
+    ],
     rejects: ['project#1', 'https://gitlab.com/g/p/issues/9', 'https://example.com/g/p/-/issues/9'],
   },
   linear: {
     spec: { preset: 'linear', teams: ['ENG'] },
     accepts: ['ENG-123', 'https://linear.app/acme/issue/ENG-123', 'https://linear.app/acme/issue/ENG-123/fix-checkout'],
-    rejects: ['OPS-1', 'https://linear.app/acme/issue/OPS-1', 'https://linear.app/acme/project/x', 'https://example.com/acme/issue/ENG-1'],
+    rejects: [
+      'OPS-1',
+      'https://linear.app/acme/issue/OPS-1',
+      'https://linear.app/acme/project/x',
+      'https://example.com/acme/issue/ENG-1',
+    ],
   },
   'azure-devops': {
     spec: { preset: 'azure-devops' },
-    accepts: ['AB#4821', 'https://dev.azure.com/acme/web/_workitems/edit/4821', 'https://acme.visualstudio.com/web/_workitems/edit/4821/'],
-    rejects: ['#4821', 'ab#1', 'https://example.com/acme/web/_workitems/edit/4821', 'https://dev.azure.com/acme/web/_boards'],
+    accepts: [
+      'AB#4821',
+      'https://dev.azure.com/acme/web/_workitems/edit/4821',
+      'https://acme.visualstudio.com/web/_workitems/edit/4821/',
+    ],
+    rejects: [
+      '#4821',
+      'ab#1',
+      'https://example.com/acme/web/_workitems/edit/4821',
+      'https://dev.azure.com/acme/web/_boards',
+    ],
   },
   'azure-devops on a server': {
     spec: { preset: 'azure-devops', host: 'tfs.acme.io' },
@@ -76,24 +122,43 @@ const tables: Record<string, Table> = {
 
 describe.each(Object.entries(tables))('%s preset', (_, { spec, accepts, rejects }) => {
   const matcher = compileTicketSpec(Array.isArray(spec) ? spec : [spec], []);
-  it.each(accepts)('accepts %s', (ticket) => expect(matcher.check(ticket)).toBe('ok'));
-  it.each(rejects)('rejects %s', (ticket) => expect(matcher.check(ticket)).toBe('format'));
+  it.each(accepts)('accepts %s', (ticket) => {
+    expect(matcher.check(ticket)).toBe('ok');
+  });
+  it.each(rejects)('rejects %s', (ticket) => {
+    expect(matcher.check(ticket)).toBe('format');
+  });
 });
 
 describe('placeholders', () => {
   const matcher = compileTicketSpec([{ preset: 'any' }], DEFAULT_PLACEHOLDERS);
-  it.each(['TODO', 'todo', 'TBD', 'XXX-1', 'xxx-999', '0', '#0', '123', '#123', '1234', '12345'])('rejects %s', (ticket) =>
-    expect(matcher.check(ticket)).toBe('placeholder'),
+  it.each(['TODO', 'todo', 'TBD', 'XXX-1', 'xxx-999', '0', '#0', '123', '#123', '1234', '12345'])(
+    'rejects %s',
+    (ticket) => {
+      expect(matcher.check(ticket)).toBe('placeholder');
+    },
   );
-  it.each(['WEB-123', '#4821', 'XXXX-1'])('accepts %s', (ticket) => expect(matcher.check(ticket)).toBe('ok'));
+  it.each(['WEB-123', '#4821', 'XXXX-1'])('accepts %s', (ticket) => {
+    expect(matcher.check(ticket)).toBe('ok');
+  });
 
-  it.each(['WEB-0', 'SDQA-000', '#00', 'acme/web#0', 'AB#0', 'https://github.com/acme/web/issues/0', 'https://x.io/browse/WEB-0/', '000'])(
-    'rejects %s, since no tracker issues number 0',
-    (ticket) => expect(compileTicketSpec([{ preset: 'any' }, { preset: 'azure-devops' }, { preset: 'numeric' }], []).check(ticket)).toBe('placeholder'),
-  );
-  it.each(['WEB-10', '#100', 'https://github.com/acme/web/issues/10', '1000'])('still accepts %s', (ticket) =>
-    expect(compileTicketSpec([{ preset: 'any' }, { preset: 'numeric' }], []).check(ticket)).toBe('ok'),
-  );
+  it.each([
+    'WEB-0',
+    'SDQA-000',
+    '#00',
+    'acme/web#0',
+    'AB#0',
+    'https://github.com/acme/web/issues/0',
+    'https://x.io/browse/WEB-0/',
+    '000',
+  ])('rejects %s, since no tracker issues number 0', (ticket) => {
+    expect(
+      compileTicketSpec([{ preset: 'any' }, { preset: 'azure-devops' }, { preset: 'numeric' }], []).check(ticket),
+    ).toBe('placeholder');
+  });
+  it.each(['WEB-10', '#100', 'https://github.com/acme/web/issues/10', '1000'])('still accepts %s', (ticket) => {
+    expect(compileTicketSpec([{ preset: 'any' }, { preset: 'numeric' }], []).check(ticket)).toBe('ok');
+  });
 
   it('uses a custom list with regex characters taken literally', () => {
     const custom = compileTicketSpec([{ preset: 'any' }], ['N/A', 'WEB-0*', '(none)']);
@@ -128,11 +193,18 @@ describe('messages', () => {
   it('gives a numeric example that fits the length limits and is not a placeholder', () => {
     const example = (minLength: number, maxLength: number) =>
       compileTicketSpec([{ preset: 'numeric', minLength, maxLength }], DEFAULT_PLACEHOLDERS).example;
-    for (const [min, max] of [[1, 20], [5, 5], [2, 3], [8, 10]]) {
+    for (const [min, max] of [
+      [1, 20],
+      [5, 5],
+      [2, 3],
+      [8, 10],
+    ]) {
       const sample = example(min, max);
       expect(sample.length).toBeGreaterThanOrEqual(min);
       expect(sample.length).toBeLessThanOrEqual(max);
-      expect(compileTicketSpec([{ preset: 'numeric', minLength: min, maxLength: max }], DEFAULT_PLACEHOLDERS).check(sample)).toBe('ok');
+      expect(
+        compileTicketSpec([{ preset: 'numeric', minLength: min, maxLength: max }], DEFAULT_PLACEHOLDERS).check(sample),
+      ).toBe('ok');
     }
   });
 

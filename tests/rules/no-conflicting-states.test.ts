@@ -100,7 +100,7 @@ runRule('no-conflicting-states', rule, {
       errors: [{ messageId: 'tagTypo', data: { found: '@unstabel', expected: '@unstable' } }],
     },
     {
-      code: "test(`a ${x} @quarantin`, async () => {});",
+      code: 'test(`a ${x} @quarantin`, async () => {});',
       settings: custom,
       errors: [{ messageId: 'tagTypo', data: { found: '@quarantin', expected: '@quarantine' } }],
     },

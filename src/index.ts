@@ -1,7 +1,9 @@
+import { createRequire } from 'node:module';
 import type { ESLint, Rule } from 'eslint';
 import markerMatchesState from './rules/marker-matches-state.js';
 import noConflictingStates from './rules/no-conflicting-states.js';
 import noOrphanedMarker from './rules/no-orphaned-marker.js';
+import requireTicketInComments from './rules/require-ticket-in-comments.js';
 import requireTicket from './rules/require-ticket.js';
 import { compileOptions, SETTINGS_KEY, type GovernanceOptions } from './utils/options.js';
 
@@ -9,22 +11,32 @@ export type { CustomState, GovernanceOptions, StateOverride } from './utils/opti
 export type { TicketSpec } from './utils/tickets.js';
 
 const PLUGIN_NAME = 'test-governance';
-const VERSION = '0.0.0';
+// Read at load time so the reported version always matches the published package.
+const { version: VERSION } = createRequire(import.meta.url)('../package.json') as { version: string };
 
-export type RuleName = 'require-ticket' | 'marker-matches-state' | 'no-orphaned-marker' | 'no-conflicting-states';
+export type RuleName =
+  | 'require-ticket'
+  | 'marker-matches-state'
+  | 'no-orphaned-marker'
+  | 'no-conflicting-states'
+  | 'require-ticket-in-comments';
 
-const ruleModules: Record<RuleName, { meta: { docs?: { recommended: 'error' | 'warn' } } }> = {
+const ruleModules: Record<RuleName, { meta: { docs: { recommended: 'error' | 'warn' } } }> = {
   'require-ticket': requireTicket,
   'marker-matches-state': markerMatchesState,
   'no-orphaned-marker': noOrphanedMarker,
   'no-conflicting-states': noConflictingStates,
+  'require-ticket-in-comments': requireTicketInComments,
 };
 
 // Public types come from `eslint` itself, so users don't need typescript-eslint installed.
 export const rules = ruleModules as unknown as Record<RuleName, Rule.RuleModule>;
 
 const recommendedRules = Object.fromEntries(
-  (Object.keys(ruleModules) as RuleName[]).map((name) => [`${PLUGIN_NAME}/${name}`, ruleModules[name].meta.docs!.recommended]),
+  (Object.keys(ruleModules) as RuleName[]).map((name) => [
+    `${PLUGIN_NAME}/${name}`,
+    ruleModules[name].meta.docs.recommended,
+  ]),
 ) as Record<`${typeof PLUGIN_NAME}/${RuleName}`, 'error' | 'warn'>;
 
 export interface FlatConfig {
@@ -45,20 +57,22 @@ const plugin: TestGovernancePlugin = {
   meta: { name: 'eslint-plugin-test-governance', version: VERSION, namespace: PLUGIN_NAME },
   rules,
   configs: {} as { recommended: FlatConfig },
-  /**
-   * Returns the recommended config with shared options in `settings['test-governance']`,
-   * so all rules read the same ticket formats and states.
-   */
-  configure(options: GovernanceOptions = {}): FlatConfig {
-    compileOptions(options); // fail on a bad config at load time, not on the first lint
-    return {
-      name: `${PLUGIN_NAME}/recommended`,
-      plugins: { [PLUGIN_NAME]: plugin },
-      rules: { ...recommendedRules },
-      settings: { [SETTINGS_KEY]: options },
-    };
-  },
+  configure,
 };
+
+/**
+ * Returns the recommended config with shared options in `settings['test-governance']`,
+ * so all rules read the same ticket formats and states.
+ */
+export function configure(options: GovernanceOptions = {}): FlatConfig {
+  compileOptions(options); // fail on a bad config at load time, not on the first lint
+  return {
+    name: `${PLUGIN_NAME}/recommended`,
+    plugins: { [PLUGIN_NAME]: plugin },
+    rules: { ...recommendedRules },
+    settings: { [SETTINGS_KEY]: options },
+  };
+}
 
 plugin.configs.recommended = {
   name: `${PLUGIN_NAME}/recommended`,
@@ -67,5 +81,8 @@ plugin.configs.recommended = {
 };
 
 export const configs = plugin.configs;
-export const configure = plugin.configure;
 export default plugin;
+// Makes `require('eslint-plugin-test-governance')` return the plugin itself rather than the module
+// namespace. With the namespace, a CommonJS config that registers the plugin next to
+// `configs.recommended` fails with "Cannot redefine plugin".
+export { plugin as 'module.exports' };

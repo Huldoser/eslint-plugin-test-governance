@@ -1,4 +1,8 @@
+import { DEFAULT_COMMENT_KEYWORDS, type BuiltinStateName } from './constants.js';
+import { ConfigError } from './errors.js';
+import { optionsSchema } from './schema.js';
 import { compileTicketSpec, DEFAULT_PLACEHOLDERS, type TicketMatcher, type TicketSpec } from './tickets.js';
+import { validate } from './validate.js';
 
 export const SETTINGS_KEY = 'test-governance';
 
@@ -17,7 +21,7 @@ export interface CustomState {
   ticket?: TicketSpec | TicketSpec[];
 }
 
-export type BuiltinStateName = 'skip' | 'fixme' | 'fail' | 'slow' | 'new' | 'unstable';
+export type { BuiltinStateName } from './constants.js';
 
 /** Options shared by every rule. Set them once in `settings['test-governance']`. */
 export interface GovernanceOptions {
@@ -35,20 +39,32 @@ export interface GovernanceOptions {
   requireTicketForConditional?: boolean;
   /** Let blank lines separate a marker from the test it belongs to. */
   allowBlankLine?: boolean;
+  /**
+   * Comment keywords that must start with a ticket anywhere in a test file, e.g. `// TODO: WEB-123`.
+   * Defaults to `{ keywords: ['FIXME', 'TODO'] }`; `false` allows free-form comments.
+   */
+  comments?: false | { keywords?: string[] };
   /** Allow free text after the tickets, e.g. `// SKIP: WEB-1 flaky on CI`. Off by default: details belong in the ticket. */
   allowNotes?: boolean;
   /** Report titles that aren't static text when a tag state is on, because their tags can't be read. */
   reportDynamicTitles?: boolean;
 }
 
-export interface StateDef {
+export type Modifier = 'skip' | 'fixme' | 'fail' | 'slow';
+
+interface StateBase {
   name: string;
   marker: string;
-  /** Modifier (`test.skip`) for modifier states. */
-  modifier?: 'skip' | 'fixme' | 'fail' | 'slow';
-  /** Tag (`@new`) for tag states. */
-  tag?: string;
   ticket: TicketMatcher;
+}
+
+/** A state is entered either through a modifier (`test.skip`) or through a tag (`@new`), never both. */
+export type StateDef = StateBase & ({ modifier: Modifier; tag?: undefined } | { tag: string; modifier?: undefined });
+
+export type TagStateDef = Extract<StateDef, { tag: string }>;
+
+export function isTagState(state: StateDef): state is TagStateDef {
+  return state.tag !== undefined;
 }
 
 export interface ResolvedOptions {
@@ -58,17 +74,22 @@ export interface ResolvedOptions {
   allowBlankLine: boolean;
   allowNotes: boolean;
   reportDynamicTitles: boolean;
+  /** Keywords checked by `require-ticket-in-comments`; empty when `comments: false`. */
+  commentKeywords: string[];
+  /**
+   * Keywords that are ordinary work comments as well as markers (`FIXME`, `TODO` and any configured
+   * comment keywords). A `// FIXME: refactor` with no ticket is a work comment, never a stray marker.
+   */
+  workCommentKeywords: Set<string>;
+  /** Ticket format for comments: the shared default format. */
+  commentTicket: TicketMatcher;
 }
 
-interface BuiltinDef {
-  marker: string;
-  modifier?: StateDef['modifier'];
-  tag?: string;
-  lifecycle?: boolean;
-  enabled: boolean;
-}
+type BuiltinDef = { marker: string; lifecycle?: boolean; enabled: boolean } & (
+  { modifier: Modifier; tag?: undefined } | { tag: string; modifier?: undefined }
+);
 
-export const BUILTIN_STATES: Record<BuiltinStateName, BuiltinDef> = {
+const BUILTIN_STATES: Record<BuiltinStateName, BuiltinDef> = {
   skip: { marker: 'SKIP', modifier: 'skip', enabled: true },
   fixme: { marker: 'FIXME', modifier: 'fixme', enabled: true },
   fail: { marker: 'FAIL', modifier: 'fail', enabled: false },
@@ -77,44 +98,34 @@ export const BUILTIN_STATES: Record<BuiltinStateName, BuiltinDef> = {
   unstable: { marker: 'UNSTABLE', tag: '@unstable', lifecycle: true, enabled: false },
 };
 
-export const MARKER_RE = /^[A-Z][A-Z0-9_-]*$/;
-export const TAG_RE = /^@[\w-]+$/;
-
-export class ConfigError extends Error {
-  constructor(message: string) {
-    super(`eslint-plugin-test-governance: ${message}`);
-    this.name = 'ConfigError';
-  }
-}
+export { ConfigError } from './errors.js';
 
 function toSpecs(spec: TicketSpec | TicketSpec[]): TicketSpec[] {
   return Array.isArray(spec) ? spec : [spec];
 }
 
-const cache = new WeakMap<object, Map<string, ResolvedOptions>>();
+const cache = new WeakMap<object, ResolvedOptions>();
 const EMPTY = {};
 
 /**
- * Merges rule options over `settings['test-governance']` and compiles the result.
- * The result is cached per settings object, so all four rules share one compile.
+ * Compiles `settings['test-governance']`. Every rule reads the same settings, so they always agree,
+ * and the result is cached per settings object, so the rules share one compile.
  */
-export function resolveOptions(settings: unknown, ruleOptions: GovernanceOptions | undefined): ResolvedOptions {
+export function resolveOptions(settings: unknown): ResolvedOptions {
   const shared = ((settings as Record<string, unknown> | undefined)?.[SETTINGS_KEY] ?? EMPTY) as GovernanceOptions;
-  const key = JSON.stringify(ruleOptions ?? null);
-  let byRule = cache.get(shared);
-  if (!byRule) {
-    byRule = new Map();
-    cache.set(shared, byRule);
-  }
-  let resolved = byRule.get(key);
+  let resolved = cache.get(shared);
   if (!resolved) {
-    resolved = compileOptions({ ...shared, ...ruleOptions });
-    byRule.set(key, resolved);
+    resolved = compileOptions(shared);
+    cache.set(shared, resolved);
   }
   return resolved;
 }
 
 export function compileOptions(options: GovernanceOptions): ResolvedOptions {
+  const problems = validate(options, optionsSchema);
+  if (problems.length > 0) {
+    throw new ConfigError(`invalid options:\n${problems.map((problem) => `  - ${problem}`).join('\n')}`);
+  }
   const placeholders = options.placeholders ?? DEFAULT_PLACEHOLDERS;
   const defaultTicket = toSpecs(options.ticket ?? { preset: 'any' });
   const compile = (spec: TicketSpec | TicketSpec[] | undefined): TicketMatcher =>
@@ -128,22 +139,18 @@ export function compileOptions(options: GovernanceOptions): ResolvedOptions {
     const override: StateOverride = typeof raw === 'boolean' ? { enabled: raw } : (raw ?? {});
     const enabled = override.enabled ?? (def.lifecycle ? (options.lifecycleTags ?? def.enabled) : def.enabled);
     if (!enabled) continue;
-    states.push({
+    const base = {
       name,
-      marker: checkMarker(override.marker ?? def.marker, name),
-      modifier: def.modifier,
-      tag: def.tag,
+      marker: override.marker ?? def.marker,
       ticket: override.ticket === undefined ? defaultMatcher : compile(override.ticket),
-    });
+    };
+    states.push(def.modifier === undefined ? { ...base, tag: def.tag } : { ...base, modifier: def.modifier });
   }
 
   for (const [name, custom] of Object.entries(options.customStates ?? {})) {
-    if (!TAG_RE.test(custom.when)) {
-      throw new ConfigError(`customStates.${name}.when must be a tag like "@${name}", got "${custom.when}".`);
-    }
     states.push({
       name,
-      marker: checkMarker(custom.marker, name),
+      marker: custom.marker,
       tag: custom.when,
       ticket: custom.ticket === undefined ? defaultMatcher : compile(custom.ticket),
     });
@@ -160,6 +167,8 @@ export function compileOptions(options: GovernanceOptions): ResolvedOptions {
     }
   }
 
+  const commentKeywords = options.comments === false ? [] : (options.comments?.keywords ?? DEFAULT_COMMENT_KEYWORDS);
+
   return {
     testFunctions: new Set(options.testFunctions ?? ['test']),
     states,
@@ -167,12 +176,8 @@ export function compileOptions(options: GovernanceOptions): ResolvedOptions {
     allowBlankLine: options.allowBlankLine ?? false,
     allowNotes: options.allowNotes ?? false,
     reportDynamicTitles: options.reportDynamicTitles ?? false,
+    commentKeywords,
+    workCommentKeywords: new Set([...DEFAULT_COMMENT_KEYWORDS, ...commentKeywords]),
+    commentTicket: defaultMatcher,
   };
-}
-
-function checkMarker(marker: string, state: string): string {
-  if (!MARKER_RE.test(marker)) {
-    throw new ConfigError(`the marker for state "${state}" must be uppercase letters, digits, "-" or "_", got "${marker}".`);
-  }
-  return marker;
 }

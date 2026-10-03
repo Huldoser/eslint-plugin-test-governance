@@ -1,4 +1,4 @@
-import { describeSubject, missingStates, strayMarkers, type Marker } from '../utils/analyze.js';
+import { describeSubject, isProse, missingStates, strayMarkers, type StateMarker } from '../utils/analyze.js';
 import { createRule } from '../utils/create-rule.js';
 import { removeComment } from '../utils/fix.js';
 
@@ -17,21 +17,30 @@ export default createRule({
       removeMarker: 'Remove this comment.',
     },
   },
-  check(context, analysis) {
+  check(context, analysis, options) {
+    // Files without Playwright tests, such as application code, have no markers to check.
+    if (!analysis.isTestFile) return;
     const { sourceCode } = context;
-    const markers: { marker: Marker; messageId: 'orphaned' | 'detached'; subject: string }[] =
-      analysis.detachedMarkers.map((marker) => ({ marker, messageId: 'detached', subject: '' }));
+    const markers: { marker: StateMarker; messageId: 'orphaned' | 'detached'; subject: string }[] = [];
+    for (const marker of analysis.detachedMarkers) {
+      // `// FIXME: WEB-12` above a helper is a tracked work comment, checked by require-ticket-in-comments.
+      if (options.workCommentKeywords.has(marker.keyword)) continue;
+      markers.push({ marker, messageId: 'detached', subject: '' });
+    }
     for (const subject of analysis.subjects) {
       // A stray marker next to a missing one is a mismatch, reported by marker-matches-state.
       if (missingStates(subject).length > 0) continue;
       const name = describeSubject(subject).replace(/^This/, 'this');
-      for (const marker of strayMarkers(subject)) markers.push({ marker, messageId: 'orphaned', subject: name });
+      for (const marker of strayMarkers(subject, options))
+        markers.push({ marker, messageId: 'orphaned', subject: name });
     }
     for (const { marker, messageId, subject } of markers) {
+      // `// SKIP: this is flaky` is prose, not a leftover ticket.
+      if (isProse(marker)) continue;
       context.report({
         loc: marker.comment.loc,
         messageId,
-        data: { marker: marker.keyword, state: marker.state!.name, subject },
+        data: { marker: marker.keyword, state: marker.state.name, subject },
         suggest: [{ messageId: 'removeMarker', fix: () => removeComment(sourceCode, marker.comment) }],
       });
     }

@@ -1,3 +1,5 @@
+import { ConfigError } from './errors.js';
+
 export type TicketSpec =
   | { preset: 'any' }
   | { preset: 'jira'; projects?: string[]; host?: string }
@@ -69,8 +71,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
   switch (spec.preset) {
     case 'any':
       return {
-        test: (t) =>
-          KEY_RE.test(t) || ISSUE_NUMBER_RE.test(t) || GITLAB_REF_RE.test(t) || parseUrl(t) !== undefined,
+        test: (t) => KEY_RE.test(t) || ISSUE_NUMBER_RE.test(t) || GITLAB_REF_RE.test(t) || parseUrl(t) !== undefined,
         expected: 'a ticket key like PROJ-123, an issue like #4821 or owner/repo#4821, or a URL',
         example: 'PROJ-123',
       };
@@ -148,6 +149,9 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
     case 'numeric': {
       const min = spec.minLength ?? 1;
       const max = spec.maxLength ?? 20;
+      if (min > max) {
+        throw new ConfigError(`numeric ticket minLength (${min}) is greater than maxLength (${max}).`);
+      }
       return {
         test: (t) => DIGITS_RE.test(t) && t.length >= min && t.length <= max,
         expected: min === max ? `a ${min}-digit number` : `a number with ${min} to ${max} digits`,
@@ -155,11 +159,15 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
       };
     }
     case 'pattern': {
+      // The schema can't tie `pattern` to this preset, so check it here.
+      if ((spec as { pattern?: unknown }).pattern === undefined) {
+        throw new ConfigError('the "pattern" ticket preset needs a `pattern` regex string.');
+      }
       let re: RegExp;
       try {
         re = new RegExp(`^(?:${spec.pattern})$`, spec.flags);
       } catch (error) {
-        throw new Error(`eslint-plugin-test-governance: invalid ticket pattern "${spec.pattern}": ${(error as Error).message}`);
+        throw new ConfigError(`invalid ticket pattern "${spec.pattern}": ${(error as Error).message}`);
       }
       return { test: (t) => re.test(t), expected: `a ticket matching /${spec.pattern}/`, example: 'TICKET' };
     }
@@ -180,7 +188,8 @@ export function compileTicketSpec(specs: TicketSpec[], placeholders: string[]): 
   return {
     check(ticket) {
       const bare = ticket.replace(/^#/, '');
-      if (ZERO_ID_RE.test(ticket) || placeholderRes.some((re) => re.test(ticket) || re.test(bare))) return 'placeholder';
+      if (ZERO_ID_RE.test(ticket) || placeholderRes.some((re) => re.test(ticket) || re.test(bare)))
+        return 'placeholder';
       return presets.some((preset) => preset.test(ticket)) ? 'ok' : 'format';
     },
     expected: presets.map((p) => p.expected).join('; or '),

@@ -7,9 +7,7 @@ import { settings } from '../helpers.js';
 const tester = new RuleTester({ languageOptions: { parser: tsParser } });
 
 tester.run('require-ticket (TypeScript syntax)', rule as never, {
-  valid: [
-    "// SKIP: WEB-1\ntest.skip('a', async ({ page }: { page: Page }) => {});",
-  ],
+  valid: ["// SKIP: WEB-1\ntest.skip('a', async ({ page }: { page: Page }) => {});"],
   invalid: [
     {
       code: [
@@ -20,12 +18,13 @@ tester.run('require-ticket (TypeScript syntax)', rule as never, {
         'const c = b!.extend({}) satisfies typeof b;',
         "c.skip('x', async () => {});",
       ].join('\n'),
+      errors: [{ messageId: 'missingMarker', line: 6, column: 1, endLine: 6, endColumn: 11 }],
+      name: 'fixtures extended with TypeScript type arguments, as, ! and satisfies',
       settings: settings({ testFunctions: [] }),
-      errors: [{ messageId: 'missingMarker' }],
     },
     {
       code: "namespace Suite {\n  test.skip('a', async () => {});\n}",
-      errors: [{ messageId: 'missingMarker' }],
+      errors: [{ messageId: 'missingMarker', line: 2, column: 3, endLine: 2, endColumn: 16 }],
     },
   ],
 });

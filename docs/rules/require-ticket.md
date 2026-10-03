@@ -13,14 +13,14 @@ at the ticket that explains it, so disabled tests show up in planning instead of
 
 A test is in a state when it is:
 
-| State | Put there by | Marker | On by default |
-| --- | --- | --- | --- |
-| `skip` | `test.skip('title', fn)`, `test.describe.skip`, `test.skip()` in a body, `testInfo.skip()` | `// SKIP:` | yes |
-| `fixme` | `test.fixme(...)`, `test.describe.fixme`, `testInfo.fixme()` | `// FIXME:` | yes |
-| `new` | the `@new` tag | `// NEW:` | with `lifecycleTags: true` |
-| `unstable` | the `@unstable` tag | `// UNSTABLE:` | with `lifecycleTags: true` |
-| `fail`, `slow` | `test.fail(...)`, `test.slow()` | `// FAIL:`, `// SLOW:` | no |
-| custom | any tag you list in `customStates` | your keyword | when configured |
+| State          | Put there by                                                                               | Marker                 | On by default              |
+| -------------- | ------------------------------------------------------------------------------------------ | ---------------------- | -------------------------- |
+| `skip`         | `test.skip('title', fn)`, `test.describe.skip`, `test.skip()` in a body, `testInfo.skip()` | `// SKIP:`             | yes                        |
+| `fixme`        | `test.fixme(...)`, `test.describe.fixme`, `testInfo.fixme()`                               | `// FIXME:`            | yes                        |
+| `new`          | the `@new` tag                                                                             | `// NEW:`              | with `lifecycleTags: true` |
+| `unstable`     | the `@unstable` tag                                                                        | `// UNSTABLE:`         | with `lifecycleTags: true` |
+| `fail`, `slow` | `test.fail(...)`, `test.slow()`                                                            | `// FAIL:`, `// SLOW:` | no                         |
+| custom         | any tag you list in `customStates`                                                         | your keyword           | when configured            |
 
 Tags are read from the title (`'checkout @new'`) and from `{ tag: '@new' }` or `{ tag: ['@new', '@smoke'] }`.
 Tags on a `describe` apply to every test inside it.
@@ -47,51 +47,58 @@ Tags on a `describe` apply to every test inside it.
 
 How ticket lists are read:
 
-| Marker | Result |
-| --- | --- |
-| `// SKIP: WEB-1, WEB-2` or `// SKIP: WEB-1,WEB-2` | two tickets |
-| `// SKIP:   WEB-1  ,  WEB-2  ` | two tickets; extra spaces are fine |
+| Marker                                                                          | Result                                                    |
+| ------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `// SKIP: WEB-1, WEB-2` or `// SKIP: WEB-1,WEB-2`                               | two tickets                                               |
+| `// SKIP:   WEB-1  ,  WEB-2  `                                                  | two tickets; extra spaces are fine                        |
 | `// SKIP: https://acme.atlassian.net/browse/WEB-1?focusedCommentId=5#comment-5` | one ticket; query strings and fragments are part of a URL |
-| `// SKIP: WEB-1 flaky on CI`, `// SKIP: WEB-1: flaky` | extra text `flaky on CI` / `: flaky` |
-| `// SKIP: WEB-1,` or `// SKIP: WEB-1.` | extra text `,` / `.` |
-| `// SKIP: WEB-1 and WEB-2` | extra text `and WEB-2`; separate tickets with commas |
-| `// SKIP: WEB-1;WEB-2`, `// SKIP: WEB-1/WEB-2` | invalid ticket, since only commas separate tickets |
-| `// SKIP: flaky on CI` | invalid ticket `flaky`: the first word must be a ticket |
+| `// SKIP: WEB-1 flaky on CI`, `// SKIP: WEB-1: flaky`                           | extra text `flaky on CI` / `: flaky`                      |
+| `// SKIP: WEB-1,` or `// SKIP: WEB-1.`                                          | extra text `,` / `.`                                      |
+| `// SKIP: WEB-1 and WEB-2`                                                      | extra text `and WEB-2`; separate tickets with commas      |
+| `// SKIP: WEB-1;WEB-2`, `// SKIP: WEB-1/WEB-2`                                  | invalid ticket, since only commas separate tickets        |
+| `// SKIP: flaky on CI`                                                          | invalid ticket `flaky`: the first word must be a ticket   |
 
 In a block comment, only the marker line is checked, so a JSDoc block can explain the skip on other
 lines. Extra text is reported only once the tickets on that line are valid.
 
 Conditional skips such as `test.skip(browserName === 'webkit', 'Not supported')` usually describe a
 permanent platform limit, so they need no ticket unless you set `requireTicketForConditional: true`.
+A runtime skip under an `if`, a `switch` case, a ternary or `&&` counts as conditional too, since
+`if (!enabled) test.skip()` does the same as `test.skip(!enabled)`.
 
 ## Examples
 
 Incorrect:
 
 <!-- example: invalid -->
+
 ```js
 test.skip('pays with PayPal', async ({ page }) => {});
 ```
 
 <!-- example: invalid -->
+
 ```js
 // SKIP: flaky on CI
 test.skip('pays with PayPal', async ({ page }) => {});
 ```
 
 <!-- example: invalid -->
+
 ```js
 // SKIP: TODO
 test.skip('pays with PayPal', async ({ page }) => {});
 ```
 
 <!-- example: invalid -->
+
 ```js
 // SKIP: WEB-481 payment sandbox is down
 test.skip('pays with PayPal', async ({ page }) => {});
 ```
 
 <!-- example: invalid settings={"lifecycleTags":true} -->
+
 ```js
 test('one-click reorder @new', async ({ page }) => {});
 ```
@@ -99,12 +106,14 @@ test('one-click reorder @new', async ({ page }) => {});
 Correct:
 
 <!-- example: valid -->
+
 ```js
 // SKIP: WEB-481
 test.skip('pays with PayPal', async ({ page }) => {});
 ```
 
 <!-- example: valid -->
+
 ```js
 // FIXME: WEB-12
 test.describe.fixme('tax rules', () => {
@@ -114,6 +123,7 @@ test.describe.fixme('tax rules', () => {
 ```
 
 <!-- example: valid -->
+
 ```js
 test('opens the dashboard', async ({ page, browserName }) => {
   test.skip(browserName === 'webkit', 'Layout differs on WebKit by design');
@@ -121,12 +131,14 @@ test('opens the dashboard', async ({ page, browserName }) => {
 ```
 
 <!-- example: valid settings={"allowNotes":true} -->
+
 ```js
 // SKIP: WEB-481 payment sandbox is down
 test.skip('pays with PayPal', async ({ page }) => {});
 ```
 
 <!-- example: valid settings={"lifecycleTags":true} -->
+
 ```js
 // NEW: WEB-77
 test('one-click reorder', { tag: '@new' }, async ({ page }) => {});
@@ -134,7 +146,5 @@ test('one-click reorder', { tag: '@new' }, async ({ page }) => {});
 
 ## Options
 
-This rule reads the shared options described in the [README](../../README.md#options), usually set once
-with `testGovernance.configure({...})`. It also accepts the same object as a rule option, which
-overrides the shared settings for this rule only.
-
+This rule has no options of its own. It reads the shared options described in the
+[README](../../README.md#options), usually set once with `testGovernance.configure({...})`.

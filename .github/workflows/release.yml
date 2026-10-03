@@ -1,0 +1,99 @@
+name: Release
+
+# Pushing a tag such as v0.1.1 stages that version on npm and creates the GitHub release, with the
+# version's CHANGELOG.md section as its notes. A maintainer then approves the staged version on
+# npmjs.com with 2FA, which makes it public. Running the workflow by hand with an existing tag only
+# creates that tag's GitHub release.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to create a GitHub release for, e.g. v0.1.0 (nothing is published to npm)
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Stage on npm
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # trusted publishing and provenance
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # full history, to check the tag is on main
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false # never restore a cache in a release build
+      # Staged publishing through trusted publishing needs a newer npm than Node ships with.
+      - run: npm install -g npm@11.21.0
+      - run: npm ci
+      - name: Check the tag matches the package version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+      - name: Check the tag is on main
+        run: |
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD; then
+            echo "::error::Tag $GITHUB_REF_NAME points at $GITHUB_SHA, which is not on main. Tag a commit on main."
+            exit 1
+          fi
+      - name: Check the changelog has an entry for this version and nothing unreleased
+        run: |
+          node scripts/changelog-section.mjs "$GITHUB_REF_NAME" > /dev/null
+          if node scripts/changelog-section.mjs Unreleased > /dev/null 2>&1; then
+            echo "::error::CHANGELOG.md has entries under [Unreleased], so $GITHUB_REF_NAME would ship changes its notes leave out. Tag the commit that released them, or move them into the version's section."
+            exit 1
+          fi
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm run test:coverage
+      - run: npm run test:pack
+      - name: Check the plugin reports the same version
+        run: |
+          node --input-type=module -e "
+            import plugin from './dist/index.js';
+            const expected = process.env.GITHUB_REF_NAME.slice(1);
+            if (plugin.meta.version !== expected) {
+              console.error('::error::meta.version is ' + plugin.meta.version + ', expected ' + expected);
+              process.exit(1);
+            }"
+      - run: npm stage publish --provenance --access public
+
+  github-release:
+    name: Create GitHub release
+    needs: publish
+    # On a tag push, only after the version is staged; when run by hand, on its own.
+    if: always() && (needs.publish.result == 'success' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      # The changelog on the checked-out branch or tag also holds the entries of older versions.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: node scripts/changelog-section.mjs "$TAG" > notes.md
+      - run: gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" --notes-file notes.md
+        env:
+          GH_TOKEN: ${{ github.token }}
