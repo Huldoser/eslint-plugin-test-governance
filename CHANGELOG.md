@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- A `funding` link in `package.json`, so `npm fund` points to
+  [GitHub Sponsors](https://github.com/sponsors/Huldoser).
+
 ## [0.2.0] - 2026-10-01
 
 0.1.1 was published with these changes by mistake and is deprecated. Use 0.2.0, or stay on 0.1.0

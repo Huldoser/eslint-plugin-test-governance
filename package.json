@@ -13,6 +13,10 @@
   "bugs": {
     "url": "https://github.com/Huldoser/eslint-plugin-test-governance/issues"
   },
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/Huldoser"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Huldoser/eslint-plugin-test-governance.git"
