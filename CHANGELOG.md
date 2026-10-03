@@ -11,6 +11,11 @@ All notable changes to this project are documented here. The format follows
 - A `funding` link in `package.json`, so `npm fund` points to
   [GitHub Sponsors](https://github.com/sponsors/Huldoser).
 
+### Fixed
+
+- A `pattern` ticket preset with the `g` or `y` flag no longer rejects every other valid ticket. Those
+  flags are now ignored, since a ticket is always matched whole.
+
 ## [0.2.0] - 2026-10-01
 
 0.1.1 was published with these changes by mistake and is deprecated. Use 0.2.0, or stay on 0.1.0
