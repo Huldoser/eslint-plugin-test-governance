@@ -67,10 +67,9 @@ For the maintainer:
 2. Tag that pull request's merge commit, not whatever `main` points at by then, and push the tag:
    `git fetch origin && git tag v<x.y.z> <merge-commit-sha> && git push origin v<x.y.z>`.
 3. The Release workflow checks that the tag is on `main` and matches the package version, and that
-   the changelog has an entry for it and nothing left under `[Unreleased]`. It then runs the checks above, stages the version on npm with provenance and creates the
-   GitHub release with that changelog entry as its notes.
-4. Approve the staged version under Staged Packages on npmjs.com (2FA required). It becomes the
-   `latest` version on npm.
+   the changelog has an entry for it and nothing left under `[Unreleased]`. It then runs the
+   checks above, publishes the version to npm with provenance, where it becomes the `latest`
+   version, and creates the GitHub release with that changelog entry as its notes.
 
 By contributing, you agree that your contributions are licensed under the [MIT License](LICENSE)
 and that you'll follow the [Code of Conduct](CODE_OF_CONDUCT.md).

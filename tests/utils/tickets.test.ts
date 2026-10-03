@@ -120,6 +120,18 @@ const tables: Record<string, Table> = {
   },
 };
 
+describe('pattern preset flags', () => {
+  it.each(['g', 'y', 'gi'])('accepts the same ticket every time with the %s flag', (flags) => {
+    const matcher = compileTicketSpec([{ preset: 'pattern', pattern: '[A-Z]+-\\d+', flags }], []);
+    expect(['ABC-1', 'ABC-1', 'ABC-2', 'ABC-3'].map((ticket) => matcher.check(ticket))).toEqual([
+      'ok',
+      'ok',
+      'ok',
+      'ok',
+    ]);
+  });
+});
+
 describe.each(Object.entries(tables))('%s preset', (_, { spec, accepts, rejects }) => {
   const matcher = compileTicketSpec(Array.isArray(spec) ? spec : [spec], []);
   it.each(accepts)('accepts %s', (ticket) => {

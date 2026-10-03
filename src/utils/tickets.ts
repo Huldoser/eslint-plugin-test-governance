@@ -165,7 +165,9 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
       }
       let re: RegExp;
       try {
-        re = new RegExp(`^(?:${spec.pattern})$`, spec.flags);
+        // `g` and `y` make `test()` resume from the last match, so the same ticket would pass and fail
+        // in turn. A ticket is matched whole, so they never change what matches; drop them.
+        re = new RegExp(`^(?:${spec.pattern})$`, spec.flags?.replace(/[gy]/g, ''));
       } catch (error) {
         throw new ConfigError(`invalid ticket pattern "${spec.pattern}": ${(error as Error).message}`);
       }

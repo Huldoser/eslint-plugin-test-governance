@@ -13,6 +13,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A `pattern` ticket preset with the `g` or `y` flag no longer rejects every other valid ticket. Those
+  flags are now ignored, since a ticket is always matched whole.
 - A marker directly above a test that is the body of an arrow function, such as
   `rows.forEach((row) =>` followed by `// SKIP: WEB-1` and `test.skip(...)`, is found. It was
   reported both as missing and as a stray marker.
