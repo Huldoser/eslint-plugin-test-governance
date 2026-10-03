@@ -1,11 +1,16 @@
 name: Release
 
-# Pushing a tag such as v0.1.1 publishes that version to npm through trusted publishing, with
-# provenance, and creates the GitHub release with the version's CHANGELOG.md section as its notes.
-# Running the workflow by hand with an existing tag only creates that tag's GitHub release.
+# Merging a release pull request (see prepare-release.yml) changes the version in package.json on
+# main. This workflow then publishes that version to npm through trusted publishing, with provenance,
+# tags the merge commit and creates the GitHub release with the version's CHANGELOG.md section as its
+# notes. Pushing a tag such as v0.2.1 by hand does the same for the tagged commit. Running the
+# workflow by hand with an existing tag only creates that tag's GitHub release.
+# npm's trusted publisher is bound to this file's name, so publishing has to stay here.
 
 on:
   push:
+    branches: [main]
+    paths: [package.json]
     tags: ['v*']
   workflow_dispatch:
     inputs:
@@ -21,13 +26,44 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  version:
+    name: Find the version to release
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.find.outputs.tag }}
+      release: ${{ steps.find.outputs.release }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - id: find
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          tag="v$(node -p "require('./package.json').version")"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          # package.json also changes for dependency updates; only a new version is released.
+          if git ls-remote --exit-code --tags "https://github.com/$GITHUB_REPOSITORY" "refs/tags/$tag" > /dev/null; then
+            echo "$tag is already released."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
   publish:
     name: Publish to npm
-    if: github.event_name == 'push'
+    needs: version
+    if: needs.version.outputs.release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write # trusted publishing and provenance
+    env:
+      TAG: ${{ needs.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -43,22 +79,22 @@ jobs:
       - name: Check the tag matches the package version
         run: |
           version=$(node -p "require('./package.json').version")
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
+          if [ "v$version" != "$TAG" ]; then
+            echo "::error::Tag $TAG does not match package.json version $version"
             exit 1
           fi
       - name: Check the tag is on main
         run: |
           git fetch --no-tags origin main
           if ! git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD; then
-            echo "::error::Tag $GITHUB_REF_NAME points at $GITHUB_SHA, which is not on main. Tag a commit on main."
+            echo "::error::Tag $TAG points at $GITHUB_SHA, which is not on main. Tag a commit on main."
             exit 1
           fi
       - name: Check the changelog has an entry for this version and nothing unreleased
         run: |
-          node scripts/changelog-section.mjs "$GITHUB_REF_NAME" > /dev/null
+          node scripts/changelog-section.mjs "$TAG" > /dev/null
           if node scripts/changelog-section.mjs Unreleased > /dev/null 2>&1; then
-            echo "::error::CHANGELOG.md has entries under [Unreleased], so $GITHUB_REF_NAME would ship changes its notes leave out. Tag the commit that released them, or move them into the version's section."
+            echo "::error::CHANGELOG.md has entries under [Unreleased], so $TAG would ship changes its notes leave out. Tag the commit that released them, or move them into the version's section."
             exit 1
           fi
       - run: npm run lint
@@ -70,7 +106,7 @@ jobs:
         run: |
           node --input-type=module -e "
             import plugin from './dist/index.js';
-            const expected = process.env.GITHUB_REF_NAME.slice(1);
+            const expected = process.env.TAG.slice(1);
             if (plugin.meta.version !== expected) {
               console.error('::error::meta.version is ' + plugin.meta.version + ', expected ' + expected);
               process.exit(1);
@@ -79,20 +115,27 @@ jobs:
 
   github-release:
     name: Create GitHub release
-    needs: publish
-    # On a tag push, only after the version is published; when run by hand, on its own.
+    needs: [version, publish]
+    # On a push, only after the version is published; when run by hand, on its own.
     if: always() && (needs.publish.result == 'success' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
       contents: write
     env:
-      TAG: ${{ inputs.tag || github.ref_name }}
+      TAG: ${{ inputs.tag || needs.version.outputs.tag }}
     steps:
       # The changelog on the checked-out branch or tag also holds the entries of older versions.
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - run: node scripts/changelog-section.mjs "$TAG" > notes.md
+      # A release from main has no tag yet. A tag pushed with this workflow's token doesn't start
+      # this workflow again.
+      - name: Tag the released commit
+        if: github.event_name == 'push' && github.ref_type == 'branch'
+        run: gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$GITHUB_SHA"
+        env:
+          GH_TOKEN: ${{ github.token }}
       - run: gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" --notes-file notes.md
         env:
           GH_TOKEN: ${{ github.token }}

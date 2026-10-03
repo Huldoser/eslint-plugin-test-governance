@@ -1,0 +1,62 @@
+name: Prepare release
+
+# Run by hand to start a release. Bumps the version, moves the [Unreleased] changelog entries into a
+# section for it, and opens a "Release x.y.z" pull request. Merging that pull request publishes the
+# version (see release.yml).
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: patch, minor, major, or an exact version such as 0.3.0
+        required: true
+        default: patch
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the release branch
+      pull-requests: write # open the release pull request
+      actions: write # start CI on it
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Bump the version and the changelog
+        id: bump
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: echo "version=$(node scripts/prepare-release.mjs "$BUMP")" >> "$GITHUB_OUTPUT"
+      - run: npm run format:check
+      - name: Open the release pull request
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branch="release/v$VERSION"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$branch"
+          git commit -am "Release $VERSION"
+          git push origin "$branch"
+          {
+            echo "Merging this publishes $VERSION to npm with provenance, tags the merge commit v$VERSION and creates the GitHub release with these notes:"
+            echo
+            node scripts/changelog-section.mjs "$VERSION"
+          } > body.md
+          gh pr create --base main --head "$branch" --title "Release $VERSION" --body-file body.md
+          # Pull requests opened with this workflow's token don't start CI on their own.
+          gh workflow run ci.yml --ref "$branch"
