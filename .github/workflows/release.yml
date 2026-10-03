@@ -1,9 +1,8 @@
 name: Release
 
-# Pushing a tag such as v0.1.1 stages that version on npm and creates the GitHub release, with the
-# version's CHANGELOG.md section as its notes. A maintainer then approves the staged version on
-# npmjs.com with 2FA, which makes it public. Running the workflow by hand with an existing tag only
-# creates that tag's GitHub release.
+# Pushing a tag such as v0.1.1 publishes that version to npm through trusted publishing, with
+# provenance, and creates the GitHub release with the version's CHANGELOG.md section as its notes.
+# Running the workflow by hand with an existing tag only creates that tag's GitHub release.
 
 on:
   push:
@@ -23,7 +22,7 @@ concurrency:
 
 jobs:
   publish:
-    name: Stage on npm
+    name: Publish to npm
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
@@ -38,7 +37,7 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
           package-manager-cache: false # never restore a cache in a release build
-      # Staged publishing through trusted publishing needs a newer npm than Node ships with.
+      # Trusted publishing needs a newer npm than Node ships with.
       - run: npm install -g npm@11.21.0
       - run: npm ci
       - name: Check the tag matches the package version
@@ -76,12 +75,12 @@ jobs:
               console.error('::error::meta.version is ' + plugin.meta.version + ', expected ' + expected);
               process.exit(1);
             }"
-      - run: npm stage publish --provenance --access public
+      - run: npm publish --provenance --access public
 
   github-release:
     name: Create GitHub release
     needs: publish
-    # On a tag push, only after the version is staged; when run by hand, on its own.
+    # On a tag push, only after the version is published; when run by hand, on its own.
     if: always() && (needs.publish.result == 'success' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
