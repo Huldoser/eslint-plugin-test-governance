@@ -60,16 +60,19 @@ reached, remove it rather than excluding it.
 
 For the maintainer:
 
-1. Open a pull request that bumps the version in `package.json` and `package-lock.json`
-   (`npm version <x.y.z> --no-git-tag-version` does both) and renames the `[Unreleased]` section
-   of `CHANGELOG.md` to `[x.y.z] - <date>`, and merge it. The plugin reads its `meta.version` from
-   `package.json`.
-2. Tag that pull request's merge commit, not whatever `main` points at by then, and push the tag:
-   `git fetch origin && git tag v<x.y.z> <merge-commit-sha> && git push origin v<x.y.z>`.
-3. The Release workflow checks that the tag is on `main` and matches the package version, and that
-   the changelog has an entry for it and nothing left under `[Unreleased]`. It then runs the
-   checks above, publishes the version to npm with provenance, where it becomes the `latest`
-   version, and creates the GitHub release with that changelog entry as its notes.
+1. Run the **Prepare release** workflow (Actions → Prepare release → Run workflow) with `patch`,
+   `minor`, `major` or an exact version. It bumps `package.json` and `package-lock.json`, moves the
+   `[Unreleased]` entries of `CHANGELOG.md` into a `[x.y.z] - <date>` section, opens a
+   "Release x.y.z" pull request and starts CI on it. `node scripts/prepare-release.mjs patch` makes
+   the same changes locally.
+2. Review and merge that pull request.
+3. The Release workflow sees the new version on `main` and checks that it matches the tag it will
+   create, that the changelog has an entry for it and nothing left under `[Unreleased]`. It then
+   runs the checks above, publishes the version to npm with provenance, where it becomes the
+   `latest` version, tags the merge commit `vx.y.z` and creates the GitHub release with that
+   changelog entry as its notes.
+
+Pushing a `vx.y.z` tag on a commit of `main` by hand still publishes that commit the same way.
 
 By contributing, you agree that your contributions are licensed under the [MIT License](LICENSE)
 and that you'll follow the [Code of Conduct](CODE_OF_CONDUCT.md).
