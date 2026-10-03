@@ -5,6 +5,9 @@ const lifecycle = settings({ lifecycleTags: true });
 
 runRule('no-orphaned-marker', rule, {
   valid: [
+    // A test in an arrow function's expression body takes its marker above the call or the statement.
+    "['a', 'b'].forEach((name) =>\n  // SKIP: WEB-1\n  test.skip(name, async () => {}),\n);",
+    "// SKIP: WEB-1\n['a', 'b'].forEach((name) => test.skip(name, async () => {}));",
     "// SKIP: WEB-1\ntest.skip('a', async () => {});",
     "// Plain comment\ntest('a', async () => {});",
     '// skip: lowercase is not a marker here\nconst x = 1;',

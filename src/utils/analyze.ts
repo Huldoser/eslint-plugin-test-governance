@@ -380,6 +380,10 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const parent = stack.at(-1);
     const anchor = anchorOf(call);
     const block = commentBlock(sourceCode, anchor, options.allowBlankLine);
+    // `rows.forEach((row) =>\n  // SKIP: WEB-1\n  test.skip(...))`: the marker sits above the call itself.
+    if (call.parent.type === 'ArrowFunctionExpression' && call.parent.body === call) {
+      block.push(...commentBlock(sourceCode, call, options.allowBlankLine));
+    }
     for (const comment of block) claimed.add(comment);
     const ownTags = new Set(tagInfo.tags.map((t) => t.tag));
     const sources: StateSource[] = [];

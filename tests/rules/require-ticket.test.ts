@@ -11,6 +11,9 @@ const missing = (state: string, marker: string, subject = 'This test', example =
 
 runRule('require-ticket', rule, {
   valid: [
+    // A test in an arrow function's expression body takes its marker above the call or the statement.
+    "['a', 'b'].forEach((name) =>\n  // SKIP: WEB-1\n  test.skip(name, async () => {}),\n);",
+    "// SKIP: WEB-1\n['a', 'b'].forEach((name) => test.skip(name, async () => {}));",
     "test('plain', async () => {});",
     "test.describe('suite', () => { test('a', async () => {}); });",
     "// SKIP: WEB-123\ntest.skip('a', async () => {});",
