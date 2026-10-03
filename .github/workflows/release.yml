@@ -111,7 +111,14 @@ jobs:
               console.error('::error::meta.version is ' + plugin.meta.version + ', expected ' + expected);
               process.exit(1);
             }"
-      - run: npm publish --provenance --access public
+      - name: Publish
+        run: |
+          # A re-run after a later step failed must not try to publish the same version again.
+          if npm view "eslint-plugin-test-governance@${TAG#v}" version > /dev/null 2>&1; then
+            echo "${TAG#v} is already on npm."
+          else
+            npm publish --provenance --access public
+          fi
 
   github-release:
     name: Create GitHub release
