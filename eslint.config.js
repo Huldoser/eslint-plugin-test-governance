@@ -22,6 +22,13 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-enum-comparison': 'off',
       // Template literals in messages interpolate numbers and booleans on purpose.
       '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true, allowBoolean: true }],
+      // node:test returns promises from describe() and it(), and the runner awaits them itself.
+      '@typescript-eslint/no-floating-promises': [
+        'error',
+        {
+          allowForKnownSafeCalls: [{ from: 'package', package: 'node:test', name: ['describe', 'it', 'test'] }],
+        },
+      ],
     },
   },
 

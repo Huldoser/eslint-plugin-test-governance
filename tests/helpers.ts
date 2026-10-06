@@ -1,6 +1,12 @@
+import { describe, it } from 'node:test';
 import tsParser from '@typescript-eslint/parser';
 import { RuleTester } from 'eslint';
-import type { GovernanceOptions } from '../src/index.js';
+import type { GovernanceOptions } from '../src/index.ts';
+
+// RuleTester registers one test per case through these hooks.
+RuleTester.describe = describe;
+RuleTester.it = it;
+RuleTester.itOnly = it.only;
 
 const parsers = [
   ['espree', undefined],

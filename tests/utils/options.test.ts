@@ -1,44 +1,51 @@
-import { compileOptions, ConfigError, resolveOptions } from '../../src/utils/options.js';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { compileOptions, ConfigError, resolveOptions } from '../../src/utils/options.ts';
 
 const stateNames = (options: Parameters<typeof compileOptions>[0]) => compileOptions(options).states.map((s) => s.name);
 
 describe('compileOptions', () => {
   it('turns on skip and fixme by default', () => {
     const resolved = compileOptions({});
-    expect(resolved.states.map((s) => [s.name, s.marker])).toEqual([
-      ['skip', 'SKIP'],
-      ['fixme', 'FIXME'],
-    ]);
-    expect([...resolved.testFunctions]).toEqual(['test']);
-    expect(resolved.requireTicketForConditional).toBe(false);
-    expect(resolved.allowBlankLine).toBe(false);
-    expect(resolved.reportDynamicTitles).toBe(false);
+    assert.deepEqual(
+      resolved.states.map((s) => [s.name, s.marker]),
+      [
+        ['skip', 'SKIP'],
+        ['fixme', 'FIXME'],
+      ],
+    );
+    assert.deepEqual([...resolved.testFunctions], ['test']);
+    assert.equal(resolved.requireTicketForConditional, false);
+    assert.equal(resolved.allowBlankLine, false);
+    assert.equal(resolved.reportDynamicTitles, false);
   });
 
   it('turns on @new and @unstable with lifecycleTags', () => {
-    expect(stateNames({ lifecycleTags: true })).toEqual(['skip', 'fixme', 'new', 'unstable']);
-    expect(stateNames({ lifecycleTags: false })).toEqual(['skip', 'fixme']);
+    assert.deepEqual(stateNames({ lifecycleTags: true }), ['skip', 'fixme', 'new', 'unstable']);
+    assert.deepEqual(stateNames({ lifecycleTags: false }), ['skip', 'fixme']);
   });
 
   it('lets states override lifecycleTags and defaults', () => {
-    expect(
+    assert.deepEqual(
       stateNames({ lifecycleTags: true, states: { unstable: false, fail: true, skip: { enabled: false } } }),
-    ).toEqual(['fixme', 'fail', 'new']);
+      ['fixme', 'fail', 'new'],
+    );
   });
 
   it('adds custom states after the built-ins', () => {
     const resolved = compileOptions({ customStates: { blocked: { when: '@blocked', marker: 'BLOCKED' } } });
-    expect(resolved.states.at(-1)).toMatchObject({ name: 'blocked', tag: '@blocked', marker: 'BLOCKED' });
+    const { name, tag, marker } = resolved.states.at(-1) ?? {};
+    assert.deepEqual({ name, tag, marker }, { name: 'blocked', tag: '@blocked', marker: 'BLOCKED' });
   });
 
   it('accepts options that belong to the preset, and states set to true or false', () => {
-    expect(() =>
+    assert.doesNotThrow(() =>
       compileOptions({
         ticket: [{ preset: 'jira', projects: ['WEB'], host: 'acme.atlassian.net', minLength: undefined } as never],
         states: { fail: true, slow: { enabled: true } },
         customStates: { blocked: { when: '@blocked', marker: 'BLOCKED', ticket: { preset: 'numeric', maxLength: 6 } } },
       }),
-    ).not.toThrow();
+    );
   });
 
   it('compiles per-state ticket formats', () => {
@@ -48,13 +55,13 @@ describe('compileOptions', () => {
       customStates: { blocked: { when: '@blocked', marker: 'BLOCKED', ticket: [{ preset: 'numeric' }] } },
     });
     const [skip, fixme, blocked] = resolved.states;
-    expect(skip.ticket.check('WEB-1')).toBe('ok');
-    expect(fixme.ticket.check('WEB-1')).toBe('format');
-    expect(fixme.ticket.check('#4821')).toBe('ok');
-    expect(blocked.ticket.check('4821')).toBe('ok');
+    assert.equal(skip.ticket.check('WEB-1'), 'ok');
+    assert.equal(fixme.ticket.check('WEB-1'), 'format');
+    assert.equal(fixme.ticket.check('#4821'), 'ok');
+    assert.equal(blocked.ticket.check('4821'), 'ok');
   });
 
-  it.each([
+  for (const [options, message] of [
     [
       { customStates: { x: { when: 'blocked', marker: 'BLOCKED' } } },
       /customStates\.x\.when must be a tag such as @needs-data \(got "blocked"\)/,
@@ -94,23 +101,25 @@ describe('compileOptions', () => {
       { customStates: { fixme: { when: '@broken', marker: 'BROKEN' } } },
       /customStates\.fixme reuses the name of the built-in "fixme" state; give it another name, or use states\.fixme/,
     ],
-  ])('rejects %j', (options, message) => {
-    expect(() => compileOptions(options as never)).toThrow(ConfigError);
-    expect(() => compileOptions(options as never)).toThrow(message);
-  });
+  ]) {
+    it(`rejects ${JSON.stringify(options)}`, () => {
+      assert.throws(() => compileOptions(options as never), ConfigError);
+      assert.throws(() => compileOptions(options as never), message);
+    });
+  }
 });
 
 describe('resolveOptions', () => {
   it('compiles shared settings once per settings object', () => {
     const settings = { 'test-governance': { lifecycleTags: true, allowBlankLine: true } };
     const resolved = resolveOptions(settings);
-    expect(resolved.allowBlankLine).toBe(true);
-    expect(resolved.states.map((s) => s.name)).toContain('new');
-    expect(resolveOptions(settings)).toBe(resolved);
+    assert.equal(resolved.allowBlankLine, true);
+    assert.ok(resolved.states.map((s) => s.name).includes('new'));
+    assert.equal(resolveOptions(settings), resolved);
   });
 
   it('works without settings', () => {
-    expect(resolveOptions(undefined).states).toHaveLength(2);
-    expect(resolveOptions({})).toBe(resolveOptions({ other: 1 }));
+    assert.equal(resolveOptions(undefined).states.length, 2);
+    assert.equal(resolveOptions({}), resolveOptions({ other: 1 }));
   });
 });

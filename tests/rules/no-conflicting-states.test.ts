@@ -1,5 +1,5 @@
-import rule from '../../src/rules/no-conflicting-states.js';
-import { runRule, settings } from '../helpers.js';
+import rule from '../../src/rules/no-conflicting-states.ts';
+import { runRule, settings } from '../helpers.ts';
 
 const lifecycle = settings({ lifecycleTags: true });
 const custom = settings({ customStates: { quarantine: { when: '@quarantine', marker: 'QUARANTINE' } } });

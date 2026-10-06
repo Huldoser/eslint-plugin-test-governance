@@ -1,8 +1,8 @@
-import { BUILTIN_STATE_NAMES, DEFAULT_COMMENT_KEYWORDS, type BuiltinStateName } from './constants.js';
-import { ConfigError } from './errors.js';
-import { optionsSchema } from './schema.js';
-import { compileTicketSpec, DEFAULT_PLACEHOLDERS, type TicketMatcher, type TicketSpec } from './tickets.js';
-import { validate } from './validate.js';
+import { BUILTIN_STATE_NAMES, DEFAULT_COMMENT_KEYWORDS, type BuiltinStateName } from './constants.ts';
+import { ConfigError } from './errors.ts';
+import { optionsSchema } from './schema.ts';
+import { compileTicketSpec, DEFAULT_PLACEHOLDERS, type TicketMatcher, type TicketSpec } from './tickets.ts';
+import { validate } from './validate.ts';
 
 export const SETTINGS_KEY = 'test-governance';
 
@@ -21,7 +21,7 @@ export interface CustomState {
   ticket?: TicketSpec | TicketSpec[];
 }
 
-export type { BuiltinStateName } from './constants.js';
+export type { BuiltinStateName } from './constants.ts';
 
 /** Options shared by every rule. Set them once in `settings['test-governance']`. */
 export interface GovernanceOptions {
@@ -98,7 +98,7 @@ const BUILTIN_STATES: Record<BuiltinStateName, BuiltinDef> = {
   unstable: { marker: 'UNSTABLE', tag: '@unstable', lifecycle: true, enabled: false },
 };
 
-export { ConfigError } from './errors.js';
+export { ConfigError } from './errors.ts';
 
 function toSpecs(spec: TicketSpec | TicketSpec[]): TicketSpec[] {
   return Array.isArray(spec) ? spec : [spec];

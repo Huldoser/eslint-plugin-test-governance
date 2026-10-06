@@ -1,5 +1,5 @@
-import rule from '../../src/rules/no-orphaned-marker.js';
-import { runRule, settings } from '../helpers.js';
+import rule from '../../src/rules/no-orphaned-marker.ts';
+import { runRule, settings } from '../helpers.ts';
 
 const lifecycle = settings({ lifecycleTags: true });
 

@@ -3,10 +3,10 @@
   "compilerOptions": {
     "noEmit": true,
     "rootDir": ".",
-    "types": ["node", "vitest/globals"],
+    "types": ["node"],
     "declaration": false,
     "declarationMap": false
   },
-  "include": ["src", "tests", "vitest.config.ts"],
+  "include": ["src", "tests"],
   "exclude": ["tests/fixtures"]
 }

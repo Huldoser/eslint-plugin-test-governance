@@ -1,14 +1,14 @@
 import { createRequire } from 'node:module';
 import type { ESLint, Rule } from 'eslint';
-import markerMatchesState from './rules/marker-matches-state.js';
-import noConflictingStates from './rules/no-conflicting-states.js';
-import noOrphanedMarker from './rules/no-orphaned-marker.js';
-import requireTicketInComments from './rules/require-ticket-in-comments.js';
-import requireTicket from './rules/require-ticket.js';
-import { compileOptions, SETTINGS_KEY, type GovernanceOptions } from './utils/options.js';
+import markerMatchesState from './rules/marker-matches-state.ts';
+import noConflictingStates from './rules/no-conflicting-states.ts';
+import noOrphanedMarker from './rules/no-orphaned-marker.ts';
+import requireTicketInComments from './rules/require-ticket-in-comments.ts';
+import requireTicket from './rules/require-ticket.ts';
+import { compileOptions, SETTINGS_KEY, type GovernanceOptions } from './utils/options.ts';
 
-export type { CustomState, GovernanceOptions, StateOverride } from './utils/options.js';
-export type { TicketSpec } from './utils/tickets.js';
+export type { CustomState, GovernanceOptions, StateOverride } from './utils/options.ts';
+export type { TicketSpec } from './utils/tickets.ts';
 
 const PLUGIN_NAME = 'test-governance';
 // Read at load time so the reported version always matches the published package.

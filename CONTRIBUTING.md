@@ -47,7 +47,7 @@ reached, remove it rather than excluding it.
 - The rules list in the README and the header of each rule page are generated. After changing rule
   metadata, run `npm run docs` and commit the result.
 - If the change affects what the sample project reports, update the snapshot with
-  `npx vitest run -u tests/sample-project.test.ts` and check the diff.
+  `UPDATE_SNAPSHOTS=1 node --test tests/sample-project.test.ts` and check the diff.
 
 ## Commits and pull requests
 

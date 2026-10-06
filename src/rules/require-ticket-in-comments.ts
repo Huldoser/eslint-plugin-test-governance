@@ -1,7 +1,7 @@
 import type { TSESTree } from '@typescript-eslint/utils';
-import { appliesTo, isStateMarker, parseTickets } from '../utils/analyze.js';
-import { createRule } from '../utils/create-rule.js';
-import { compileTicketSpec } from '../utils/tickets.js';
+import { appliesTo, isStateMarker, parseTickets } from '../utils/analyze.ts';
+import { createRule } from '../utils/create-rule.ts';
+import { compileTicketSpec } from '../utils/tickets.ts';
 
 /** Recognises anything shaped like a ticket, to tell a wrong-format ticket from plain prose. */
 const ticketShape = compileTicketSpec([{ preset: 'any' }], []);

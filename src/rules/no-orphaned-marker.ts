@@ -1,6 +1,6 @@
-import { describeSubject, isProse, missingStates, strayMarkers, type StateMarker } from '../utils/analyze.js';
-import { createRule } from '../utils/create-rule.js';
-import { removeComment } from '../utils/fix.js';
+import { describeSubject, isProse, missingStates, strayMarkers, type StateMarker } from '../utils/analyze.ts';
+import { createRule } from '../utils/create-rule.ts';
+import { removeComment } from '../utils/fix.ts';
 
 export default createRule({
   name: 'no-orphaned-marker',

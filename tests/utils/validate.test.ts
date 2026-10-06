@@ -1,13 +1,15 @@
-import { ConfigError, compileOptions } from '../../src/utils/options.js';
-import { validate, type Schema } from '../../src/utils/validate.js';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { ConfigError, compileOptions } from '../../src/utils/options.ts';
+import { validate, type Schema } from '../../src/utils/validate.ts';
 
 /** The problems `compileOptions` reports for these options, without the shared prefix. */
 function problems(options: unknown): string[] {
   try {
     compileOptions(options as never);
   } catch (error) {
-    expect(error).toBeInstanceOf(ConfigError);
-    return (error as Error).message
+    assert.ok(error instanceof ConfigError);
+    return error.message
       .split('\n')
       .slice(1)
       .map((line) => line.replace(/^ {2}- /, ''));
@@ -16,7 +18,7 @@ function problems(options: unknown): string[] {
 }
 
 describe('options validation', () => {
-  it.each([
+  for (const [options, message] of [
     [{ lifecycleTag: true }, 'lifecycleTag is not a known option; did you mean "lifecycleTags"?'],
     [{ LIFECYCLETAGS: true }, 'LIFECYCLETAGS is not a known option; did you mean "lifecycleTags"?'],
     [{ lifecycleTags: 'yes' }, 'lifecycleTags must be a boolean (got "yes")'],
@@ -52,19 +54,21 @@ describe('options validation', () => {
     [{ testFunctions: [1] }, 'testFunctions[0] must be a string (got 1)'],
     [{ testFunctions: () => ['test'] }, 'testFunctions must be an array (got a function)'],
     [{ placeholders: 'x'.repeat(60) }, `placeholders must be an array (got "${'x'.repeat(36)}...)`],
-  ])('%j', (options, message) => {
-    expect(problems(options)).toEqual([message]);
-  });
+  ]) {
+    it(JSON.stringify(options), () => {
+      assert.deepEqual(problems(options), [message]);
+    });
+  }
 
   it('reports every problem at once', () => {
-    expect(problems({ xyzzy: 1, allowNotes: 'no' })).toEqual([
+    assert.deepEqual(problems({ xyzzy: 1, allowNotes: 'no' }), [
       'xyzzy is not a known option (expected one of: testFunctions, ticket, placeholders, lifecycleTags, states, customStates, comments, requireTicketForConditional, allowBlankLine, allowNotes, reportDynamicTitles)',
       'allowNotes must be a boolean (got "no")',
     ]);
   });
 
   it('accepts valid options, including explicit undefined values', () => {
-    expect(
+    assert.deepEqual(
       problems({
         ticket: [
           { preset: 'jira', projects: ['WEB'] },
@@ -75,30 +79,31 @@ describe('options validation', () => {
         customStates: { blocked: { when: '@blocked', marker: 'BLOCKED' } },
         comments: false,
       }),
-    ).toEqual([]);
-    expect(problems({ comments: { keywords: ['FIXME', 'HACK'] } })).toEqual([]);
+      [],
+    );
+    assert.deepEqual(problems({ comments: { keywords: ['FIXME', 'HACK'] } }), []);
   });
 });
 
 describe('validate', () => {
   it('describes a pattern without a hint by the pattern itself', () => {
     const schema: Schema = { type: 'string', pattern: '^a+$' };
-    expect(validate('b', schema, 'name')).toEqual(['name must be a string matching /^a+$/ (got "b")']);
+    assert.deepEqual(validate('b', schema, 'name'), ['name must be a string matching /^a+$/ (got "b")']);
   });
 
   it('treats a schema without a type as matching anything', () => {
-    expect(validate(Symbol('x'), {})).toEqual([]);
+    assert.deepEqual(validate(Symbol('x'), {}), []);
   });
 
   it('shows values JSON cannot represent', () => {
-    expect(validate(Symbol('s'), { type: 'string' }, 'name')).toEqual(['name must be a string (got Symbol(s))']);
+    assert.deepEqual(validate(Symbol('s'), { type: 'string' }, 'name'), ['name must be a string (got Symbol(s))']);
   });
 
   it('allows unknown keys when the schema does not forbid them', () => {
-    expect(validate({ extra: 1 }, { type: 'object', properties: {} })).toEqual([]);
+    assert.deepEqual(validate({ extra: 1 }, { type: 'object', properties: {} }), []);
   });
 
   it('names the top level "options" and pluralises item counts', () => {
-    expect(validate([1], { type: 'array', minItems: 2 })).toEqual(['options must have at least 2 items']);
+    assert.deepEqual(validate([1], { type: 'array', minItems: 2 }), ['options must have at least 2 items']);
   });
 });

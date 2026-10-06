@@ -1,5 +1,5 @@
-import rule from '../../src/rules/require-ticket-in-comments.js';
-import { runRule, settings } from '../helpers.js';
+import rule from '../../src/rules/require-ticket-in-comments.ts';
+import { runRule, settings } from '../helpers.ts';
 
 const TEST = "\ntest('a', async () => {});";
 const missing = (keyword: string, upper = keyword.toUpperCase(), example = 'PROJ-123') => ({

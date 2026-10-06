@@ -1,6 +1,6 @@
 import type { TSESLint, TSESTree } from '@typescript-eslint/utils';
-import type { ResolvedOptions, StateDef } from './options.js';
-import type { TicketCheck, TicketMatcher } from './tickets.js';
+import type { ResolvedOptions, StateDef } from './options.ts';
+import type { TicketCheck, TicketMatcher } from './tickets.ts';
 
 type Node = TSESTree.Node;
 type Comment = TSESTree.Comment;
@@ -545,7 +545,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       }
     }
     // Parsers provide visitor keys for every node type they produce; the fallback is only defensive.
-    /* v8 ignore next */
+    /* node:coverage ignore next */
     for (const key of keys[node.type] ?? []) {
       const child = (node as unknown as Record<string, unknown>)[key];
       if (Array.isArray(child)) {
