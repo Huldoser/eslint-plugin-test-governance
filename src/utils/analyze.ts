@@ -138,6 +138,8 @@ function isFunction(node: Node | undefined): node is TSESTree.FunctionLike {
 function collectTestNames(program: TSESTree.Program, configured: Set<string>): Set<string> {
   const names = new Set(configured);
   const mergeTests = new Set<string>();
+  /** Names bound to another test runner, such as `ava` in `import ava from 'ava'`. */
+  const others = new Set<string>();
   const isTestExpression = (node: Node): boolean => {
     const target = unwrap(node);
     if (target.type === 'Identifier') return names.has(target.name);
@@ -147,12 +149,23 @@ function collectTestNames(program: TSESTree.Program, configured: Set<string>): S
     if (target.callee.type !== 'MemberExpression') return false;
     return memberName(target.callee) === 'extend' && isTestExpression(target.callee.object);
   };
+  // require('node:test'), ava, ava.serial or `ava as TestFn<Context>`
+  const isOtherFramework = (node: Node): boolean => {
+    const target = unwrap(node);
+    const source = requireSource(target);
+    if (source !== undefined) return OTHER_FRAMEWORKS.has(source);
+    if (target.type === 'Identifier') return others.has(target.name);
+    return target.type === 'MemberExpression' && isOtherFramework(target.object);
+  };
 
   for (const statement of program.body) {
     if (statement.type === 'ImportDeclaration') {
       const source = statement.source.value;
       if (OTHER_FRAMEWORKS.has(source)) {
-        for (const spec of statement.specifiers) names.delete(spec.local.name);
+        for (const spec of statement.specifiers) {
+          names.delete(spec.local.name);
+          others.add(spec.local.name);
+        }
       } else if (isPlaywrightModule(source)) {
         for (const spec of statement.specifiers) {
           if (spec.type === 'ImportDefaultSpecifier') names.add(spec.local.name);
@@ -170,13 +183,19 @@ function collectTestNames(program: TSESTree.Program, configured: Set<string>): S
       if (!init) continue;
       if (declarator.id.type === 'Identifier' && init.type === 'CallExpression' && isTestExpression(init)) {
         names.add(declarator.id.name);
+      } else if (declarator.id.type === 'Identifier' && isOtherFramework(init)) {
+        // `const test = require('node:test')` is another runner's `test`, like an import from it.
+        names.delete(declarator.id.name);
+        others.add(declarator.id.name);
       } else if (declarator.id.type === 'ObjectPattern') {
         const source = requireSource(init);
         if (source === undefined) continue;
         for (const prop of declarator.id.properties) {
           if (prop.type !== 'Property' || prop.key.type !== 'Identifier' || prop.value.type !== 'Identifier') continue;
-          if (OTHER_FRAMEWORKS.has(source)) names.delete(prop.value.name);
-          else if (isPlaywrightModule(source) && prop.key.name === 'test') names.add(prop.value.name);
+          if (OTHER_FRAMEWORKS.has(source)) {
+            names.delete(prop.value.name);
+            others.add(prop.value.name);
+          } else if (isPlaywrightModule(source) && prop.key.name === 'test') names.add(prop.value.name);
         }
       }
     }
@@ -453,11 +472,18 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
         const param = last.params.at(1);
         if (param?.type === 'Identifier') testInfo = param.name;
       }
-      const isDeclaration = args.length >= 2 && isFunction(last) && !isFunction(args[0]);
+      // The body is usually written inline, but can be a function defined elsewhere:
+      // `test.skip('pays', payWithCard)`. A string title tells that apart from `test.skip(cond, 'why')`.
+      const titled = args.length >= 2 && isStaticText(args[0]);
+      const isDeclaration = args.length >= 2 && !isFunction(args[0]) && (isFunction(last) || titled);
       if (path.every((p) => TEST_MODIFIERS.has(p)) && isDeclaration) {
         return { subject: makeSubject('test', call, path, collectTags(call, true)), testInfo };
       }
-      if (path[0] === 'describe' && path.slice(1).every((p) => DESCRIBE_MODIFIERS.has(p)) && isFunction(last)) {
+      if (
+        path[0] === 'describe' &&
+        path.slice(1).every((p) => DESCRIBE_MODIFIERS.has(p)) &&
+        (isFunction(last) || titled)
+      ) {
         const tagInfo = collectTags(call, args.length >= 2);
         return { subject: makeSubject('describe', call, path.slice(1), tagInfo), testInfo };
       }

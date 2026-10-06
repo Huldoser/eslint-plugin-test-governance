@@ -17,6 +17,9 @@ runRule('require-ticket', rule, {
     "test('plain', async () => {});",
     "test.describe('suite', () => { test('a', async () => {}); });",
     "// SKIP: WEB-123\ntest.skip('a', async () => {});",
+    // A body defined elsewhere.
+    "// SKIP: WEB-123\ntest.skip('pays', payWithCard);",
+    "test.skip(isMobile, 'Not on mobile');",
     "/* SKIP: WEB-123 */\ntest.skip('a', async () => {});",
     "/**\n * Waiting on the new checkout API.\n * SKIP: WEB-123\n */\ntest.skip('a', async () => {});",
     "// SKIP: WEB-1\n// eslint-disable-next-line no-empty-function\ntest.skip('a', async () => {});",
@@ -99,6 +102,14 @@ runRule('require-ticket', rule, {
     "import { test, it } from '@jest/globals';\ntest.skip('adds', () => {});\nit.skip('subtracts', () => {});",
     "import test from 'node:test';\ntest.skip('adds', () => {});",
     "const { test } = require('bun:test');\ntest.skip('adds', () => {});",
+    // The same runners bound to a variable, as CommonJS and AVA code usually does.
+    "const test = require('node:test');\ntest.skip('adds', () => {});",
+    "const test = require('ava').serial;\ntest.skip('adds', (t) => {});",
+    "import ava from 'ava';\nconst test = ava;\ntest.skip('adds', (t) => {});",
+    "const tap = require('tap');\nconst test = tap.test;\ntest.skip('adds', () => {});",
+    "const { test: base } = require('mocha');\nconst test = base;\ntest.skip('adds', () => {});",
+    // Only `test` itself is taken from a Playwright require.
+    "const { expect: e } = require('@playwright/test');\ne.skip('a', async () => {});",
     // A local variable that happens to be called `test` is not Playwright's.
     "function check() {\n  const test = { skip(name, fn) { fn(); } };\n  test.skip('not playwright', () => {});\n}",
     "{\n  let test = helpers;\n  test.skip('not playwright', () => {});\n}",
@@ -153,6 +164,26 @@ runRule('require-ticket', rule, {
   ],
   invalid: [
     { code: "test.skip('a', async () => {});", errors: [missing('skip', 'SKIP')] },
+    // A variable called `test` that isn't bound to another test runner is still Playwright's.
+    {
+      code: "const test = require('@playwright/test').test;\ntest.skip('a', async () => {});",
+      errors: [missing('skip', 'SKIP')],
+    },
+    { code: "const test = fixtures;\ntest.skip('a', async () => {});", errors: [missing('skip', 'SKIP')] },
+    { code: "const test = makeTest();\ntest.skip('a', async () => {});", errors: [missing('skip', 'SKIP')] },
+    {
+      code: "import { test as t } from 'playwright/test';\nt.skip('a', async () => {});",
+      errors: [missing('skip', 'SKIP')],
+      settings: settings({ testFunctions: [] }),
+    },
+    // A body defined elsewhere, or wrapped in a helper.
+    { code: "test.skip('pays', payWithCard);", errors: [missing('skip', 'SKIP')] },
+    { code: "test.skip(`pays ${card}`, { tag: '@slow' }, payWith(card));", errors: [missing('skip', 'SKIP')] },
+    {
+      code: "test.describe.fixme('checkout', defineCheckoutTests);",
+      errors: [missing('fixme', 'FIXME', 'This describe block')],
+    },
+    { code: "test('pays @new', withPage(async () => {}));", errors: [missing('new', 'NEW')], settings: lifecycle },
     // Only the head of the declaration is reported, not the whole body.
     {
       code: "test.skip('pays with PayPal', async ({ page }) => {\n  await page.goto('/');\n  await page.click('#pay');\n});",

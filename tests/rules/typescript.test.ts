@@ -7,7 +7,11 @@ import { settings } from '../helpers.ts';
 const tester = new RuleTester({ languageOptions: { parser: tsParser } });
 
 tester.run('require-ticket (TypeScript syntax)', rule as never, {
-  valid: ["// SKIP: WEB-1\ntest.skip('a', async ({ page }: { page: Page }) => {});"],
+  valid: [
+    "// SKIP: WEB-1\ntest.skip('a', async ({ page }: { page: Page }) => {});",
+    // AVA's typed test function is not Playwright's.
+    "import anyTest, { type TestFn } from 'ava';\nconst test = anyTest as TestFn<{ db: string }>;\ntest.skip('a', async (t) => {});",
+  ],
   invalid: [
     {
       code: [
