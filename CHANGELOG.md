@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-06
+
 ### Fixed
 
 - A `test` bound to another test runner without an import, as in `const test = require('node:test')`,
@@ -132,7 +134,8 @@ First release.
 - Support for ESLint 9 and 10 flat config, JavaScript and TypeScript test files, `.extend()`
   fixtures, describe blocks, runtime skips and tags in titles or the `tag` option.
 
-[Unreleased]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.1.1...v0.2.0
