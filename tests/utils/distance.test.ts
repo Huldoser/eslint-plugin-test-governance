@@ -1,7 +1,9 @@
-import { editDistance, typoThreshold } from '../../src/utils/distance.js';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { editDistance, typoThreshold } from '../../src/utils/distance.ts';
 
 describe('editDistance', () => {
-  it.each([
+  const cases: [string, string, number][] = [
     ['', '', 0],
     ['unstable', 'unstable', 0],
     ['unstabel', 'unstable', 1],
@@ -11,15 +13,18 @@ describe('editDistance', () => {
     ['abc', '', 3],
     ['', 'abc', 3],
     ['new', 'old', 3],
-  ])('%s → %s is %i', (a, b, distance) => {
-    expect(editDistance(a, b)).toBe(distance);
-  });
+  ];
+  for (const [a, b, distance] of cases) {
+    it(`${a} → ${b} is ${distance}`, () => {
+      assert.equal(editDistance(a, b), distance);
+    });
+  }
 });
 
 describe('typoThreshold', () => {
   it('allows no typos for short tags and more for long ones', () => {
-    expect(typoThreshold(3)).toBe(0);
-    expect(typoThreshold(5)).toBe(1);
-    expect(typoThreshold(8)).toBe(2);
+    assert.equal(typoThreshold(3), 0);
+    assert.equal(typoThreshold(5), 1);
+    assert.equal(typoThreshold(8), 2);
   });
 });

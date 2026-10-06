@@ -1,7 +1,7 @@
 import tsParser from '@typescript-eslint/parser';
 import { RuleTester } from 'eslint';
-import rule from '../../src/rules/require-ticket.js';
-import { settings } from '../helpers.js';
+import rule from '../../src/rules/require-ticket.ts';
+import { settings } from '../helpers.ts';
 
 // Syntax only the TypeScript parser understands.
 const tester = new RuleTester({ languageOptions: { parser: tsParser } });

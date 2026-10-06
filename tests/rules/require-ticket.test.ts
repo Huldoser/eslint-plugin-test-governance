@@ -1,5 +1,5 @@
-import rule from '../../src/rules/require-ticket.js';
-import { runRule, settings } from '../helpers.js';
+import rule from '../../src/rules/require-ticket.ts';
+import { runRule, settings } from '../helpers.ts';
 
 const ANY = 'a ticket key like PROJ-123, an issue like #4821 or owner/repo#4821, or a URL';
 const lifecycle = settings({ lifecycleTags: true });

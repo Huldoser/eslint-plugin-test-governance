@@ -1,5 +1,5 @@
-import { BUILTIN_STATE_NAMES, MARKER_RE, TAG_RE, TICKET_PRESETS } from './constants.js';
-import type { Schema } from './validate.js';
+import { BUILTIN_STATE_NAMES, MARKER_RE, TAG_RE, TICKET_PRESETS } from './constants.ts';
+import type { Schema } from './validate.ts';
 
 const MARKER_HINT = 'an uppercase keyword such as NEEDS-DATA (letters, digits, "-" and "_")';
 const TAG_HINT = 'a tag such as @needs-data';

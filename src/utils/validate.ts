@@ -1,4 +1,4 @@
-import { editDistance } from './distance.js';
+import { editDistance } from './distance.ts';
 
 /** The subset of JSON Schema that the options schema uses. */
 export interface Schema {

@@ -1,5 +1,5 @@
-import rule from '../../src/rules/marker-matches-state.js';
-import { runRule, settings } from '../helpers.js';
+import rule from '../../src/rules/marker-matches-state.ts';
+import { runRule, settings } from '../helpers.ts';
 
 const lifecycle = settings({ lifecycleTags: true });
 

@@ -1,8 +1,8 @@
-import { headLoc, type TagOccurrence } from '../utils/analyze.js';
-import { createRule } from '../utils/create-rule.js';
-import { isTagState } from '../utils/options.js';
-import { editDistance, typoThreshold } from '../utils/distance.js';
-import { tagRange } from '../utils/fix.js';
+import { headLoc, type TagOccurrence } from '../utils/analyze.ts';
+import { createRule } from '../utils/create-rule.ts';
+import { isTagState } from '../utils/options.ts';
+import { editDistance, typoThreshold } from '../utils/distance.ts';
+import { tagRange } from '../utils/fix.ts';
 
 export default createRule({
   name: 'no-conflicting-states',

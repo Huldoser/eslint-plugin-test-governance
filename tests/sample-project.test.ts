@@ -1,11 +1,16 @@
+import assert from 'node:assert/strict';
+import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { test } from 'node:test';
 import tsParser from '@typescript-eslint/parser';
 import { ESLint, type Linter } from 'eslint';
-import testGovernance from '../src/index.js';
+import testGovernance from '../src/index.ts';
 // Plain JS so scripts/pack-smoke.mjs can share it; types are in format.d.mts.
 import { formatResults } from './fixtures/format.mjs';
 
 const cwd = path.resolve(import.meta.dirname, 'fixtures/sample-project');
+// Run with UPDATE_SNAPSHOTS=1 to rewrite the snapshot after an intended change.
+const snapshot = path.resolve(import.meta.dirname, '__snapshots__/sample-project.txt');
 
 // Mirrors fixtures/sample-project/eslint.config.js, but loads the plugin from source.
 // scripts/pack-smoke.mjs lints the same project with the real config and the packed tarball.
@@ -24,7 +29,9 @@ const config = [
 test('lints the sample project', async () => {
   const eslint = new ESLint({ cwd, overrideConfigFile: true, overrideConfig: config });
   const results = await eslint.lintFiles(['tests']);
-  await expect(formatResults(results, cwd)).toMatchFileSnapshot('__snapshots__/sample-project.txt');
+  const actual = formatResults(results, cwd);
+  if (process.env.UPDATE_SNAPSHOTS) writeFileSync(snapshot, actual);
+  assert.equal(actual, readFileSync(snapshot, 'utf8'));
 });
 
 test('the recommended config works without options', async () => {
@@ -37,18 +44,21 @@ test('the recommended config works without options', async () => {
     ] as Linter.Config[],
   });
   const [result] = await eslint.lintFiles(['tests/checkout.spec.ts']);
-  expect(result.messages.map((m) => [m.line, m.ruleId])).toEqual([
-    [7, 'test-governance/require-ticket-in-comments'],
-    [12, 'test-governance/require-ticket'],
-    [18, 'test-governance/require-ticket'],
-    [20, 'test-governance/require-ticket'],
-    [23, 'test-governance/marker-matches-state'],
-    [24, 'test-governance/require-ticket'],
-  ]);
+  assert.deepEqual(
+    result.messages.map((m) => [m.line, m.ruleId]),
+    [
+      [7, 'test-governance/require-ticket-in-comments'],
+      [12, 'test-governance/require-ticket'],
+      [18, 'test-governance/require-ticket'],
+      [20, 'test-governance/require-ticket'],
+      [23, 'test-governance/marker-matches-state'],
+      [24, 'test-governance/require-ticket'],
+    ],
+  );
 });
 
 test('configure() rejects a bad config when the config file loads', () => {
-  expect(() => testGovernance.configure({ customStates: { x: { when: 'x', marker: 'X' } } })).toThrow(/must be a tag/);
+  assert.throws(() => testGovernance.configure({ customStates: { x: { when: 'x', marker: 'X' } } }), /must be a tag/);
   // A typo fails with a hint instead of being ignored.
-  expect(() => testGovernance.configure({ lifecycleTag: true } as never)).toThrow(/did you mean "lifecycleTags"/);
+  assert.throws(() => testGovernance.configure({ lifecycleTag: true } as never), /did you mean "lifecycleTags"/);
 });

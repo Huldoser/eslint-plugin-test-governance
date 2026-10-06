@@ -44,7 +44,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm install --no-save eslint@9.0.0
+      # Node 22.12 runs the TypeScript tests only with type stripping turned on; later versions have it on by default.
       - run: npm test
+        env:
+          NODE_OPTIONS: --experimental-strip-types --no-warnings=ExperimentalWarning
 
   lint:
     runs-on: ubuntu-latest

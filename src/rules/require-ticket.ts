@@ -1,5 +1,5 @@
-import { appliesTo, describeSubject, evaluate, headLoc } from '../utils/analyze.js';
-import { createRule } from '../utils/create-rule.js';
+import { appliesTo, describeSubject, evaluate, headLoc } from '../utils/analyze.ts';
+import { createRule } from '../utils/create-rule.ts';
 
 export default createRule({
   name: 'require-ticket',

@@ -1,6 +1,6 @@
-import { appliesTo, describeSubject, isStateMarker, missingStates, strayMarkers } from '../utils/analyze.js';
-import { createRule } from '../utils/create-rule.js';
-import { indentOf, keywordRange } from '../utils/fix.js';
+import { appliesTo, describeSubject, isStateMarker, missingStates, strayMarkers } from '../utils/analyze.ts';
+import { createRule } from '../utils/create-rule.ts';
+import { indentOf, keywordRange } from '../utils/fix.ts';
 
 export default createRule({
   name: 'marker-matches-state',

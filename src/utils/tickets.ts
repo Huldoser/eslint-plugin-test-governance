@@ -1,4 +1,4 @@
-import { ConfigError } from './errors.js';
+import { ConfigError } from './errors.ts';
 
 export type TicketSpec =
   | { preset: 'any' }
