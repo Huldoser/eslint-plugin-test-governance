@@ -1,7 +1,5 @@
 // @ts-check
 import eslintPlugin from 'eslint-plugin-eslint-plugin';
-import prettier from 'eslint-config-prettier/flat';
-import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
@@ -35,10 +33,6 @@ export default tseslint.config(
   {
     files: ['**/*.{js,mjs}'],
     extends: [tseslint.configs.disableTypeChecked],
-    languageOptions: { globals: globals.node },
     rules: { eqeqeq: 'error', 'prefer-const': 'error' },
   },
-
-  // Formatting is Prettier's job; turn off rules that would fight it.
-  prettier,
 );
