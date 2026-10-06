@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A `test` bound to another test runner without an import, as in `const test = require('node:test')`,
+  `const test = require('ava')` or `const test = anyTest as TestFn<Context>`, is no longer mistaken
+  for Playwright's `test`. Before, skipped tests in those files were reported as missing a ticket.
+
 ## [0.3.0] - 2026-10-06
 
 ### Added

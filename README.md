@@ -172,8 +172,9 @@ so keep it free of nested quantifiers.
 - Any name in `testFunctions`, for fixtures imported from your own modules. The default `['test']`
   covers the common `import { test } from './fixtures'`.
 
-A name imported from another test runner (`vitest`, `@jest/globals`, `node:test`, `bun:test`,
-`mocha`, `ava`, `tap`, `uvu`) is never treated as Playwright's `test`, and neither is a local
+A name imported or required from another test runner (`vitest`, `@jest/globals`, `node:test`,
+`bun:test`, `mocha`, `ava`, `tap`, `uvu`), or a variable set from one such as
+`const test = require('ava')`, is never treated as Playwright's `test`, and neither is a local
 variable declared inside a function that happens to be called `test`.
 
 ### Syntax the rules understand
