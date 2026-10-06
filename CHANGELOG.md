@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- `require-ticket-in-comments` reads a ticket in parentheses after a space, as in `// TODO (WEB-123)`.
+  Before, such comments were reported as having no ticket at all.
+
 ## [0.3.0] - 2026-10-06
 
 ### Added
