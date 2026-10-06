@@ -44,9 +44,31 @@ export default createRule({
     }
 
     // `TODO`/`FIXME` in capitals counts with or without a colon. Other casings need the colon, so a
-    // sentence that happens to start with "Todo" is not mistaken for a work comment.
+    // sentence that happens to start with "Todo" is not mistaken for a work comment. The keyword can
+    // carry its ticket in parentheses, `TODO(WEB-123): ...`, a common style that tools also use for
+    // a name, `TODO(alice)`, which is not a ticket.
     const alternatives = keywords.map(escapeRegExp).join('|');
-    const keywordRe = new RegExp(`^(\\s*\\*?\\s*)(${alternatives})(?:\\s*:|(?=\\s|$))`, 'i');
+    const keywordRe = new RegExp(`^(\\s*\\*?\\s*)(${alternatives})(?:\\(([^)]*)\\))?(?:\\s*:|(?=\\s|$))`, 'i');
+
+    /**
+     * `TODO(WEB-1, WEB-2): text`: the tickets are in the parentheses, and anything after them, from the
+     * closing parenthesis on, is a note.
+     */
+    function parseParenthesized(
+      line: string,
+      start: number,
+      open: number,
+      inParens: string,
+    ): ReturnType<typeof parseTickets> {
+      const parsed = parseTickets(inParens, start + open + 1, matcher);
+      const close = open + inParens.length + 2;
+      const note = line
+        .slice(close)
+        .replace(/^\s*:?/, '')
+        .trim();
+      if (note === '' || parsed.extra) return parsed;
+      return { ...parsed, extra: { text: note, range: [start + close, start + line.trimEnd().length] } };
+    }
 
     for (const comment of sourceCode.getAllComments()) {
       if (owned.has(comment)) continue;
@@ -60,10 +82,15 @@ export default createRule({
         const match = keywordRe.exec(line);
         if (!match) continue;
         const [whole, indent, keyword] = match;
+        // The parenthesised group is optional, so it can be undefined despite RegExpExecArray's typing.
+        const inParens = match[3] as string | undefined;
         const upper = keyword.toUpperCase();
         if (keyword !== upper && !whole.endsWith(':')) continue;
 
-        const { tickets, extra } = parseTickets(line.slice(whole.length), start + whole.length, matcher);
+        const { tickets, extra } =
+          inParens === undefined
+            ? parseTickets(line.slice(whole.length), start + whole.length, matcher)
+            : parseParenthesized(line, start, indent.length + keyword.length, inParens);
         const loc = {
           start: sourceCode.getLocFromIndex(start + indent.length),
           end: sourceCode.getLocFromIndex(start + line.trimEnd().length),

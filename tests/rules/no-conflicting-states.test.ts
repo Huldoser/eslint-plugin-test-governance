@@ -13,6 +13,8 @@ runRule('no-conflicting-states', rule, {
     { code: "test('a', async ({ browserName }) => { test.skip(browserName === 'webkit'); });", settings: lifecycle },
     { code: "test.describe('s @new', () => { test('a', async () => {}); });", settings: lifecycle },
     { code: "test('a @quarantine', async () => {});", settings: custom },
+    // Real words two or more letters away in length are not typos.
+    { code: "test('a @stable @untestable', async () => {});", settings: lifecycle },
     // Only @unstable is on: no @new checks.
     { code: "test.skip('a @new @unstable', async () => {});", settings: settings({ states: { unstable: true } }) },
     { code: "test('a @new @unstable', async () => {});", settings: settings({ states: { new: true } }) },
@@ -103,6 +105,11 @@ runRule('no-conflicting-states', rule, {
       code: 'test(`a ${x} @quarantin`, async () => {});',
       settings: custom,
       errors: [{ messageId: 'tagTypo', data: { found: '@quarantin', expected: '@quarantine' } }],
+    },
+    {
+      code: "test('a', { tag: ['@unstble', '@stable'] }, async () => {});",
+      settings: lifecycle,
+      errors: [{ messageId: 'tagTypo', data: { found: '@unstble', expected: '@unstable' } }],
     },
     {
       code: "test('a @qurantiine', async () => {});",

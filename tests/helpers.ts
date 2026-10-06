@@ -13,7 +13,9 @@ type Cases = Parameters<RuleTester['run']>[2];
 export function runRule(name: string, rule: unknown, cases: Cases): void {
   for (const [label, parser] of parsers) {
     describe(label, () => {
-      const tester = new RuleTester({ languageOptions: { parser, ecmaVersion: 'latest', sourceType: 'module' } });
+      // ESLint 9.0 rejects `parser: undefined`, so leave the key out for espree, the default parser.
+      const languageOptions = { ...(parser && { parser }), ecmaVersion: 'latest', sourceType: 'module' } as const;
+      const tester = new RuleTester({ languageOptions });
       tester.run(name, rule as Parameters<RuleTester['run']>[1], cases);
     });
   }

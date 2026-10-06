@@ -1,4 +1,4 @@
-import { DEFAULT_COMMENT_KEYWORDS, type BuiltinStateName } from './constants.js';
+import { BUILTIN_STATE_NAMES, DEFAULT_COMMENT_KEYWORDS, type BuiltinStateName } from './constants.js';
 import { ConfigError } from './errors.js';
 import { optionsSchema } from './schema.js';
 import { compileTicketSpec, DEFAULT_PLACEHOLDERS, type TicketMatcher, type TicketSpec } from './tickets.js';
@@ -121,8 +121,56 @@ export function resolveOptions(settings: unknown): ResolvedOptions {
   return resolved;
 }
 
+/** The options each ticket preset takes besides `preset`. */
+const PRESET_OPTIONS: Record<TicketSpec['preset'], string[]> = {
+  any: [],
+  jira: ['projects', 'host'],
+  github: ['host'],
+  gitlab: ['host'],
+  linear: ['teams'],
+  'azure-devops': ['host'],
+  numeric: ['minLength', 'maxLength'],
+  pattern: ['pattern', 'flags'],
+};
+
+/** Options set on a ticket spec that its preset ignores, such as `host` on the `any` preset. */
+function presetProblems(ticket: TicketSpec | TicketSpec[] | undefined, path: string): string[] {
+  if (ticket === undefined) return [];
+  const specs = Array.isArray(ticket) ? ticket : [ticket];
+  return specs.flatMap((spec, index) => {
+    const at = Array.isArray(ticket) ? `${path}[${index}]` : path;
+    const allowed = PRESET_OPTIONS[spec.preset];
+    return Object.keys(spec)
+      .filter(
+        (key) => key !== 'preset' && (spec as Record<string, unknown>)[key] !== undefined && !allowed.includes(key),
+      )
+      .map((key) => {
+        const presets = Object.entries(PRESET_OPTIONS).filter(([, keys]) => keys.includes(key));
+        return `${at}.${key} is not an option of the "${spec.preset}" preset (it applies to ${presets.map(([name]) => `"${name}"`).join(', ')})`;
+      });
+  });
+}
+
+/** Problems the schema can't express: options that belong to another preset, and reused state names. */
+function crossFieldProblems(options: GovernanceOptions): string[] {
+  const problems = presetProblems(options.ticket, 'ticket');
+  for (const [name, override] of Object.entries(options.states ?? {})) {
+    if (typeof override === 'object') problems.push(...presetProblems(override.ticket, `states.${name}.ticket`));
+  }
+  for (const [name, custom] of Object.entries(options.customStates ?? {})) {
+    if ((BUILTIN_STATE_NAMES as readonly string[]).includes(name)) {
+      problems.push(
+        `customStates.${name} reuses the name of the built-in "${name}" state; give it another name, or use states.${name} to change the built-in`,
+      );
+    }
+    problems.push(...presetProblems(custom.ticket, `customStates.${name}.ticket`));
+  }
+  return problems;
+}
+
 export function compileOptions(options: GovernanceOptions): ResolvedOptions {
-  const problems = validate(options, optionsSchema);
+  const schemaProblems = validate(options, optionsSchema);
+  const problems = schemaProblems.length > 0 ? schemaProblems : crossFieldProblems(options);
   if (problems.length > 0) {
     throw new ConfigError(`invalid options:\n${problems.map((problem) => `  - ${problem}`).join('\n')}`);
   }

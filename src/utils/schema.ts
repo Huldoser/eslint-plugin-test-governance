@@ -3,13 +3,16 @@ import type { Schema } from './validate.js';
 
 const MARKER_HINT = 'an uppercase keyword such as NEEDS-DATA (letters, digits, "-" and "_")';
 const TAG_HINT = 'a tag such as @needs-data';
+/** Jira project and Linear team keys, as they appear in tickets: `WEB` in `WEB-123`. */
+const KEY_PATTERN = '^[A-Z][A-Z0-9_]+$';
+const KEY_HINT = 'an uppercase key as it appears in tickets, such as WEB for WEB-123';
 
 const ticketSpecSchema: Schema = {
   type: 'object',
   properties: {
     preset: { type: 'string', enum: [...TICKET_PRESETS] },
-    projects: { type: 'array', items: { type: 'string' } },
-    teams: { type: 'array', items: { type: 'string' } },
+    projects: { type: 'array', items: { type: 'string', pattern: KEY_PATTERN, patternHint: KEY_HINT } },
+    teams: { type: 'array', items: { type: 'string', pattern: KEY_PATTERN, patternHint: KEY_HINT } },
     host: { type: 'string' },
     minLength: { type: 'integer', minimum: 1 },
     maxLength: { type: 'integer', minimum: 1 },

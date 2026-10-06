@@ -15,6 +15,8 @@ source of truth and nothing is forgotten in a comment.
 ```ts
 // TODO: WEB-512                 ✓
 // FIXME: WEB-77, WEB-78         ✓ several tickets, separated by commas
+// TODO(WEB-512)                 ✓ the ticket can go in parentheses
+// TODO(alice): refactor this    ✖ a name is not a ticket
 // TODO: refactor this           ✖ no ticket
 // FIXME: WEB-77 flaky locator   ✖ only tickets are allowed (allowNotes: true allows the note)
 ```
@@ -24,6 +26,8 @@ How comments are read:
 - The keyword starts the comment (or a line of a block comment). `TODO` and `FIXME` in capitals
   count with or without a colon. Other casings, such as `todo:`, need the colon, so a sentence that
   happens to start with "Todo" is left alone.
+- The tickets can also go in parentheses straight after the keyword, `TODO(WEB-512)`, a style many
+  teams already use. Anything after the parentheses is a note, as it would be after `TODO: WEB-512`.
 - The tickets follow the same rules as markers: the shared ticket format, placeholders such as `TBD`
   rejected, and no text after the tickets unless `allowNotes` is set.
 - A `// FIXME:` marker directly above a `test.fixme(...)` is checked by

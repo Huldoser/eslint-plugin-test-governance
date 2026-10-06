@@ -15,6 +15,10 @@ runRule('marker-matches-state', rule, {
     "// SKIP: TODO\ntest.skip('a', async () => {});",
     // Conditional skips don't need a marker, so nothing is missing.
     "// FIXME: WEB-1\ntest('a', async ({ browserName }) => { test.skip(browserName === 'webkit'); });",
+    // A work comment above a skipped test isn't a marker for another state; require-ticket-in-comments
+    // and require-ticket report it.
+    "// FIXME: solve test intermitencies\ntest.skip('a', async () => {});",
+    "// FIXME: flaky\ntest.skip('a', async () => {});",
     // A marker for an inherited state is redundant, not wrong.
     "// SKIP: WEB-1\ntest.describe.skip('s', () => {\n  // SKIP: WEB-1\n  test('a', async () => {});\n});",
   ],
@@ -91,7 +95,7 @@ runRule('marker-matches-state', rule, {
       errors: [
         {
           messageId: 'sharedMarker',
-          data: { found: 'SKIP', foundState: 'skip', expected: 'UNSTABLE', state: 'unstable', subject: 'this test' },
+          data: { found: 'SKIP', foundState: 'skip', expected: 'UNSTABLE', state: 'unstable', subject: 'This test' },
           suggestions: [
             {
               messageId: 'addMarker',
@@ -108,7 +112,7 @@ runRule('marker-matches-state', rule, {
       errors: [
         {
           messageId: 'sharedMarker',
-          data: { found: 'NEW', foundState: 'new', expected: 'FIXME', state: 'fixme', subject: 'this test' },
+          data: { found: 'NEW', foundState: 'new', expected: 'FIXME', state: 'fixme', subject: 'This test' },
           suggestions: [],
         },
       ],
