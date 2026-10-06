@@ -18,6 +18,9 @@ runRule('require-ticket-in-comments', rule, {
     `// TODO(WEB-1)${TEST}`,
     `// FIXME(WEB-1, WEB-2):${TEST}`,
     `/* TODO(https://github.com/acme/web/issues/12) */${TEST}`,
+    // Some teams put a space before the parenthesis.
+    `// TODO (WEB-1)${TEST}`,
+    `// FIXME (WEB-1, WEB-2):${TEST}`,
     { code: `// TODO(WEB-1): remove after the migration${TEST}`, settings: settings({ allowNotes: true }) },
     // Prose that merely starts with the word, and keywords inside longer words.
     `// todo list for the next sprint${TEST}`,
@@ -113,6 +116,27 @@ runRule('require-ticket-in-comments', rule, {
     { code: `// FIXME(): later${TEST}`, errors: [missing('FIXME')] },
     { code: `// todo(alice): later${TEST}`, errors: [missing('todo', 'TODO')] },
     { code: `// TODO(TBD)${TEST}`, errors: [{ messageId: 'placeholderTicket', data: { ticket: 'TBD' } }] },
+    { code: `// TODO (alice): later${TEST}`, errors: [missing('TODO')] },
+    {
+      code: `// TODO (WEB-1): remove after the migration${TEST}`,
+      errors: [
+        {
+          messageId: 'extraText',
+          data: { keyword: 'TODO', text: 'remove after the migration' },
+          line: 1,
+          column: 16,
+          endLine: 1,
+          endColumn: 44,
+          suggestions: [
+            {
+              messageId: 'removeExtraText',
+              data: { text: 'remove after the migration' },
+              output: `// TODO (WEB-1)${TEST}`,
+            },
+          ],
+        },
+      ],
+    },
     // Notes after the parentheses follow allowNotes, like notes after `TODO: WEB-1`.
     {
       code: `// TODO(WEB-1): remove after the migration${TEST}`,
