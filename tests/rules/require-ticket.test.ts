@@ -21,9 +21,14 @@ runRule('require-ticket', rule, {
     "/**\n * Waiting on the new checkout API.\n * SKIP: WEB-123\n */\ntest.skip('a', async () => {});",
     "// SKIP: WEB-1\n// eslint-disable-next-line no-empty-function\ntest.skip('a', async () => {});",
     "// SKIP: WEB-1, WEB-2\ntest.skip('a', async () => {});",
+    "// SKIP: WEB-1\n// SKIP: WEB-2\ntest.skip('a', async () => {});",
     "// SKIP: WEB-1,WEB-2\ntest.skip('a', async () => {});",
     "// SKIP:   WEB-1  ,  WEB-2   \ntest.skip('a', async () => {});",
     "// SKIP: https://acme.atlassian.net/browse/WEB-1?focusedCommentId=5#comment-5\ntest.skip('a', async () => {});",
+    // A full stop or colon after the last ticket is punctuation, not a note.
+    "// SKIP: WEB-1.\ntest.skip('a', async () => {});",
+    "// SKIP: WEB-1, WEB-2.\ntest.skip('a', async () => {});",
+    "// SKIP: WEB-1:\ntest.skip('a', async () => {});",
     "/*\r\n * Context for the skip.\r\n * SKIP: WEB-1\r\n */\r\ntest.skip('a', async () => {});",
     // Notes after the ticket are allowed with allowNotes.
     ...[
@@ -53,6 +58,14 @@ runRule('require-ticket', rule, {
     "test('a', async () => { process.env.CI ? test.skip() : undefined; });",
     "test('a', async () => { process.env.CI && test.skip(); });",
     "test('a', async () => { switch (process.env.BROWSER) { case 'webkit': test.skip(); } });",
+    // So is a skip in a `catch` block, or after an early `return` or `throw`.
+    'export async function needsAzurite() {\n  try { await ping(); } catch (error) { test.skip(true, `Azurite is down: ${error}`); }\n}',
+    "test('a', async () => { try { await setup(); } catch { test.skip(); } finally { cleanup(); } });",
+    "test('a', async ({ page }, testInfo) => { try { await setup(); } catch { if (retry) {} testInfo.fixme(); } });",
+    "test('a', async () => { if (ready) return; test.skip(); });",
+    "test('a', async () => { if (!ready) { log('not ready'); return; }\n  await step();\n  test.skip(); });",
+    "test('a', async () => { if (supported) {} else throw new Error('x'); { test.skip(); } });",
+    "test('a', async () => { if (!enabled) { throw new Error('off'); } for (;;) { test.skip(); break; } });",
     // Runtime skips: marker above the call or above the enclosing test.
     "test('a', async () => {\n  // SKIP: WEB-1\n  test.skip();\n});",
     "// SKIP: WEB-1\ntest('a', async () => {\n  test.skip();\n});",
@@ -180,6 +193,15 @@ runRule('require-ticket', rule, {
       code: "// SKIP: WEB-1, nope\ntest.skip('a', async () => {});",
       errors: [{ messageId: 'invalidTicket', data: { ticket: 'nope', state: 'skip', expected: ANY } }],
     },
+    // A broken marker is reported even when another marker for the same state is valid.
+    {
+      code: "// SKIP: WEB-1\n// SKIP: nope\ntest.skip('a', async () => {});",
+      errors: [{ messageId: 'invalidTicket', data: { ticket: 'nope', state: 'skip', expected: ANY }, line: 2 }],
+    },
+    {
+      code: "// SKIP: WEB-1\ntest.describe.skip('s', () => {\n  // SKIP: TBD\n  test.skip('a', async () => {});\n});",
+      errors: [{ messageId: 'placeholderTicket', data: { ticket: 'TBD' }, line: 3 }],
+    },
     ...['TODO', 'tbd', 'XXX-1', '#123', '0', '12345', 'SDQA-0'].map((ticket) => ({
       code: `// SKIP: ${ticket}\ntest.skip('a', async () => {});`,
       errors: [{ messageId: 'placeholderTicket' as const, data: { ticket } }],
@@ -188,7 +210,6 @@ runRule('require-ticket', rule, {
     ...[
       ['// SKIP: WEB-123 flaky on CI', 'flaky on CI', '// SKIP: WEB-123'],
       ['// SKIP: WEB-1: flaky', ': flaky', '// SKIP: WEB-1'],
-      ['// SKIP: WEB-1.', '.', '// SKIP: WEB-1'],
       ['// SKIP: WEB-1,', ',', '// SKIP: WEB-1'],
       ['// SKIP: WEB-1, WEB-2 ,', ',', '// SKIP: WEB-1, WEB-2'],
       ['// SKIP: WEB-1 and WEB-2', 'and WEB-2', '// SKIP: WEB-1'],
@@ -283,6 +304,29 @@ runRule('require-ticket', rule, {
       errors: [missing('skip', 'SKIP', 'This skip call')],
     },
     { code: 'test.skip();', errors: [missing('skip', 'SKIP', 'This skip call')] },
+    // Code before the call that doesn't always leave the function doesn't make it conditional.
+    {
+      code: "test('a', async () => { if (ready) { log('ready'); } test.skip(); });",
+      errors: [missing('skip', 'SKIP', 'This skip call')],
+    },
+    {
+      code: "test('a', async () => { if (ready) log('ready'); else log('waiting'); test.skip(); });",
+      errors: [missing('skip', 'SKIP', 'This skip call')],
+    },
+    {
+      code: "test('a', async () => { test.skip(); if (ready) return; });",
+      errors: [missing('skip', 'SKIP', 'This skip call')],
+    },
+    // A `catch` or early return in another function doesn't guard this call.
+    {
+      code: "test('a', async () => {\n  try { await setup(); } catch { const retry = () => { if (x) return; }; }\n  test.skip();\n});",
+      errors: [missing('skip', 'SKIP', 'This skip call')],
+    },
+    {
+      code: "test('a', async () => { try { await setup(); } catch { test.skip(); } });",
+      settings: settings({ requireTicketForConditional: true }),
+      errors: [missing('skip', 'SKIP', 'This skip call')],
+    },
     // A guard outside the enclosing function doesn't make the call conditional.
     {
       code: "if (process.env.CI) {\n  test('a', async () => { test.skip(); });\n}",

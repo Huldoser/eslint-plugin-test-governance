@@ -15,7 +15,8 @@ npm install
 
 ## Checks
 
-Every pull request runs these in CI (tests on Node 22 and 24 with ESLint 9 and 10):
+Every pull request runs these in CI (tests on Node 22 and 24 with ESLint 9 and 10, plus the oldest supported
+versions, Node 22.12 with ESLint 9.0.0):
 
 ```sh
 npm run lint           # ESLint, including type-aware rules and eslint-plugin-eslint-plugin

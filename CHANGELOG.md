@@ -6,6 +6,32 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `require-ticket-in-comments` accepts the ticket in parentheses: `// TODO(WEB-123)`. A name in
+  parentheses, as in `// TODO(alice): refactor`, is not a ticket and is reported. Before, comments
+  written this way were never checked.
+- Configuration mistakes that used to be accepted silently now fail with a clear message: lowercase
+  Jira `projects` or Linear `teams` (`'web'` never matches a ticket like `WEB-1`), options that belong
+  to another ticket preset (such as `host` on the `any` preset), and a custom state that reuses a
+  built-in state's name (`customStates: { fixme: ... }`).
+
+### Fixed
+
+- A skip in a `catch` block (`catch { test.skip(true, 'Mail server is down') }`) or after an early
+  exit such as `if (ready) return;` counts as conditional, like one under an `if`, so it no longer
+  needs a ticket by default.
+- A plain `// FIXME: some text` above `test.skip(...)` no longer gets a confusing `marker-matches-state`
+  error claiming the test is also in the `fixme` state. `require-ticket-in-comments` and
+  `require-ticket` report what is actually wrong. The `marker-matches-state` message for a test in
+  two states now starts its second sentence with a capital letter.
+- `@stable`, `@untestable` and other tags two or more letters longer or shorter than `@unstable`
+  (or any other state tag) are no longer reported as typos of it.
+- A broken marker next to a valid one for the same state, as in `// SKIP: WEB-1` followed by
+  `// SKIP: nope`, is reported. Before, the valid marker hid it.
+- A full stop or colon after the last ticket, as in `// SKIP: WEB-1.`, is no longer reported as
+  extra text.
+
 ## [0.2.1] - 2026-10-03
 
 ### Added

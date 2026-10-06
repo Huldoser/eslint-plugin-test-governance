@@ -53,7 +53,8 @@ How ticket lists are read:
 | `// SKIP:   WEB-1  ,  WEB-2  `                                                  | two tickets; extra spaces are fine                        |
 | `// SKIP: https://acme.atlassian.net/browse/WEB-1?focusedCommentId=5#comment-5` | one ticket; query strings and fragments are part of a URL |
 | `// SKIP: WEB-1 flaky on CI`, `// SKIP: WEB-1: flaky`                           | extra text `flaky on CI` / `: flaky`                      |
-| `// SKIP: WEB-1,` or `// SKIP: WEB-1.`                                          | extra text `,` / `.`                                      |
+| `// SKIP: WEB-1.` or `// SKIP: WEB-1:`                                          | one ticket; a full stop or colon at the end is fine       |
+| `// SKIP: WEB-1,`                                                               | extra text `,`                                            |
 | `// SKIP: WEB-1 and WEB-2`                                                      | extra text `and WEB-2`; separate tickets with commas      |
 | `// SKIP: WEB-1;WEB-2`, `// SKIP: WEB-1/WEB-2`                                  | invalid ticket, since only commas separate tickets        |
 | `// SKIP: flaky on CI`                                                          | invalid ticket `flaky`: the first word must be a ticket   |
@@ -64,7 +65,12 @@ lines. Extra text is reported only once the tickets on that line are valid.
 Conditional skips such as `test.skip(browserName === 'webkit', 'Not supported')` usually describe a
 permanent platform limit, so they need no ticket unless you set `requireTicketForConditional: true`.
 A runtime skip under an `if`, a `switch` case, a ternary or `&&` counts as conditional too, since
-`if (!enabled) test.skip()` does the same as `test.skip(!enabled)`.
+`if (!enabled) test.skip()` does the same as `test.skip(!enabled)`. So does a skip in a `catch` block,
+such as `catch { test.skip(true, 'Mail server is down') }`, and a skip after an early exit such as
+`if (ready) return;` or `if (!ok) throw error;` earlier in the same function.
+
+If one test or describe has several markers for the same state, each must be valid: in
+`// SKIP: WEB-1` followed by `// SKIP: nope`, the second line is reported.
 
 ## Examples
 

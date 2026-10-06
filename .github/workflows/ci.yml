@@ -31,6 +31,21 @@ jobs:
       - run: npm run test:coverage
       - run: npm run test:pack -- --eslint ${{ matrix.eslint }}
 
+  # The oldest versions package.json accepts: Node 22.12 (engines) and ESLint 9.0.0 (peer range).
+  # ESLint 9.0 ships no types, so this job runs the tests only; the jobs above cover types and packing.
+  oldest:
+    name: Node 22.12 / ESLint 9.0.0 (oldest supported)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.12.0
+          cache: npm
+      - run: npm ci
+      - run: npm install --no-save eslint@9.0.0
+      - run: npm test
+
   lint:
     runs-on: ubuntu-latest
     steps:

@@ -1,4 +1,4 @@
-import { describeSubject, isStateMarker, missingStates, strayMarkers } from '../utils/analyze.js';
+import { appliesTo, describeSubject, isStateMarker, missingStates, strayMarkers } from '../utils/analyze.js';
 import { createRule } from '../utils/create-rule.js';
 import { indentOf, keywordRange } from '../utils/fix.js';
 
@@ -26,13 +26,18 @@ export default createRule({
       const missing = missingStates(subject);
       if (missing.length === 0) continue;
       const stray = strayMarkers(subject, options);
-      const subjectName = describeSubject(subject).replace(/^This/, 'this');
+      const subjectName = describeSubject(subject);
 
       for (const marker of stray) {
         context.report({
           loc: marker.comment.loc,
           messageId: 'wrongMarker',
-          data: { found: marker.keyword, expected: missing[0].marker, state: missing[0].name, subject: subjectName },
+          data: {
+            found: marker.keyword,
+            expected: missing[0].marker,
+            state: missing[0].name,
+            subject: subjectName.replace(/^This/, 'this'),
+          },
           suggest: missing.map((state) => ({
             messageId: 'renameMarker' as const,
             data: { expected: state.marker },
@@ -43,8 +48,12 @@ export default createRule({
       }
       if (stray.length > 0) continue;
 
-      // One marker written for a test that is in two states.
-      const present = subject.markers.filter(isStateMarker).find((m) => m.state !== missing[0]);
+      // One marker written for a test that is in two states. A marker for a state the test isn't in
+      // is not "shared": with no stray markers left, it can only be a work comment such as
+      // `// FIXME: flaky` above `test.skip(...)`, which require-ticket-in-comments reports.
+      const present = subject.markers
+        .filter(isStateMarker)
+        .find((m) => m.state !== missing[0] && appliesTo(subject, m.state.name));
       if (!present) continue;
       for (const state of missing) {
         const tickets = present.tickets.map((t) => t.text).join(', ');

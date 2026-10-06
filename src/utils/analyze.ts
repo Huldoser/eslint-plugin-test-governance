@@ -258,7 +258,8 @@ export function parseTickets(text: string, offset: number, matcher: TicketMatche
     index += separator.length;
   }
   const rest = text.slice(lastEnd).trimEnd();
-  if (tickets.length === 0 || rest.trim() === '') return { tickets };
+  // A sentence-ending `WEB-1.` has nothing after the ticket; `WEB-1: flaky` has a note.
+  if (tickets.length === 0 || /^[.:;]*$/.test(rest.trim())) return { tickets };
   return { tickets, extra: { text: rest.trim(), range: [offset + lastEnd, offset + lastEnd + rest.length] } };
 }
 
@@ -327,10 +328,25 @@ function isUnconditional(call: TSESTree.CallExpression): boolean {
 
 const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression']);
 
+/** Whether a statement always leaves the function or block: `return`, `throw`, or a block containing one. */
+function exits(statement: TSESTree.Statement): boolean {
+  if (statement.type === 'ReturnStatement' || statement.type === 'ThrowStatement') return true;
+  return statement.type === 'BlockStatement' && statement.body.some(exits);
+}
+
+/** `if (ready) return;` or `if (!ok) { throw error; }`: code after it only runs on some paths. */
+function isEarlyExit(statement: TSESTree.Statement): boolean {
+  return (
+    statement.type === 'IfStatement' &&
+    (exits(statement.consequent) || (statement.alternate !== null && exits(statement.alternate)))
+  );
+}
+
 /**
- * Whether the call only runs on some paths of its function: under an `if`, a `switch` case, a ternary
- * or the right side of `&&`, `||` or `??`. `if (!enabled) test.skip()` is the same as
- * `test.skip(!enabled)`.
+ * Whether the call only runs on some paths of its function: under an `if`, a `switch` case, a ternary,
+ * the right side of `&&`, `||` or `??`, in a `catch` block, or after an early exit such as
+ * `if (ready) return;`. `if (!enabled) test.skip()` is the same as `test.skip(!enabled)`, and
+ * `catch { test.skip(true, 'service is down') }` only skips when the service is down.
  */
 function isGuarded(call: TSESTree.CallExpression): boolean {
   let child: Node = call;
@@ -338,6 +354,11 @@ function isGuarded(call: TSESTree.CallExpression): boolean {
     if ((node.type === 'IfStatement' || node.type === 'ConditionalExpression') && child !== node.test) return true;
     if (node.type === 'SwitchCase' && child !== node.test) return true;
     if (node.type === 'LogicalExpression' && child === node.right) return true;
+    if (node.type === 'CatchClause') return true;
+    if (node.type === 'BlockStatement') {
+      const index = node.body.indexOf(child as TSESTree.Statement);
+      if (node.body.slice(0, index).some(isEarlyExit)) return true;
+    }
   }
   return false;
 }
@@ -550,9 +571,14 @@ export function evaluate(subject: Subject, state: StateDef): Evaluation {
     const marker = subject.markers.find((m) => m.caseOf === state);
     return marker ? { kind: 'case', marker } : { kind: 'missing' };
   }
-  if (markers.some((m) => m.tickets.length > 0 && m.tickets.every((t) => t.result === 'ok'))) return { kind: 'ok' };
-  // Report the problem with the closest marker.
-  const [marker] = markers;
+  const isValid = (m: Marker): boolean => m.tickets.length > 0 && m.tickets.every((t) => t.result === 'ok');
+  // A broken marker in the subject's own block is reported even when another marker is valid: in
+  // `// SKIP: WEB-1` + `// SKIP: nope`, the second line is still wrong. Broken markers further up
+  // are reported for the test or describe they sit above.
+  const brokenOwn = markers.find((m) => subject.markers.includes(m) && !isValid(m));
+  if (!brokenOwn && markers.some(isValid)) return { kind: 'ok' };
+  // Report the problem with the closest broken marker.
+  const marker = brokenOwn ?? markers[0];
   const bad = marker.tickets.find((t) => t.result !== 'ok');
   return bad ? { kind: 'bad-ticket', marker, ticket: bad } : { kind: 'no-ticket', marker };
 }

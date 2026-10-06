@@ -31,6 +31,16 @@ describe('compileOptions', () => {
     expect(resolved.states.at(-1)).toMatchObject({ name: 'blocked', tag: '@blocked', marker: 'BLOCKED' });
   });
 
+  it('accepts options that belong to the preset, and states set to true or false', () => {
+    expect(() =>
+      compileOptions({
+        ticket: [{ preset: 'jira', projects: ['WEB'], host: 'acme.atlassian.net', minLength: undefined } as never],
+        states: { fail: true, slow: { enabled: true } },
+        customStates: { blocked: { when: '@blocked', marker: 'BLOCKED', ticket: { preset: 'numeric', maxLength: 6 } } },
+      }),
+    ).not.toThrow();
+  });
+
   it('compiles per-state ticket formats', () => {
     const resolved = compileOptions({
       ticket: { preset: 'jira' },
@@ -59,6 +69,31 @@ describe('compileOptions', () => {
     [{ ticket: { preset: 'pattern' } }, /"pattern" ticket preset needs a `pattern` regex string/],
     [{ customStates: { x: { when: '@x', marker: 'SKIP' } } }, /two states use the marker "SKIP"/],
     [{ lifecycleTags: true, customStates: { x: { when: '@new', marker: 'X' } } }, /two states use the tag "@new"/],
+    [
+      { ticket: { preset: 'jira', projects: ['web'] } },
+      /ticket\.projects\[0\] must be an uppercase key as it appears in tickets, such as WEB for WEB-123 \(got "web"\)/,
+    ],
+    [{ ticket: { preset: 'linear', teams: ['Eng'] } }, /ticket\.teams\[0\] must be an uppercase key/],
+    [
+      { ticket: { preset: 'any', host: 'jira.acme.com' } },
+      /ticket\.host is not an option of the "any" preset \(it applies to "jira", "github", "gitlab", "azure-devops"\)/,
+    ],
+    [
+      { ticket: [{ preset: 'jira' }, { preset: 'numeric', projects: ['WEB'] }] },
+      /ticket\[1\]\.projects is not an option of the "numeric" preset \(it applies to "jira"\)/,
+    ],
+    [
+      { states: { fixme: { ticket: { preset: 'github', teams: ['ENG'] } } } },
+      /states\.fixme\.ticket\.teams is not an option of the "github" preset \(it applies to "linear"\)/,
+    ],
+    [
+      { customStates: { blocked: { when: '@blocked', marker: 'BLOCKED', ticket: { preset: 'any', flags: 'i' } } } },
+      /customStates\.blocked\.ticket\.flags is not an option of the "any" preset \(it applies to "pattern"\)/,
+    ],
+    [
+      { customStates: { fixme: { when: '@broken', marker: 'BROKEN' } } },
+      /customStates\.fixme reuses the name of the built-in "fixme" state; give it another name, or use states\.fixme/,
+    ],
   ])('rejects %j', (options, message) => {
     expect(() => compileOptions(options as never)).toThrow(ConfigError);
     expect(() => compileOptions(options as never)).toThrow(message);

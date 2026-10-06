@@ -75,9 +75,14 @@ export default createRule({
         });
         return;
       }
+      // A typo changes, adds, drops or swaps a letter or two. A tag that is two or more letters
+      // shorter or longer, like `@stable` or `@untestable` next to `@unstable`, is a different word.
       const near = tagStates.find((s) => {
         const expected = s.tag.toLowerCase();
-        return editDistance(lower, expected) <= typoThreshold(expected.length - 1);
+        return (
+          Math.abs(lower.length - expected.length) < 2 &&
+          editDistance(lower, expected) <= typoThreshold(expected.length - 1)
+        );
       });
       if (near) {
         context.report({ node: occurrence.node, messageId: 'tagTypo', data: { found: tag, expected: near.tag } });
