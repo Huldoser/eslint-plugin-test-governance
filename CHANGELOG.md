@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A test or describe whose body is not written inline, such as `test.skip('pays', payWithCard)` or
+  `test('pays @new', withPage(async () => {}))`, is checked like any other. Before, it was ignored,
+  so a skipped test written this way needed no ticket.
+
 ## [0.3.0] - 2026-10-06
 
 ### Added
