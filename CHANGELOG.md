@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- A `test` bound to another test runner without an import, as in `const test = require('node:test')`,
+  `const test = require('ava')` or `const test = anyTest as TestFn<Context>`, is no longer mistaken
+  for Playwright's `test`. Before, skipped tests in those files were reported as missing a ticket.
 - `require-ticket-in-comments` reads a ticket in parentheses after a space, as in `// TODO (WEB-123)`.
   Before, such comments were reported as having no ticket at all.
 
