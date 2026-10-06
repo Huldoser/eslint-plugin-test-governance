@@ -13,6 +13,9 @@ All notable changes to this project are documented here. The format follows
   for Playwright's `test`. Before, skipped tests in those files were reported as missing a ticket.
 - `require-ticket-in-comments` reads a ticket in parentheses after a space, as in `// TODO (WEB-123)`.
   Before, such comments were reported as having no ticket at all.
+- A test or describe whose body is not written inline, such as `test.skip('pays', payWithCard)` or
+  `test('pays @new', withPage(async () => {}))`, is checked like any other. Before, it was ignored,
+  so a skipped test written this way needed no ticket.
 
 ## [0.3.0] - 2026-10-06
 

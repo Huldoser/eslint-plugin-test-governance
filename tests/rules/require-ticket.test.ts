@@ -17,6 +17,9 @@ runRule('require-ticket', rule, {
     "test('plain', async () => {});",
     "test.describe('suite', () => { test('a', async () => {}); });",
     "// SKIP: WEB-123\ntest.skip('a', async () => {});",
+    // A body defined elsewhere.
+    "// SKIP: WEB-123\ntest.skip('pays', payWithCard);",
+    "test.skip(isMobile, 'Not on mobile');",
     "/* SKIP: WEB-123 */\ntest.skip('a', async () => {});",
     "/**\n * Waiting on the new checkout API.\n * SKIP: WEB-123\n */\ntest.skip('a', async () => {});",
     "// SKIP: WEB-1\n// eslint-disable-next-line no-empty-function\ntest.skip('a', async () => {});",
@@ -173,6 +176,14 @@ runRule('require-ticket', rule, {
       errors: [missing('skip', 'SKIP')],
       settings: settings({ testFunctions: [] }),
     },
+    // A body defined elsewhere, or wrapped in a helper.
+    { code: "test.skip('pays', payWithCard);", errors: [missing('skip', 'SKIP')] },
+    { code: "test.skip(`pays ${card}`, { tag: '@slow' }, payWith(card));", errors: [missing('skip', 'SKIP')] },
+    {
+      code: "test.describe.fixme('checkout', defineCheckoutTests);",
+      errors: [missing('fixme', 'FIXME', 'This describe block')],
+    },
+    { code: "test('pays @new', withPage(async () => {}));", errors: [missing('new', 'NEW')], settings: lifecycle },
     // Only the head of the declaration is reported, not the whole body.
     {
       code: "test.skip('pays with PayPal', async ({ page }) => {\n  await page.goto('/');\n  await page.click('#pay');\n});",
