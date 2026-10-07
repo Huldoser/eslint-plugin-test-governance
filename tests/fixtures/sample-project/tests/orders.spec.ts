@@ -1,7 +1,7 @@
 import { expect, test } from '../fixtures';
 
 test.describe('Order entry', () => {
-  test('SDQA-10: places a limit order @smoke', async ({ page }) => {
+  test('places a limit order at the chosen price @smoke', async ({ page }) => {
     // TODO: TRADE-490
     await page.goto('/orders');
     // FIXME: the price check is flaky on mobile
@@ -10,37 +10,37 @@ test.describe('Order entry', () => {
 
   // Markers hold tickets only, so the note after TRADE-481 is reported.
   // SKIP: TRADE-481 broker sandbox is down
-  test.skip('SDQA-11: buys shares with margin', async ({ page }) => {
+  test.skip('rejects a margin order above the buying power', async ({ page }) => {
     await page.goto('/orders');
   });
 
-  // The test-case ID in the title is not a ticket, so this is reported.
-  test.skip('SDQA-12: amends an order price', async () => {});
+  // A skipped test with no marker is reported.
+  test.skip('updates the price of an open order', async () => {});
 
   // FIXME: TODO
-  test.fixme('SDQA-13: shows fees per exchange', async () => {});
+  test.fixme('shows the commission before an order is placed', async () => {});
 
   // SKIP: TRADE-500
-  test.fixme('SDQA-14: fills a partial order', async () => {});
+  test.fixme('shows the unfilled quantity of a partly filled order', async () => {});
 
   // NEW: RISK-77
-  test('SDQA-15: one-click sell all @new', async ({ page }) => {
+  test('closes all positions with one click @new', async ({ page }) => {
     await page.goto('/positions');
   });
 
-  test('SDQA-16: trailing stop order', { tag: ['@unstable', '@smoke'] }, async () => {});
+  test('moves a trailing stop up with the price', { tag: ['@unstable', '@smoke'] }, async () => {});
 
   // UNSTABLE: OPS-9
-  test('SDQA-17: bracket order @unstable', async () => {});
+  test('triggers a stop-loss when the price drops @unstable', async () => {});
 
   // NEW: RISK-80 promoted, marker left behind
-  test('SDQA-18: saved watchlists', async () => {});
+  test('saves a watchlist', async () => {});
 
-  test('SDQA-19: trade history export @New', async () => {});
+  test('exports the trade history as CSV @New', async () => {});
 
-  test('SDQA-20: dividend payouts @unstabel', async () => {});
+  test('shows dividend payments in the account history @unstabel', async () => {});
 
-  test('SDQA-21: webkit-only chart layout', async ({ browserName }) => {
+  test('draws the price chart', async ({ browserName }) => {
     test.skip(browserName === 'webkit', 'Chart layout differs on WebKit by design');
   });
 });

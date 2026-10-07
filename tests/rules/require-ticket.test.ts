@@ -119,7 +119,7 @@ runRule('require-ticket', rule, {
     // mergeTests() of something that isn't a test, and calls that aren't mergeTests().
     "import { test as base } from '@playwright/test';\nconst t = combine(base), u = factory()(), { a } = config, { b } = load('x');\nt.skip('places an order', async () => {});\nu.skip('cancels an order', async () => {});",
     // Tickets are never read from titles, even when they look like one.
-    "test('SDQA-52: closes all positions at market close', async () => {});",
+    "test('TRADE-52: closes all positions at market close', async () => {});",
     // fail and slow are off by default.
     "test.fail('rejects an order over the position limit', async () => {});",
     "test('backtests a moving-average strategy', async () => { test.slow(); });",
@@ -233,9 +233,9 @@ runRule('require-ticket', rule, {
       code: "// SKIP: TRADE-1\ntest.describe('order entry', () => {\n  test.skip('places an order', async () => {});\n});",
       errors: [missing('skip', 'SKIP')],
     },
-    // The test-case ID in the title is not a ticket.
+    // A ticket key in the title is not a marker.
     {
-      code: "test.skip('SDQA-52: cancels all open orders at market close', async () => {});",
+      code: "test.skip('TRADE-52: cancels all open orders at market close', async () => {});",
       errors: [missing('skip', 'SKIP')],
     },
     { code: "// SKIP:\ntest.skip('places an order', async () => {});", errors: [{ messageId: 'missingTicket' }] },

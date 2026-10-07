@@ -169,7 +169,7 @@ describe('placeholders', () => {
 
   for (const ticket of [
     'TRADE-0',
-    'SDQA-000',
+    'TRADE-000',
     '#00',
     'acme/trading-engine#0',
     'AB#0',
