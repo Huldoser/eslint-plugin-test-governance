@@ -6,7 +6,7 @@ export default [
   {
     files: ['tests/**/*.{js,ts}'],
     ...testGovernance.configure({
-      ticket: { preset: 'jira', projects: ['WEB', 'QA'] },
+      ticket: { preset: 'jira', projects: ['TRADE', 'RISK'] },
       lifecycleTags: true,
       customStates: { 'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' } },
     }),

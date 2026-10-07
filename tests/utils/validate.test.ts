@@ -26,7 +26,7 @@ describe('options validation', () => {
       { ticket: { preset: 'jria' } },
       'ticket.preset must be one of "any", "jira", "github", "gitlab", "linear", "azure-devops", "numeric", "pattern" (got "jria")',
     ],
-    [{ ticket: { preset: 'jira', projects: 'WEB' } }, 'ticket.projects must be an array (got "WEB")'],
+    [{ ticket: { preset: 'jira', projects: 'TRADE' } }, 'ticket.projects must be an array (got "TRADE")'],
     [{ ticket: [] }, 'ticket must have at least 1 item'],
     [{ ticket: 'jira' }, 'ticket must be an object or an array (got "jira")'],
     [
@@ -34,7 +34,7 @@ describe('options validation', () => {
       'ticket[1].preset must be one of "any", "jira", "github", "gitlab", "linear", "azure-devops", "numeric", "pattern" (got "githb")',
     ],
     [
-      { ticket: { preset: 'jira', project: ['WEB'] } },
+      { ticket: { preset: 'jira', project: ['TRADE'] } },
       'ticket.project is not a known option; did you mean "projects"?',
     ],
     [{ ticket: {} }, 'ticket.preset is required'],
@@ -71,7 +71,7 @@ describe('options validation', () => {
     assert.deepEqual(
       problems({
         ticket: [
-          { preset: 'jira', projects: ['WEB'] },
+          { preset: 'jira', projects: ['TRADE'] },
           { preset: 'numeric', minLength: 4 },
         ],
         lifecycleTags: undefined,

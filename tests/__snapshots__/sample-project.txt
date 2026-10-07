@@ -1,16 +1,16 @@
-tests/checkout.spec.ts:7:8 error test-governance/require-ticket-in-comments `FIXME` comments must start with a ticket, e.g. `// FIXME: WEB-123`. Put the details in the ticket.
-tests/checkout.spec.ts:12:19 error test-governance/require-ticket Only ticket IDs are allowed after `SKIP:`, separated by commas. Put details in the ticket instead of `payment sandbox is down`.
-tests/checkout.spec.ts:18:3 error test-governance/require-ticket This test is in the 'skip' state but has no `// SKIP: <ticket>` comment directly above it, e.g. `// SKIP: WEB-123`.
-tests/checkout.spec.ts:20:3 error test-governance/require-ticket 'TODO' is a placeholder, not a real ticket. Link the ticket that tracks this test.
-tests/checkout.spec.ts:23:3 error test-governance/marker-matches-state `SKIP:` doesn't match this code: this test is in the 'fixme' state, so the marker should be `FIXME:`.
-tests/checkout.spec.ts:24:3 error test-governance/require-ticket This test is in the 'fixme' state but has no `// FIXME: <ticket>` comment directly above it, e.g. `// FIXME: WEB-123`.
-tests/checkout.spec.ts:31:3 error test-governance/require-ticket This test is in the 'unstable' state but has no `// UNSTABLE: <ticket>` comment directly above it, e.g. `// UNSTABLE: WEB-123`.
-tests/checkout.spec.ts:33:3 error test-governance/require-ticket 'OPS-9' is not a valid ticket for the 'unstable' state. Expected a Jira key like WEB-123 in project WEB, QA, or a Jira URL.
-tests/checkout.spec.ts:36:3 error test-governance/no-orphaned-marker `NEW:` is left over: this test is not in the 'new' state.
-tests/checkout.spec.ts:39:8 warn  test-governance/no-conflicting-states `@New` should be written `@new`.
-tests/checkout.spec.ts:41:8 warn  test-governance/no-conflicting-states `@unstabel` looks like a typo of `@unstable`.
-tests/inventory.spec.js:9:1 error test-governance/require-ticket This describe block is in the 'needs-data' state but has no `// NEEDS-DATA: <ticket>` comment directly above it, e.g. `// NEEDS-DATA: WEB-123`.
-tests/inventory.spec.js:17:3 error test-governance/require-ticket Write the marker keyword in uppercase: `SKIP:` instead of `skip:`.
-tests/inventory.spec.js:22:1 error test-governance/require-ticket This test is in the 'new' state but has no `// NEW: <ticket>` comment directly above it, e.g. `// NEW: WEB-123`.
-tests/inventory.spec.js:22:1 error test-governance/require-ticket This test is in the 'unstable' state but has no `// UNSTABLE: <ticket>` comment directly above it, e.g. `// UNSTABLE: WEB-123`.
-tests/inventory.spec.js:22:6 warn  test-governance/no-conflicting-states `@new` and `@unstable` are separate stages; a test should be in only one of them.
+tests/orders.spec.ts:7:8 error test-governance/require-ticket-in-comments `FIXME` comments must start with a ticket, e.g. `// FIXME: TRADE-123`. Put the details in the ticket.
+tests/orders.spec.ts:12:21 error test-governance/require-ticket Only ticket IDs are allowed after `SKIP:`, separated by commas. Put details in the ticket instead of `broker sandbox is down`.
+tests/orders.spec.ts:18:3 error test-governance/require-ticket This test is in the 'skip' state but has no `// SKIP: <ticket>` comment directly above it, e.g. `// SKIP: TRADE-123`.
+tests/orders.spec.ts:20:3 error test-governance/require-ticket 'TODO' is a placeholder, not a real ticket. Link the ticket that tracks this test.
+tests/orders.spec.ts:23:3 error test-governance/marker-matches-state `SKIP:` doesn't match this code: this test is in the 'fixme' state, so the marker should be `FIXME:`.
+tests/orders.spec.ts:24:3 error test-governance/require-ticket This test is in the 'fixme' state but has no `// FIXME: <ticket>` comment directly above it, e.g. `// FIXME: TRADE-123`.
+tests/orders.spec.ts:31:3 error test-governance/require-ticket This test is in the 'unstable' state but has no `// UNSTABLE: <ticket>` comment directly above it, e.g. `// UNSTABLE: TRADE-123`.
+tests/orders.spec.ts:33:3 error test-governance/require-ticket 'OPS-9' is not a valid ticket for the 'unstable' state. Expected a Jira key like TRADE-123 in project TRADE, RISK, or a Jira URL.
+tests/orders.spec.ts:36:3 error test-governance/no-orphaned-marker `NEW:` is left over: this test is not in the 'new' state.
+tests/orders.spec.ts:39:8 warn  test-governance/no-conflicting-states `@New` should be written `@new`.
+tests/orders.spec.ts:41:8 warn  test-governance/no-conflicting-states `@unstabel` looks like a typo of `@unstable`.
+tests/portfolio.spec.js:9:1 error test-governance/require-ticket This describe block is in the 'needs-data' state but has no `// NEEDS-DATA: <ticket>` comment directly above it, e.g. `// NEEDS-DATA: TRADE-123`.
+tests/portfolio.spec.js:17:3 error test-governance/require-ticket Write the marker keyword in uppercase: `SKIP:` instead of `skip:`.
+tests/portfolio.spec.js:22:1 error test-governance/require-ticket This test is in the 'new' state but has no `// NEW: <ticket>` comment directly above it, e.g. `// NEW: TRADE-123`.
+tests/portfolio.spec.js:22:1 error test-governance/require-ticket This test is in the 'unstable' state but has no `// UNSTABLE: <ticket>` comment directly above it, e.g. `// UNSTABLE: TRADE-123`.
+tests/portfolio.spec.js:22:6 warn  test-governance/no-conflicting-states `@new` and `@unstable` are separate stages; a test should be in only one of them.

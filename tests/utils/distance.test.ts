@@ -10,9 +10,9 @@ describe('editDistance', () => {
     ['unstble', 'unstable', 1],
     ['unstablee', 'unstable', 1],
     ['quarantin', 'quarantine', 1],
-    ['abc', '', 3],
-    ['', 'abc', 3],
-    ['new', 'old', 3],
+    ['bid', '', 3],
+    ['', 'bid', 3],
+    ['bid', 'ask', 3],
   ];
   for (const [a, b, distance] of cases) {
     it(`${a} → ${b} is ${distance}`, () => {
