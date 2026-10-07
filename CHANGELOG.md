@@ -11,6 +11,9 @@ All notable changes to this project are documented here. The format follows
 - The type declarations load in TypeScript 5.0 to 5.5. Before, they included a string export name
   that only TypeScript 5.6 and later can parse, so older versions failed on the plugin's types even
   with `skipLibCheck`.
+- Tests inside a node type that a custom parser gives no visitor keys for are now checked. ESLint
+  reads such nodes' children from the node itself, and the rules now do the same. Before, everything
+  inside such a node was skipped.
 
 ## [0.3.1] - 2026-10-06
 

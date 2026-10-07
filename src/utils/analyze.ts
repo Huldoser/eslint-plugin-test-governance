@@ -382,6 +382,21 @@ function isGuarded(call: TSESTree.CallExpression): boolean {
   return false;
 }
 
+/** Keys that point back up the tree or at comments rather than at child nodes. */
+const NON_CHILD_KEYS = new Set(['parent', 'leadingComments', 'trailingComments']);
+
+/**
+ * The keys of a node type that the parser gave no visitor keys for, read from the node itself, as
+ * ESLint's own traverser does. Without this, tests inside such a node would go unchecked.
+ */
+function ownKeys(node: Node): string[] {
+  return Object.keys(node).filter((key) => !NON_CHILD_KEYS.has(key) && !key.startsWith('_'));
+}
+
+function isNode(value: unknown): value is Node {
+  return typeof (value as Partial<Node> | null)?.type === 'string';
+}
+
 const cache = new WeakMap<object, WeakMap<ResolvedOptions, Analysis>>();
 
 export function analyze(sourceCode: SourceCode, options: ResolvedOptions): Analysis {
@@ -544,15 +559,9 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
         pushedInfo = true;
       }
     }
-    // Parsers provide visitor keys for every node type they produce; the fallback is only defensive.
-    /* node:coverage ignore next */
-    for (const key of keys[node.type] ?? []) {
+    for (const key of keys[node.type] ?? ownKeys(node)) {
       const child = (node as unknown as Record<string, unknown>)[key];
-      if (Array.isArray(child)) {
-        for (const item of child) if (item) walk(item as Node);
-      } else if (child && typeof (child as Node).type === 'string') {
-        walk(child as Node);
-      }
+      for (const item of Array.isArray(child) ? child : [child]) if (isNode(item)) walk(item);
     }
     if (pushedSubject) stack.pop();
     if (pushedInfo) testInfoNames.pop();
