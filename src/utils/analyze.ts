@@ -21,7 +21,7 @@ const SKIPPING_MODIFIERS = new Set(['skip', 'fixme']);
 const MARKER_LINE_RE = /^\s*\*?\s*([A-Za-z][\w-]*)\s*:(.*)$/;
 const TAG_RE = /(?<![\w@])@[\w-]+/g;
 
-export interface MarkerTicket {
+interface MarkerTicket {
   text: string;
   result: TicketCheck;
 }
@@ -51,7 +51,7 @@ export interface TagOccurrence {
   node: TSESTree.Literal | TSESTree.TemplateLiteral;
 }
 
-export interface StateSource {
+interface StateSource {
   state: StateDef;
   /** False for conditional skips unless `requireTicketForConditional` is set. */
   required: boolean;
@@ -628,7 +628,7 @@ export function isProse(marker: Marker): boolean {
  * is also a work-comment keyword and it doesn't start with a valid ticket. `require-ticket-in-comments`
  * reports those; the marker rules leave them alone.
  */
-export function isWorkComment(marker: Marker, options: ResolvedOptions): boolean {
+function isWorkComment(marker: Marker, options: ResolvedOptions): boolean {
   return options.workCommentKeywords.has(marker.keyword.toUpperCase()) && marker.tickets.at(0)?.result !== 'ok';
 }
 
