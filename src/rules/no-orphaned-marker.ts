@@ -23,7 +23,7 @@ export default createRule({
     const { sourceCode } = context;
     const markers: { marker: StateMarker; messageId: 'orphaned' | 'detached'; subject: string }[] = [];
     for (const marker of analysis.detachedMarkers) {
-      // `// FIXME: WEB-12` above a helper is a tracked work comment, checked by require-ticket-in-comments.
+      // `// FIXME: TRADE-12` above a helper is a tracked work comment, checked by require-ticket-in-comments.
       if (options.workCommentKeywords.has(marker.keyword)) continue;
       markers.push({ marker, messageId: 'detached', subject: '' });
     }

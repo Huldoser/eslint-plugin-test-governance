@@ -26,27 +26,27 @@ Incorrect:
 <!-- example: invalid settings={"lifecycleTags":true} -->
 
 ```js
-test('filters by category @new @unstable', async () => {});
+test('places a limit order @new @unstable', async () => {});
 ```
 
 <!-- example: invalid settings={"lifecycleTags":true} -->
 
 ```js
-// SKIP: WEB-9
-// NEW: WEB-9
-test.skip('filters by category @new', async () => {});
+// SKIP: TRADE-9
+// NEW: TRADE-9
+test.skip('places a limit order @new', async () => {});
 ```
 
 <!-- example: invalid settings={"lifecycleTags":true} -->
 
 ```js
-test('invoice download @New', async () => {});
+test('exports the trade history as CSV @New', async () => {});
 ```
 
 <!-- example: invalid settings={"lifecycleTags":true} -->
 
 ```js
-test('loyalty points @unstabel', async () => {});
+test('shows dividend payments in the account history @unstabel', async () => {});
 ```
 
 Correct:
@@ -54,9 +54,15 @@ Correct:
 <!-- example: valid settings={"lifecycleTags":true} -->
 
 ```js
-test('filters by category @unstable', async () => {});
+test('places a limit order @unstable', async () => {});
 ```
 
 ## Options
 
-Uses the shared options described in the [README](../../README.md#options).
+This rule has no options of its own. It reads the shared options described in the
+[README](../../README.md#options). These change what it reports:
+
+- `lifecycleTags`, or `states` for `new` and `unstable`: the `@new` checks run when the `new` state
+  is on, and `@new` together with `@unstable` is reported when both are on.
+- `customStates`: the tags of custom states get the same case and typo checks.
+- `testFunctions`: which functions count as Playwright's `test`.
