@@ -21,8 +21,6 @@ export interface CustomState {
   ticket?: TicketSpec | TicketSpec[];
 }
 
-export type { BuiltinStateName } from './constants.ts';
-
 /** Options shared by every rule. Set them once in `settings['test-governance']`. */
 export interface GovernanceOptions {
   /**
@@ -62,7 +60,7 @@ export interface GovernanceOptions {
   reportDynamicTitles?: boolean;
 }
 
-export type Modifier = 'skip' | 'fixme' | 'fail' | 'slow';
+type Modifier = 'skip' | 'fixme' | 'fail' | 'slow';
 
 interface StateBase {
   name: string;

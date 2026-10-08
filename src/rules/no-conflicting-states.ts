@@ -5,14 +5,15 @@ import { editDistance, typoThreshold } from '../utils/distance.ts';
 import { tagRange } from '../utils/fix.ts';
 
 export default createRule({
-  name: 'no-conflicting-states',
   meta: {
     type: 'problem',
-    fixable: 'code',
     docs: {
       description: 'Disallow state tags that contradict each other, differ in case or look like typos',
       recommended: 'warn',
+      url: 'https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/rules/no-conflicting-states.md',
     },
+    fixable: 'code',
+    schema: [],
     messages: {
       newAndUnstable: '`{{new}}` and `{{unstable}}` are separate stages; a test should be in only one of them.',
       newSkipped:
@@ -21,7 +22,7 @@ export default createRule({
       tagTypo: '`{{found}}` looks like a typo of `{{expected}}`.',
     },
   },
-  check(context, analysis, options) {
+  create(context, analysis, options) {
     const { sourceCode } = context;
     const tagStates = options.states.filter(isTagState);
     const newTag = options.states.find((s) => s.name === 'new')?.tag;
