@@ -1,4 +1,4 @@
-import { BUILTIN_STATE_NAMES, MARKER_RE, TAG_RE, TICKET_PRESETS } from './constants.ts';
+import { BUILTIN_STATE_NAMES, FRAMEWORK_NAMES, MARKER_RE, TAG_RE, TICKET_PRESETS } from './constants.ts';
 import type { Schema } from './validate.ts';
 
 const MARKER_HINT = 'an uppercase keyword such as NEEDS-DATA (letters, digits, "-" and "_")';
@@ -46,6 +46,7 @@ const stateOverrideSchema: Schema = {
 export const optionsSchema: Schema = {
   type: 'object',
   properties: {
+    framework: { type: 'string', enum: [...FRAMEWORK_NAMES] },
     testFunctions: { type: 'array', items: { type: 'string' } },
     ticket: ticketSchema,
     placeholders: { type: 'array', items: { type: 'string' } },

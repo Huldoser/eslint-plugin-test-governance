@@ -60,4 +60,4 @@ This rule has no options of its own. It reads the shared options described in th
 - `requireTicketForConditional`: conditional skips such as `test.skip(browserName === 'webkit')`
   need a marker only when this is set, so only then is a wrong marker above one reported.
 - `allowBlankLine`: whether a marker separated from its test by a blank line still belongs to it.
-- `testFunctions`: which functions count as Playwright's `test`.
+- `framework` and `testFunctions`: which functions count as the framework's `test`.

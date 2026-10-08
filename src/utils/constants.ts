@@ -3,8 +3,12 @@ export const MARKER_RE = /^[A-Z][A-Z0-9_-]*$/;
 /** A tag as written in options: `@` followed by letters, digits, `-` and `_`. */
 export const TAG_RE = /^@[\w-]+$/;
 
-export const BUILTIN_STATE_NAMES = ['skip', 'fixme', 'fail', 'slow', 'new', 'unstable'] as const;
+export const BUILTIN_STATE_NAMES = ['skip', 'fixme', 'fail', 'slow', 'todo', 'new', 'unstable'] as const;
 export type BuiltinStateName = (typeof BUILTIN_STATE_NAMES)[number];
+
+/** The test frameworks the rules understand. */
+export const FRAMEWORK_NAMES = ['playwright', 'jest', 'vitest'] as const;
+export type FrameworkName = (typeof FRAMEWORK_NAMES)[number];
 
 export const TICKET_PRESETS = [
   'any',

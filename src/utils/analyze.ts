@@ -1,4 +1,5 @@
 import type { TSESLint, TSESTree } from '@typescript-eslint/utils';
+import { isOtherRunner, RUNTIME_MODIFIERS, type Framework, type Root } from './frameworks.ts';
 import type { ResolvedOptions, StateDef } from './options.ts';
 import type { TicketCheck, TicketMatcher } from './tickets.ts';
 
@@ -6,18 +7,9 @@ type Node = TSESTree.Node;
 type Comment = TSESTree.Comment;
 type SourceCode = Readonly<TSESLint.SourceCode>;
 
-const PLAYWRIGHT_MODULES = new Set(['@playwright/test', 'playwright/test']);
-/** Other test runners. A name imported from one of these is never Playwright's `test`. */
-const OTHER_FRAMEWORKS = new Set(['vitest', '@jest/globals', 'node:test', 'bun:test', 'mocha', 'ava', 'tap', 'uvu']);
-
-/** `@playwright/test` and the component-testing packages such as `@playwright/experimental-ct-react`. */
-function isPlaywrightModule(source: string): boolean {
-  return PLAYWRIGHT_MODULES.has(source) || source.startsWith('@playwright/experimental-ct-');
-}
-const TEST_MODIFIERS = new Set(['only', 'skip', 'fixme', 'fail', 'slow']);
-const DESCRIBE_MODIFIERS = new Set(['only', 'skip', 'fixme', 'serial', 'parallel']);
-const RUNTIME_MODIFIERS = new Set(['skip', 'fixme', 'fail', 'slow']);
-const SKIPPING_MODIFIERS = new Set(['skip', 'fixme']);
+const TEST: Root = { kind: 'test', modifiers: [] };
+/** Modifiers that keep a test from running. */
+const SKIPPING_MODIFIERS = new Set(['skip', 'fixme', 'todo']);
 /** What a step's `TestStepInfo` can do at runtime: `step.skip()`. */
 const STEP_INFO_METHODS = new Set(['skip']);
 const MARKER_LINE_RE = /^\s*\*?\s*([A-Za-z][\w-]*)\s*:(.*)$/;
@@ -91,7 +83,7 @@ export interface Analysis {
   subjects: Subject[];
   /** Markers that are not in the comment block of any test, describe or runtime call. */
   detachedMarkers: StateMarker[];
-  /** Whether the file uses Playwright at all: a Playwright import or a call to a test function. */
+  /** Whether the file uses the test framework at all: an import from it or a call to a test function. */
   isTestFile: boolean;
 }
 
@@ -107,12 +99,26 @@ interface Chain {
   path: string[];
 }
 
-/** A parameter that holds `testInfo` or a step's `TestStepInfo`, and the runtime methods it has. */
-interface InfoName {
+/**
+ * A name for what can change a test's state at runtime: a parameter such as `testInfo`, a step's
+ * `TestStepInfo` or Vitest's test context, with its methods, or one of those methods taken out of it,
+ * as `skip` in Vitest's `({ skip }) => ...`.
+ */
+type InfoName = {
   name: string;
-  methods: Set<string>;
-  /** The step a `TestStepInfo` belongs to. Unset for `testInfo`, which acts on the whole test. */
+  /** The step a `TestStepInfo` belongs to. Unset for the others, which act on the whole test. */
   step?: Subject;
+} & ({ methods: ReadonlySet<string>; method?: undefined } | { method: string; methods?: undefined });
+
+/** The names a parameter gives to runtime info: `testInfo`, or `skip` in `({ skip }) => ...`. */
+function infoNames(param: TSESTree.Parameter | undefined, methods: ReadonlySet<string>, step?: Subject): InfoName[] {
+  if (param?.type === 'Identifier') return [{ name: param.name, methods, step }];
+  if (param?.type !== 'ObjectPattern') return [];
+  return param.properties.flatMap((prop): InfoName[] => {
+    if (prop.type !== 'Property' || prop.value.type !== 'Identifier') return [];
+    const method = propertyName(prop);
+    return method !== undefined && methods.has(method) ? [{ name: prop.value.name, method, step }] : [];
+  });
 }
 
 function memberName(node: TSESTree.MemberExpression): string | undefined {
@@ -121,14 +127,33 @@ function memberName(node: TSESTree.MemberExpression): string | undefined {
   return undefined;
 }
 
-function chainOf(node: Node): Chain | undefined {
+/**
+ * The name a callee starts from and the members after it: `['describe', 'skip']` for
+ * `test.describe.skip`. A member called to build the function, as `each` in `test.each(table)` or
+ * ``test.each`...` ``, is written with parentheses: `['skip', 'each()']` for `test.skip.each(table)`.
+ */
+function chainOf(node: Node, factories: ReadonlySet<string>): Chain | undefined {
   const path: string[] = [];
   let current = node;
-  while (current.type === 'MemberExpression') {
-    const name = memberName(current);
-    if (name === undefined) return undefined;
-    path.unshift(name);
-    current = current.object;
+  for (;;) {
+    if (current.type === 'MemberExpression') {
+      const name = memberName(current);
+      if (name === undefined) return undefined;
+      path.unshift(name);
+      current = current.object;
+      continue;
+    }
+    const factory =
+      current.type === 'CallExpression'
+        ? current.callee
+        : current.type === 'TaggedTemplateExpression'
+          ? current.tag
+          : undefined;
+    if (factory?.type !== 'MemberExpression') break;
+    const name = memberName(factory);
+    if (name === undefined || !factories.has(name)) return undefined;
+    path.unshift(`${name}()`);
+    current = factory.object;
   }
   return current.type === 'Identifier' ? { root: current, path } : undefined;
 }
@@ -145,64 +170,72 @@ function unwrap(node: Node): Node {
   return current;
 }
 
-function isFunction(node: Node | undefined): node is TSESTree.FunctionLike {
+function isFunction(node: Node | undefined): node is TSESTree.ArrowFunctionExpression | TSESTree.FunctionExpression {
   return node?.type === 'ArrowFunctionExpression' || node?.type === 'FunctionExpression';
 }
 
 interface TestNames {
-  /** Names that refer to Playwright's `test`. */
-  tests: Set<string>;
-  /** Names bound to the whole Playwright module, as in `import * as pw`, whose `test` is `pw.test`. */
+  /** Names that refer to the framework's test functions, with what each one is. */
+  roots: Map<string, Root>;
+  /** Names bound to a whole framework module, as in `import * as pw`, whose `test` is `pw.test`. */
   modules: Set<string>;
 }
 
-/** Collects the top-level names that refer to Playwright's `test` or to its module. */
-function collectTestNames(program: TSESTree.Program, configured: Set<string>): TestNames {
-  const names = new Set(configured);
+/** Collects the top-level names that refer to the framework's test functions or to its module. */
+function collectTestNames(program: TSESTree.Program, framework: Framework, configured: Set<string>): TestNames {
+  const roots = new Map(framework.globals);
+  for (const name of configured) roots.set(name, TEST);
   const modules = new Set<string>();
   const mergeTests = new Set<string>();
   /** Names bound to another test runner, such as `ava` in `import ava from 'ava'`. */
   const others = new Set<string>();
-  /** `pw.test` or `pw.mergeTests` on the Playwright module. */
-  const isModuleMember = (node: Node, member: string): boolean =>
-    node.type === 'MemberExpression' &&
-    node.object.type === 'Identifier' &&
-    modules.has(node.object.name) &&
-    memberName(node) === member;
-  const isTestExpression = (node: Node): boolean => {
+  /** The member name of `pw.test` or `pw.mergeTests` on a framework module. */
+  const moduleMember = (node: Node): string | undefined =>
+    node.type === 'MemberExpression' && node.object.type === 'Identifier' && modules.has(node.object.name)
+      ? memberName(node)
+      : undefined;
+  /** The test function an expression is, such as `base.extend({...})` or `mergeTests(a, b)`. */
+  const resolve = (node: Node): Root | undefined => {
     const target = unwrap(node);
-    if (target.type === 'Identifier') return names.has(target.name);
-    if (isModuleMember(target, 'test')) return true;
-    if (target.type !== 'CallExpression') return false;
+    if (target.type === 'Identifier') return roots.get(target.name);
+    const member = moduleMember(target);
+    if (member !== undefined) return framework.exports.get(member);
+    if (target.type !== 'CallExpression') return undefined;
     // mergeTests(dbTest, a11yTest) or pw.mergeTests(dbTest, a11yTest)
-    if (target.callee.type === 'Identifier') return mergeTests.has(target.callee.name);
-    if (target.callee.type !== 'MemberExpression') return false;
-    if (isModuleMember(target.callee, 'mergeTests')) return true;
-    return memberName(target.callee) === 'extend' && isTestExpression(target.callee.object);
+    if (target.callee.type === 'Identifier') return mergeTests.has(target.callee.name) ? TEST : undefined;
+    if (target.callee.type !== 'MemberExpression') return undefined;
+    if (moduleMember(target.callee) === 'mergeTests') return TEST;
+    return memberName(target.callee) === 'extend' ? resolve(target.callee.object) : undefined;
   };
   // require('node:test'), ava, ava.serial or `ava as TestFn<Context>`
   const isOtherFramework = (node: Node): boolean => {
     const target = unwrap(node);
     const source = requireSource(target);
-    if (source !== undefined) return OTHER_FRAMEWORKS.has(source);
+    if (source !== undefined) return isOtherRunner(framework, source);
     if (target.type === 'Identifier') return others.has(target.name);
     return target.type === 'MemberExpression' && isOtherFramework(target.object);
+  };
+  const setOther = (name: string): void => {
+    roots.delete(name);
+    others.add(name);
   };
 
   for (const statement of program.body) {
     if (statement.type === 'ImportDeclaration') {
       const source = statement.source.value;
-      if (OTHER_FRAMEWORKS.has(source)) {
+      if (isOtherRunner(framework, source)) {
+        for (const spec of statement.specifiers) setOther(spec.local.name);
+      } else if (framework.ownsModule(source)) {
         for (const spec of statement.specifiers) {
-          names.delete(spec.local.name);
-          others.add(spec.local.name);
-        }
-      } else if (isPlaywrightModule(source)) {
-        for (const spec of statement.specifiers) {
-          if (spec.type === 'ImportDefaultSpecifier') names.add(spec.local.name);
-          else if (spec.type === 'ImportNamespaceSpecifier') modules.add(spec.local.name);
-          else if (importedName(spec) === 'test') names.add(spec.local.name);
-          else if (importedName(spec) === 'mergeTests') mergeTests.add(spec.local.name);
+          const local = spec.local.name;
+          if (spec.type === 'ImportNamespaceSpecifier') modules.add(local);
+          else if (spec.type === 'ImportDefaultSpecifier') {
+            if (framework.defaultExport) roots.set(local, framework.defaultExport);
+          } else {
+            const root = framework.exports.get(importedName(spec));
+            if (root) roots.set(local, root);
+            else if (importedName(spec) === 'mergeTests') mergeTests.add(local);
+          }
         }
       }
       continue;
@@ -212,31 +245,33 @@ function collectTestNames(program: TSESTree.Program, configured: Set<string>): T
     for (const declarator of declaration.declarations) {
       const init = declarator.init && unwrap(declarator.init);
       if (!init) continue;
-      // `const t = base.extend({...})`, `const t = mergeTests(a, b)` or a plain alias, `const t = base`.
-      if (declarator.id.type === 'Identifier' && isTestExpression(init)) {
-        names.add(declarator.id.name);
-      } else if (declarator.id.type === 'Identifier' && isOtherFramework(init)) {
+      if (declarator.id.type === 'Identifier') {
+        const name = declarator.id.name;
+        // `const t = base.extend({...})`, `const t = mergeTests(a, b)` or a plain alias, `const t = base`.
+        const root = resolve(init);
+        if (root) roots.set(name, root);
         // `const test = require('node:test')` is another runner's `test`, like an import from it.
-        names.delete(declarator.id.name);
-        others.add(declarator.id.name);
-      } else if (declarator.id.type === 'Identifier') {
-        // `const pw = require('@playwright/test')`, used as `pw.test`.
-        const source = requireSource(init);
-        if (source !== undefined && isPlaywrightModule(source)) modules.add(declarator.id.name);
+        else if (isOtherFramework(init)) setOther(name);
+        else {
+          // `const pw = require('@playwright/test')`, used as `pw.test`.
+          const source = requireSource(init);
+          if (source !== undefined && framework.ownsModule(source)) modules.add(name);
+        }
       } else if (declarator.id.type === 'ObjectPattern') {
         const source = requireSource(init);
         if (source === undefined) continue;
         for (const prop of declarator.id.properties) {
           if (prop.type !== 'Property' || prop.value.type !== 'Identifier') continue;
-          if (OTHER_FRAMEWORKS.has(source)) {
-            names.delete(prop.value.name);
-            others.add(prop.value.name);
-          } else if (isPlaywrightModule(source) && propertyName(prop) === 'test') names.add(prop.value.name);
+          if (isOtherRunner(framework, source)) setOther(prop.value.name);
+          else if (framework.ownsModule(source)) {
+            const root = framework.exports.get(propertyName(prop) ?? '');
+            if (root) roots.set(prop.value.name, root);
+          }
         }
       }
     }
   }
-  return { tests: names, modules };
+  return { roots, modules };
 }
 
 /** The name a property key spells out: `test` in `{ test }`, `{ 'test': t }` or `{ ['test']: t }`. */
@@ -386,28 +421,53 @@ function isStaticText(node: Node): node is TSESTree.StringLiteral | TSESTree.Tem
   return (node.type === 'Literal' && typeof node.value === 'string') || node.type === 'TemplateLiteral';
 }
 
+/**
+ * The plain-keyed properties of a test's details or options object, the second argument in
+ * `test('title', { tag: '@smoke' }, fn)` or Vitest's `test('title', { skip: true }, fn)`.
+ */
+function detailsOf(call: TSESTree.CallExpression): [string, Node][] {
+  const details = call.arguments.at(1);
+  if (details?.type !== 'ObjectExpression') return [];
+  return details.properties.flatMap((prop): [string, Node][] => {
+    if (prop.type !== 'Property' || prop.computed) return [];
+    const key = prop.key.type === 'Identifier' ? prop.key.name : String((prop.key as TSESTree.Literal).value);
+    return [[key, prop.value]];
+  });
+}
+
 function collectTags(
   source: string,
   call: TSESTree.CallExpression,
   hasTitle: boolean,
+  tagKey: string | undefined,
 ): { tags: TagOccurrence[]; dynamic: boolean } {
   const tags: TagOccurrence[] = [];
   if (!hasTitle) return { tags, dynamic: false };
-  const [title, details] = call.arguments;
+  const [title] = call.arguments;
   const dynamic = !isStaticText(title);
   if (!dynamic) scanTags(source, title, tags);
-  if (call.arguments.length >= 3 && details.type === 'ObjectExpression') {
-    for (const prop of details.properties) {
-      if (prop.type !== 'Property' || prop.computed) continue;
-      const key = prop.key.type === 'Identifier' ? prop.key.name : String((prop.key as TSESTree.Literal).value);
-      if (key !== 'tag') continue;
-      const values = prop.value.type === 'ArrayExpression' ? prop.value.elements : [prop.value];
-      for (const value of values) {
-        if (value && isStaticText(value)) scanTags(source, value, tags);
-      }
+  for (const [key, value] of detailsOf(call)) {
+    if (key !== tagKey) continue;
+    const values = value.type === 'ArrayExpression' ? value.elements : [value];
+    for (const item of values) {
+      if (item && isStaticText(item)) scanTags(source, item, tags);
     }
   }
   return { tags, dynamic };
+}
+
+/**
+ * Whether a call declares a test or describe block: a title and a body, as in `test('title', fn)` or
+ * `test('title', details, fn)`, a static title with a body defined elsewhere, as in
+ * `test.skip('pays', payWithCard)`, a describe with only a body, or a `todo` with only a title. A string
+ * title tells `test.skip('pays', payWithCard)` apart from a runtime `test.skip(isMobile, 'why')`.
+ */
+function isDeclaration(kind: Root['kind'], args: TSESTree.CallExpressionArgument[], todo: boolean): boolean {
+  const first = args.at(0);
+  if (isFunction(first)) return kind === 'describe';
+  if (first === undefined) return false;
+  if (args.length === 1) return todo;
+  return isStaticText(first) || args.slice(1).some(isFunction);
 }
 
 function isUnconditional(call: TSESTree.CallExpression): boolean {
@@ -484,35 +544,42 @@ export function analyze(sourceCode: SourceCode, options: ResolvedOptions): Analy
 }
 
 function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis {
-  const { states } = options;
-  const testNames = collectTestNames(sourceCode.ast, options.testFunctions);
+  const { states, framework } = options;
+  const testNames = collectTestNames(sourceCode.ast, framework, options.testFunctions);
   /**
-   * The members after Playwright's `test` in a callee, such as `['describe', 'skip']` for
-   * `test.describe.skip` or `pw.test.describe.skip`. Undefined when the callee isn't Playwright's `test`.
+   * The test function a callee starts from and the members after it, such as `test` and
+   * `['describe', 'skip']` for `test.describe.skip` or `pw.test.describe.skip`. Undefined when the callee
+   * isn't one of the framework's test functions.
    */
-  const testPath = (chain: Chain | undefined): string[] | undefined => {
+  const target = (chain: Chain | undefined): { root: Root; path: string[] } | undefined => {
     if (chain === undefined) return undefined;
     const { root, path } = chain;
-    let rest: string[] | undefined;
-    if (testNames.tests.has(root.name)) rest = path;
-    else if (testNames.modules.has(root.name) && path[0] === 'test') rest = path.slice(1);
-    return rest !== undefined && !isLocalVariable(sourceCode, root) ? rest : undefined;
+    let base = testNames.roots.get(root.name);
+    let rest = path;
+    if (base === undefined && testNames.modules.has(root.name)) {
+      base = framework.exports.get(path[0]);
+      rest = path.slice(1);
+    }
+    return base !== undefined && !isLocalVariable(sourceCode, root) ? { root: base, path: rest } : undefined;
   };
   let usesTest = sourceCode.ast.body.some(
-    (statement) => statement.type === 'ImportDeclaration' && isPlaywrightModule(statement.source.value),
+    (statement) => statement.type === 'ImportDeclaration' && framework.ownsModule(statement.source.value),
   );
   const subjects: Subject[] = [];
   const claimed = new Set<Comment>();
   const stack: Subject[] = [];
-  const infoNames: InfoName[] = [];
+  const infos: InfoName[] = [];
   const keys = sourceCode.visitorKeys as Record<string, readonly string[] | undefined>;
 
+  /**
+   * `modifiers` maps each state modifier the call has to whether it always applies; a conditional one,
+   * like `test.skip(isMobile)` or Vitest's `skipIf(...)`, needs a ticket only with `requireTicketForConditional`.
+   */
   const makeSubject = (
     kind: Subject['kind'],
     call: TSESTree.CallExpression,
-    modifiers: string[],
+    modifiers: ReadonlyMap<string, boolean>,
     tagInfo: { tags: TagOccurrence[]; dynamic: boolean },
-    required = true,
     parent = stack.at(-1),
   ): Subject => {
     const anchor = anchorOf(call);
@@ -525,8 +592,12 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const ownTags = new Set(tagInfo.tags.map((t) => t.tag));
     const sources: StateSource[] = [];
     for (const state of states) {
-      const matches = state.modifier !== undefined ? modifiers.includes(state.modifier) : ownTags.has(state.tag);
-      if (matches) sources.push({ state, required });
+      if (state.modifier === undefined) {
+        if (ownTags.has(state.tag)) sources.push({ state, required: true });
+        continue;
+      }
+      const always = modifiers.get(state.modifier);
+      if (always !== undefined) sources.push({ state, required: always || options.requireTicketForConditional });
     }
     const inherited = new Set<string>();
     const inheritedTags = new Set<string>();
@@ -539,7 +610,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       for (const tag of parent.inheritedTags) inheritedTags.add(tag);
       for (const tag of parent.tags) inheritedTags.add(tag.tag);
     }
-    const ownSkip = modifiers.some((m) => SKIPPING_MODIFIERS.has(m));
+    const ownSkip = [...modifiers].some(([modifier, always]) => always && SKIPPING_MODIFIERS.has(modifier));
     const subject: Subject = {
       kind,
       node: call,
@@ -559,80 +630,106 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     return subject;
   };
 
-  const visitCall = (call: TSESTree.CallExpression): { subject?: Subject; info?: InfoName } => {
-    const chain = chainOf(call.callee);
-    const args = call.arguments;
-    const last = args.at(-1);
-    let info: InfoName | undefined;
+  /** The state modifiers of a declaration, from its members and, in Vitest, its options object. */
+  const modifiersOf = (members: string[], call: TSESTree.CallExpression): Map<string, boolean> => {
+    const modifiers = new Map<string, boolean>();
+    const add = (modifier: string, always: boolean): void => {
+      if (!modifiers.get(modifier)) modifiers.set(modifier, always);
+    };
+    for (const member of members) {
+      const effect = framework.effects.get(member);
+      if (effect) add(effect.modifier, !effect.conditional);
+    }
+    // `{ skip: true }` always skips, `{ skip: isMobile }` only sometimes, `{ skip: false }` never.
+    for (const [key, value] of detailsOf(call)) {
+      const modifier = framework.optionEffects.get(key);
+      const literal = value.type === 'Literal' ? value.value : undefined;
+      if (modifier && literal !== false) add(modifier, literal === true);
+    }
+    return modifiers;
+  };
 
-    const path = testPath(chain);
-    if (path !== undefined) {
-      usesTest = true;
+  /** What a body can change the test's state with: Playwright's `testInfo` or Vitest's test context. */
+  const bodyInfos = (args: TSESTree.CallExpressionArgument[], path: string[]): InfoName[] => {
+    const body = args.findLast(isFunction);
+    // `test.each(table)` passes the row to the body, and `test.for(cases)` passes it before the context.
+    if (!framework.info || !body || path.includes('each()')) return [];
+    const param = body.params.at(framework.info.param + (path.includes('for()') ? 1 : 0));
+    return infoNames(param, framework.info.methods);
+  };
+
+  const visitCall = (call: TSESTree.CallExpression): { subject?: Subject; infos?: InfoName[] } => {
+    const callee = target(chainOf(call.callee, framework.factories));
+    if (callee === undefined) return { subject: runtimeCall(call) };
+    usesTest = true;
+    const args = call.arguments;
+    const { root } = callee;
+    let { path } = callee;
+
+    if (framework.playwright) {
       // `test.step('fills the order', async (step) => {...})` or `test.step.skip(...)`. The step's body
       // gets a `TestStepInfo` that can skip the step at runtime.
       const step = path.join('.');
       if ((step === 'step' || step === 'step.skip') && args.length >= 2) {
-        const subject = makeSubject('step', call, path.slice(1), { tags: [], dynamic: false });
+        const subject = makeSubject('step', call, modifiersOf(path.slice(1), call), { tags: [], dynamic: false });
         const body = args[1];
         const param = isFunction(body) ? body.params.at(0) : undefined;
-        if (param?.type === 'Identifier') info = { name: param.name, methods: STEP_INFO_METHODS, step: subject };
-        return { subject, info };
+        return { subject, infos: infoNames(param, STEP_INFO_METHODS, subject) };
       }
-      if (isFunction(last)) {
-        const param = last.params.at(1);
-        if (param?.type === 'Identifier') info = { name: param.name, methods: RUNTIME_MODIFIERS };
-      }
-      // The body is usually written inline, but can be a function defined elsewhere:
-      // `test.skip('pays', payWithCard)`. A string title tells that apart from `test.skip(cond, 'why')`.
-      const titled = args.length >= 2 && isStaticText(args[0]);
-      const isDeclaration = args.length >= 2 && !isFunction(args[0]) && (isFunction(last) || titled);
-      if (path.every((p) => TEST_MODIFIERS.has(p)) && isDeclaration) {
-        return { subject: makeSubject('test', call, path, collectTags(sourceCode.text, call, true)), info };
-      }
-      if (
-        path[0] === 'describe' &&
-        path.slice(1).every((p) => DESCRIBE_MODIFIERS.has(p)) &&
-        (isFunction(last) || titled)
-      ) {
-        const tagInfo = collectTags(sourceCode.text, call, args.length >= 2);
-        return { subject: makeSubject('describe', call, path.slice(1), tagInfo), info };
-      }
-      if (path.length === 1 && RUNTIME_MODIFIERS.has(path[0])) {
-        return { subject: runtimeSubject(call, path[0]), info };
-      }
-      return { info };
     }
+    const bodyInfo = bodyInfos(args, path);
+    let { kind } = root;
+    if (framework.playwright && path[0] === 'describe') {
+      kind = 'describe';
+      path = path.slice(1);
+    }
+    const members = [...root.modifiers, ...path];
+    const allowed = kind === 'test' ? framework.testMembers : framework.describeMembers;
+    if (members.every((m) => allowed.has(m)) && isDeclaration(kind, args, members.includes('todo'))) {
+      // A declaration always has a first argument: its title, or the body of a describe without one.
+      const tagInfo = collectTags(sourceCode.text, call, !isFunction(args[0]), framework.tagKey);
+      return { subject: makeSubject(kind, call, modifiersOf(members, call), tagInfo), infos: bodyInfo };
+    }
+    // test.skip(), test.fixme(), test.fail() and test.slow() in a test, a describe or a hook.
+    if (framework.playwright && path.length === 1 && RUNTIME_MODIFIERS.has(path[0])) {
+      return { subject: runtimeSubject(call, path[0]), infos: bodyInfo };
+    }
+    return { infos: bodyInfo };
+  };
 
-    // testInfo.skip(), step.skip() and test.info().skip()
-    if (call.callee.type === 'MemberExpression') {
-      const name = memberName(call.callee);
-      const object = call.callee.object;
-      if (name !== undefined && RUNTIME_MODIFIERS.has(name)) {
-        if (object.type === 'Identifier') {
-          // The innermost parameter with that name is the one the call uses.
-          const info = infoNames.findLast((i) => i.name === object.name);
-          if (info?.methods.has(name)) return { subject: runtimeSubject(call, name, info.step) };
-        } else if (object.type === 'CallExpression' && testPath(chainOf(object.callee))?.join('.') === 'info') {
-          return { subject: runtimeSubject(call, name) };
-        }
-      }
+  /** `testInfo.skip()`, `step.skip()`, `test.info().skip()`, and Vitest's `context.skip()` or `skip()`. */
+  const runtimeCall = (call: TSESTree.CallExpression): Subject | undefined => {
+    const { callee } = call;
+    // The innermost parameter with a name is the one the call uses.
+    const innermost = (name: string): InfoName | undefined => infos.findLast((info) => info.name === name);
+    if (callee.type === 'Identifier') {
+      const info = innermost(callee.name);
+      return info?.method !== undefined ? runtimeSubject(call, info.method, info.step) : undefined;
     }
-    return {};
+    if (callee.type !== 'MemberExpression') return undefined;
+    const name = memberName(callee);
+    if (name === undefined || !RUNTIME_MODIFIERS.has(name)) return undefined;
+    const { object } = callee;
+    if (object.type === 'Identifier') {
+      const info = innermost(object.name);
+      return info?.methods?.has(name) ? runtimeSubject(call, name, info.step) : undefined;
+    }
+    const isTestInfo =
+      object.type === 'CallExpression' &&
+      target(chainOf(object.callee, framework.factories))?.path.join('.') === 'info';
+    return isTestInfo ? runtimeSubject(call, name) : undefined;
   };
 
   /** `step` is set for `step.skip()`, which skips only its step; the other calls act on the whole test. */
   const runtimeSubject = (call: TSESTree.CallExpression, modifier: string, step?: Subject): Subject | undefined => {
     if (!states.some((s) => s.modifier === modifier)) return undefined;
-    const unconditional = isUnconditional(call);
     const subject = makeSubject(
       'runtime',
       call,
-      [modifier],
+      new Map([[modifier, isUnconditional(call)]]),
       { tags: [], dynamic: false },
-      unconditional || options.requireTicketForConditional,
       step ?? stack.findLast((s) => s.kind !== 'step'),
     );
-    subject.skipped = unconditional && SKIPPING_MODIFIERS.has(modifier);
     const parent = subject.parent;
     if (parent) {
       parent.runtimeStates.add(subject.states[0].state.name);
@@ -643,16 +740,16 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
 
   const walk = (node: Node): void => {
     let pushedSubject = false;
-    let pushedInfo = false;
+    let pushedInfos = 0;
     if (node.type === 'CallExpression') {
-      const { subject, info } = visitCall(node);
-      if (subject && subject.kind !== 'runtime') {
-        stack.push(subject);
+      const visit = visitCall(node);
+      if (visit.subject && visit.subject.kind !== 'runtime') {
+        stack.push(visit.subject);
         pushedSubject = true;
       }
-      if (info !== undefined) {
-        infoNames.push(info);
-        pushedInfo = true;
+      for (const info of visit.infos ?? []) {
+        infos.push(info);
+        pushedInfos++;
       }
     }
     for (const key of keys[node.type] ?? ownKeys(node)) {
@@ -660,7 +757,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       for (const item of Array.isArray(child) ? child : [child]) if (isNode(item)) walk(item);
     }
     if (pushedSubject) stack.pop();
-    if (pushedInfo) infoNames.pop();
+    infos.splice(infos.length - pushedInfos, pushedInfos);
   };
   walk(sourceCode.ast);
 
@@ -752,7 +849,9 @@ export function strayMarkers(subject: Subject, options: ResolvedOptions): StateM
 export function headLoc(subject: Subject): TSESTree.SourceLocation {
   const { node } = subject;
   if (subject.kind === 'runtime') return node.loc;
-  const title = node.arguments.length > 1 ? node.arguments[0] : undefined;
+  // A describe can have a body and no title. A todo test has only a title.
+  const [first] = node.arguments;
+  const title = isFunction(first) ? undefined : first;
   return { start: node.callee.loc.start, end: (title ?? node.callee).loc.end };
 }
 

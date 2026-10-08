@@ -129,6 +129,32 @@ describe('compileOptions', () => {
   }
 });
 
+describe('framework', () => {
+  for (const framework of ['jest', 'vitest'] as const) {
+    it(`turns on skip and todo for ${framework}, and has no fixme or slow`, () => {
+      assert.deepEqual(stateNames({ framework }), ['skip', 'todo']);
+      assert.deepEqual(
+        stateNames({ framework, lifecycleTags: true, states: { fixme: true, slow: true, fail: true } }),
+        ['skip', 'fail', 'todo', 'new', 'unstable'],
+      );
+      assert.deepEqual([...compileOptions({ framework }).testFunctions], ['test', 'it']);
+      assert.equal(compileOptions({ framework }).framework.name, framework);
+    });
+  }
+
+  it('is Playwright by default, which has no todo state', () => {
+    assert.equal(compileOptions({}).framework.name, 'playwright');
+    assert.deepEqual(stateNames({ framework: 'playwright', states: { todo: true } }), ['skip', 'fixme']);
+  });
+
+  it('rejects an unknown framework', () => {
+    assert.throws(
+      () => compileOptions({ framework: 'mocha' } as never),
+      /framework must be one of "playwright", "jest", "vitest" \(got "mocha"\)/,
+    );
+  });
+});
+
 describe('resolveOptions', () => {
   it('compiles shared settings once per settings object', () => {
     const settings = { 'test-governance': { lifecycleTags: true, allowBlankLine: true } };

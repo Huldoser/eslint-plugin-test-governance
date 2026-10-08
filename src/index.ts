@@ -5,8 +5,10 @@ import noConflictingStates from './rules/no-conflicting-states.ts';
 import noOrphanedMarker from './rules/no-orphaned-marker.ts';
 import requireTicketInComments from './rules/require-ticket-in-comments.ts';
 import requireTicket from './rules/require-ticket.ts';
+import { FRAMEWORK_NAMES, type FrameworkName } from './utils/constants.ts';
 import { compileOptions, SETTINGS_KEY, type GovernanceOptions } from './utils/options.ts';
 
+export type { FrameworkName } from './utils/constants.ts';
 export type { CustomState, GovernanceOptions, StateOverride } from './utils/options.ts';
 export type { TicketSpec } from './utils/tickets.ts';
 
@@ -46,28 +48,35 @@ export interface FlatConfig {
   settings?: Record<string, unknown>;
 }
 
+/**
+ * `recommended` is the Playwright config. `playwright`, `jest` and `vitest` turn on the same rules
+ * for that framework; point each one at its test files with `files`.
+ */
+export type ConfigName = 'recommended' | FrameworkName;
+
 export interface TestGovernancePlugin extends ESLint.Plugin {
   meta: { name: string; version: string; namespace: string };
   rules: Record<RuleName, Rule.RuleModule>;
-  configs: { recommended: FlatConfig };
+  configs: Record<ConfigName, FlatConfig>;
   configure(options?: GovernanceOptions): FlatConfig;
 }
 
 const plugin: TestGovernancePlugin = {
   meta: { name: 'eslint-plugin-test-governance', version: VERSION, namespace: PLUGIN_NAME },
   rules,
-  configs: {} as { recommended: FlatConfig },
+  configs: {} as Record<ConfigName, FlatConfig>,
   configure,
 };
 
 /**
  * Returns the recommended config with shared options in `settings['test-governance']`,
- * so all rules read the same ticket formats and states.
+ * so all rules read the same ticket formats and states. With `framework`, it is that
+ * framework's config.
  */
 export function configure(options: GovernanceOptions = {}): FlatConfig {
   compileOptions(options); // fail on a bad config at load time, not on the first lint
   return {
-    name: `${PLUGIN_NAME}/recommended`,
+    name: `${PLUGIN_NAME}/${options.framework ?? 'recommended'}`,
     plugins: { [PLUGIN_NAME]: plugin },
     rules: { ...recommendedRules },
     settings: { [SETTINGS_KEY]: options },
@@ -79,6 +88,10 @@ plugin.configs.recommended = {
   plugins: { [PLUGIN_NAME]: plugin },
   rules: { ...recommendedRules },
 };
+// Each sets its framework, so it wins over a `configure()` that applies to all files when listed after it.
+for (const framework of FRAMEWORK_NAMES) {
+  plugin.configs[framework] = configure({ framework });
+}
 
 export const configs = plugin.configs;
 export default plugin;
