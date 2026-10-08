@@ -79,6 +79,16 @@ runRule('no-conflicting-states', rule, {
       errors: [{ messageId: 'newSkipped' }],
     },
     {
+      code: "test.skip('shows the order book @new', async () => {});",
+      settings: lifecycle,
+      errors: [
+        {
+          message:
+            "`@new` on a skipped test: a new test that doesn't run can't be promoted. Fix the test or drop the tag.",
+        },
+      ],
+    },
+    {
       code: "test.describe('risk limits', () => {\n  test.skip(true);\n  test('triggers a stop-loss when the price drops @new', async () => {});\n});",
       settings: lifecycle,
       errors: [{ messageId: 'newSkipped', line: 3 }],
@@ -107,6 +117,13 @@ runRule('no-conflicting-states', rule, {
       settings: lifecycle,
       output: null,
       errors: [{ messageId: 'tagCase' }],
+    },
+    // `\u002D` is a hyphen, so the last tag is `@New-beta` and stays as written.
+    {
+      code: "test('places an order @New and amends it @New @New\\u002Dbeta', async () => {});",
+      settings: lifecycle,
+      output: "test('places an order @new and amends it @new @New\\u002Dbeta', async () => {});",
+      errors: [{ messageId: 'tagCase' }, { messageId: 'tagCase' }],
     },
     {
       code: "test('amends the order price @unstabel', async () => {});",

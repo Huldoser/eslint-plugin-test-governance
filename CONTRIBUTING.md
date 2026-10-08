@@ -22,7 +22,7 @@ versions, Node 22.12 with ESLint 9.0.0):
 npm run lint           # ESLint, including type-aware rules and eslint-plugin-eslint-plugin
 npm run format:check   # Prettier (run `npm run format` to fix)
 npm run typecheck      # TypeScript, including the tests
-npm run test:coverage  # all tests; fails below 100% coverage of src/rules and src/utils
+npm run test:coverage  # all tests; fails below 100% coverage of src
 npm run test:pack      # packs the plugin and lints tests/fixtures/sample-project with the tarball
 npm run docs:check     # the README rules list and rule doc headers are up to date
 ```
