@@ -19,6 +19,7 @@ const config = [
   {
     files: ['tests/**/*.{js,ts}'],
     ...testGovernance.configure({
+      framework: 'playwright',
       ticket: { preset: 'jira', projects: ['TRADE', 'RISK'] },
       lifecycleTags: true,
       customStates: { 'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' } },
@@ -60,7 +61,13 @@ test('the Playwright config works without options', async () => {
 });
 
 test('configure() rejects a bad config when the config file loads', () => {
-  assert.throws(() => testGovernance.configure({ customStates: { x: { when: 'x', marker: 'X' } } }), /must be a tag/);
+  assert.throws(
+    () => testGovernance.configure({ framework: 'playwright', customStates: { x: { when: 'x', marker: 'X' } } }),
+    /must be a tag/,
+  );
   // A typo fails with a hint instead of being ignored.
-  assert.throws(() => testGovernance.configure({ lifecycleTag: true } as never), /did you mean "lifecycleTags"/);
+  assert.throws(
+    () => testGovernance.configure({ framework: 'playwright', lifecycleTag: true } as never),
+    /did you mean "lifecycleTags"/,
+  );
 });

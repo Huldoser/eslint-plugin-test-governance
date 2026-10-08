@@ -59,7 +59,7 @@ export interface TestGovernancePlugin extends ESLint.Plugin {
   meta: { name: string; version: string; namespace: string };
   rules: Record<RuleName, Rule.RuleModule>;
   configs: Record<ConfigName, FlatConfig>;
-  configure(options?: GovernanceOptions): FlatConfig;
+  configure(options: GovernanceOptions): FlatConfig;
 }
 
 const plugin: TestGovernancePlugin = {
@@ -73,10 +73,10 @@ const plugin: TestGovernancePlugin = {
  * Returns the config of `options.framework` with shared options in `settings['test-governance']`,
  * so all rules read the same ticket formats and states.
  */
-export function configure(options: GovernanceOptions = {}): FlatConfig {
+export function configure(options: GovernanceOptions): FlatConfig {
   compileOptions(options); // fail on a bad config at load time, not on the first lint
   return {
-    name: `${PLUGIN_NAME}/${options.framework ?? 'playwright'}`,
+    name: `${PLUGIN_NAME}/${options.framework}`,
     plugins: { [PLUGIN_NAME]: plugin },
     rules: { ...configRules },
     settings: { [SETTINGS_KEY]: options },

@@ -7,7 +7,7 @@ import tsParser from '@typescript-eslint/parser';
 import { Linter } from 'eslint';
 import testGovernance from '../src/index.ts';
 import { BUILTIN_STATE_NAMES, FRAMEWORK_NAMES, TICKET_PRESETS, type FrameworkName } from '../src/utils/constants.ts';
-import { compileOptions } from '../src/utils/options.ts';
+import { compileOptions, type GovernanceOptions } from '../src/utils/options.ts';
 import { optionsSchema } from '../src/utils/schema.ts';
 import { DEFAULT_PLACEHOLDERS, type TicketMatcher } from '../src/utils/tickets.ts';
 
@@ -105,7 +105,8 @@ function checkExample(example: Example, rules: Linter.RulesRecord): void {
         languageOptions: example.lang === 'ts' ? { parser: tsParser } : {},
         plugins: { 'test-governance': testGovernance },
         rules,
-        settings: { 'test-governance': example.settings },
+        // Examples are Playwright tests unless their settings name another framework.
+        settings: { 'test-governance': { framework: 'playwright', ...example.settings } },
       },
     ],
     `example.spec.${example.lang}`,
@@ -194,7 +195,7 @@ describe('README.md', () => {
     });
     assert.ok(configureExamples.length >= 2);
     for (const { literal, constants } of configureExamples) {
-      const options = evaluate(literal, constants) as Record<string, unknown>;
+      const options = evaluate(literal, constants) as GovernanceOptions;
       assert.doesNotThrow(() => testGovernance.configure(options), literal);
     }
   });
@@ -209,9 +210,9 @@ describe('README.md', () => {
         .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
         .replaceAll('…', '.*')}$`,
     );
-    const options: Record<string, unknown> = { lifecycleTag: true, ticket: { preset: 'jria' } };
+    const options = { framework: 'playwright', lifecycleTag: true, ticket: { preset: 'jria' } };
     assert.throws(
-      () => testGovernance.configure(options),
+      () => testGovernance.configure(options as never),
       (error: Error) => pattern.test(error.message),
     );
   });
@@ -233,7 +234,7 @@ describe('README.md', () => {
     assert.deepEqual(Object.keys(samples).sort(), ticketOptions.sort());
     const takes = (preset: string, key: string): boolean => {
       try {
-        testGovernance.configure({ ticket: { preset, [key]: samples[key] } } as Record<string, unknown>);
+        testGovernance.configure({ framework: 'playwright', ticket: { preset, [key]: samples[key] } } as never);
       } catch (error) {
         return !(error as Error).message.includes(`ticket.${key} is not an option`);
       }
@@ -278,6 +279,7 @@ describe('option defaults', () => {
   const descriptionColumn = options[0].indexOf('Description');
   const optionRows = rowsByName(options);
   const defaultsRows = new Map(table(readme, '## Defaults').map((row) => [row[0], row[1]]));
+  const required = [...(optionsSchema.required ?? [])];
 
   // Tickets that tell the presets and placeholders apart.
   const SAMPLE_TICKETS = [
@@ -297,9 +299,15 @@ describe('option defaults', () => {
     ...SAMPLE_TICKETS.map((t) => matcher.check(t)),
   ];
 
-  /** What the rules see for `options`, with each ticket format reduced to how it judges sample tickets. */
+  /**
+   * What the rules see for `options` in Playwright files, or another framework's if they name one, with each
+   * ticket format reduced to how it judges sample tickets.
+   */
   function resolved(options: Record<string, unknown>): unknown {
-    const { framework, testFunctions, states, workCommentKeywords, commentTicket, ...rest } = compileOptions(options);
+    const { framework, testFunctions, states, workCommentKeywords, commentTicket, ...rest } = compileOptions({
+      framework: 'playwright',
+      ...options,
+    });
     return {
       ...rest,
       framework: framework.name,
@@ -320,7 +328,7 @@ describe('option defaults', () => {
   const body = /^export interface GovernanceOptions \{\n([\s\S]*?)\n\}/m.exec(read('src/utils/options.ts'))?.[1] ?? '';
   let doc = '';
   for (const line of body.split('\n')) {
-    const property = /^ {2}(\w+)\?:/.exec(line);
+    const property = /^ {2}(\w+)\??:/.exec(line);
     if (property) {
       hoverDocs.set(property[1], doc.replace(/\s+/g, ' ').trim());
       doc = '';
@@ -337,10 +345,19 @@ describe('option defaults', () => {
   it('lists the defaults the rules use', () => {
     for (const [name, row] of optionRows) {
       // These two defaults are lists in prose, checked by the tests below.
-      if (name === 'placeholders' || name === 'states') continue;
+      if (name === 'placeholders' || name === 'states' || required.includes(name)) continue;
       const literal = /^`([^`]+)`$/.exec(row[defaultColumn])?.[1];
       assert.ok(literal, `the default of ${name} is a single code span`);
       assert.deepEqual(resolved({ [name]: evaluate(literal) }), resolved({}), `${name} defaults to ${literal}`);
+    }
+  });
+
+  it('lists the required options as required, in the README and the hover docs', () => {
+    assert.deepEqual(required, ['framework']);
+    for (const name of required) {
+      assert.equal(optionRows.get(name)?.[defaultColumn], 'required', name);
+      assert.match(hoverDocs.get(name) ?? '', /\bRequired\b/, name);
+      assert.throws(() => compileOptions({} as GovernanceOptions), new RegExp(`${name} is required`));
     }
   });
 

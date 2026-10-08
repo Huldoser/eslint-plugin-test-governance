@@ -1,10 +1,10 @@
 import tsParser from '@typescript-eslint/parser';
 import { RuleTester } from 'eslint';
 import rule from '../../src/rules/require-ticket.ts';
-import { settings } from '../helpers.ts';
+import { PLAYWRIGHT_SETTINGS, settings } from '../helpers.ts';
 
 // Syntax only the TypeScript parser understands.
-const tester = new RuleTester({ languageOptions: { parser: tsParser } });
+const tester = new RuleTester({ languageOptions: { parser: tsParser }, settings: PLAYWRIGHT_SETTINGS });
 const lifecycle = settings({ lifecycleTags: true });
 
 tester.run('require-ticket (TypeScript syntax)', rule as never, {

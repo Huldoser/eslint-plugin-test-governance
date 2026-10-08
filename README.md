@@ -186,12 +186,13 @@ The defaults follow how most teams already work, so each framework config is use
 ## Options
 
 All options go in `configure({...})`, or in `settings['test-governance']` if you build the config
-yourself. The rules have no options of their own: they all read these shared settings, so they
-always agree on ticket formats, states and markers. To turn a rule off, set it to `'off'` as usual.
+yourself. `framework` is required, and every other option has a default. The rules have no options
+of their own: they all read these shared settings, so they always agree on ticket formats, states
+and markers. To turn a rule off, set it to `'off'` as usual.
 
 | Option                        | Type                                                     | Default                           | Description                                                                                                                                                                                                                                                                                                                                                                                   |
 | ----------------------------- | -------------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `framework`                   | `'playwright' \| 'jest' \| 'vitest'`                     | `'playwright'`                    | The test framework of the files the config applies to. `configs.playwright`, `configs.jest` and `configs.vitest` set it. See [Frameworks](#frameworks).                                                                                                                                                                                                                                       |
+| `framework`                   | `'playwright' \| 'jest' \| 'vitest'`                     | required                          | The test framework of the files the config applies to. `configs.playwright`, `configs.jest` and `configs.vitest` set it, and `configure()` needs it. See [Frameworks](#frameworks).                                                                                                                                                                                                           |
 | `ticket`                      | `TicketSpec \| TicketSpec[]`                             | `{ preset: 'any' }`               | Accepted ticket formats. An array accepts a ticket that matches any entry. See [Ticket presets](#ticket-presets).                                                                                                                                                                                                                                                                             |
 | `placeholders`                | `string[]`                                               | see above                         | Tickets rejected as placeholders. `*` matches any characters. Case-insensitive; a leading `#` is ignored. Your list replaces the default one, so repeat the defaults you want to keep. Tickets numbered 0 are always rejected.                                                                                                                                                                |
 | `lifecycleTags`               | `boolean`                                                | `false`                           | Turns on the `new` (`@new`) and `unstable` (`@unstable`) states.                                                                                                                                                                                                                                                                                                                              |
@@ -227,6 +228,7 @@ reports in GitHub:
 
 ```js
 testGovernance.configure({
+  framework: 'playwright',
   ticket: { preset: 'jira', projects: ['TRADE'] },
   lifecycleTags: true,
   states: { unstable: { ticket: { preset: 'github' } } },

@@ -22,14 +22,26 @@ describe('configs', () => {
   });
 
   it('names a configure() config after its framework', () => {
-    assert.equal(configure().name, 'test-governance/playwright');
+    assert.equal(configure({ framework: 'playwright' }).name, 'test-governance/playwright');
     assert.equal(configure({ framework: 'jest' }).name, 'test-governance/jest');
+  });
+
+  it('needs a framework in configure() when the config file loads', () => {
+    assert.throws(() => configure({ lifecycleTags: true } as never), /framework is required/);
+  });
+
+  it('fails on the first lint when a config built by hand names no framework', () => {
+    const config = { plugins: { 'test-governance': testGovernance }, rules: configs.playwright.rules };
+    assert.throws(() => new Linter().verify(SKIPPED_VITEST_TEST, config, 'orders.spec.js'), /framework is required/);
   });
 
   it('keeps the shared options of an earlier config and sets the framework of a later one', () => {
     const linter = new Linter();
     const config = [
-      { files: ['**/*.ts'], ...configure({ ticket: { preset: 'jira', projects: ['TRADE'] } }) },
+      {
+        files: ['**/*.ts'],
+        ...configure({ framework: 'playwright', ticket: { preset: 'jira', projects: ['TRADE'] } }),
+      },
       { files: ['unit/**'], ...configs.vitest },
     ];
     const [unit] = linter.verify(SKIPPED_VITEST_TEST, config, 'unit/pricing.test.ts');
