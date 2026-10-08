@@ -2,7 +2,7 @@
 
 📝 Disallow state tags that contradict each other, differ in case or look like typos.
 
-⚠️ This rule _warns_ in the ✅ `recommended` [config](https://github.com/Huldoser/eslint-plugin-test-governance#usage).
+⚠️ This rule _warns_ in the following [configs](https://github.com/Huldoser/eslint-plugin-test-governance#usage): 🃏 `jest`, 🎭 `playwright`, ⚡ `vitest`.
 
 🔧 This rule is automatically fixable by the [`--fix` CLI option](https://eslint.org/docs/latest/user-guide/command-line-interface#--fix).
 

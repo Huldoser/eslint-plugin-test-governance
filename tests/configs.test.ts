@@ -1,32 +1,47 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { Linter } from 'eslint';
-import testGovernance, { configs, configure } from '../src/index.ts';
+import testGovernance, { configs, configure, rules } from '../src/index.ts';
+import { FRAMEWORK_NAMES } from '../src/utils/constants.ts';
 
 const SKIPPED_VITEST_TEST = "import { test } from 'vitest';\ntest.skip('fills a limit order', () => {});";
 
 describe('configs', () => {
-  it('has a config for each framework, with the same rules as recommended', () => {
-    assert.deepEqual(Object.keys(configs).sort(), ['jest', 'playwright', 'recommended', 'vitest']);
-    for (const framework of ['playwright', 'jest', 'vitest'] as const) {
+  it('has a config for each framework and no other', () => {
+    assert.deepEqual(Object.keys(configs).sort(), [...FRAMEWORK_NAMES].sort());
+    const ruleNames = Object.keys(rules).map((name) => `test-governance/${name}`);
+    for (const framework of FRAMEWORK_NAMES) {
       const config = configs[framework];
       assert.equal(config.name, `test-governance/${framework}`);
-      assert.deepEqual(config.rules, configs.recommended.rules);
+      // Every config turns on every rule, at the same severity.
+      assert.deepEqual(Object.keys(config.rules).sort(), ruleNames.sort());
+      assert.deepEqual(config.rules, configs.playwright.rules);
       assert.deepEqual(config.settings, { 'test-governance': { framework } });
       assert.equal(config.plugins['test-governance'], testGovernance);
     }
-    assert.equal(configs.recommended.settings, undefined);
   });
 
   it('names a configure() config after its framework', () => {
-    assert.equal(configure().name, 'test-governance/recommended');
+    assert.equal(configure({ framework: 'playwright' }).name, 'test-governance/playwright');
     assert.equal(configure({ framework: 'jest' }).name, 'test-governance/jest');
+  });
+
+  it('needs a framework in configure() when the config file loads', () => {
+    assert.throws(() => configure({ lifecycleTags: true } as never), /framework is required/);
+  });
+
+  it('fails on the first lint when a config built by hand names no framework', () => {
+    const config = { plugins: { 'test-governance': testGovernance }, rules: configs.playwright.rules };
+    assert.throws(() => new Linter().verify(SKIPPED_VITEST_TEST, config, 'orders.spec.js'), /framework is required/);
   });
 
   it('keeps the shared options of an earlier config and sets the framework of a later one', () => {
     const linter = new Linter();
     const config = [
-      { files: ['**/*.ts'], ...configure({ ticket: { preset: 'jira', projects: ['TRADE'] } }) },
+      {
+        files: ['**/*.ts'],
+        ...configure({ framework: 'playwright', ticket: { preset: 'jira', projects: ['TRADE'] } }),
+      },
       { files: ['unit/**'], ...configs.vitest },
     ];
     const [unit] = linter.verify(SKIPPED_VITEST_TEST, config, 'unit/pricing.test.ts');

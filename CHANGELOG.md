@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** `configure()` needs a `framework`, as in
+  `configure({ framework: 'playwright', ticket: { preset: 'jira' } })`, and so does
+  `settings['test-governance']` in a config you build yourself. Before, a config without one checked
+  files as Playwright tests. Now `configure()` fails when the config file loads, and hand-written
+  settings fail on the first lint, with a message that names the three frameworks. To share options
+  between frameworks, pass the same options to a `configure()` for each one.
+
+### Removed
+
+- **Breaking:** `configs.recommended` is gone. It checked every file as Playwright tests, so pick the
+  config for your framework instead: `configs.playwright`, `configs.jest` or `configs.vitest`. For
+  Playwright, replace `configs.recommended` with `configs.playwright`, and
+  `extends: ['test-governance/recommended']` with `extends: ['test-governance/playwright']`. The
+  rules and their severities are the same.
+
 ### Fixed
 
 - Tags kept in a `const` or an enum in the same file count, as in `{ tag: TAGS.NEW }` after

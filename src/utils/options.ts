@@ -29,8 +29,11 @@ export interface CustomState {
 
 /** Options shared by every rule. Set them once in `settings['test-governance']`. */
 export interface GovernanceOptions {
-  /** The test framework of the files the config applies to. Defaults to `'playwright'`. */
-  framework?: FrameworkName;
+  /**
+   * The test framework of the files the config applies to: `'playwright'`, `'jest'` or `'vitest'`. Required;
+   * `configs.playwright`, `configs.jest` and `configs.vitest` set it.
+   */
+  framework: FrameworkName;
   /**
    * Names that are treated as the framework's `test` function. Defaults to `['test']` for Playwright and
    * `['test', 'it']` for Jest and Vitest. Your list replaces the default one, so include those names if
@@ -194,7 +197,7 @@ export function compileOptions(options: GovernanceOptions): ResolvedOptions {
   if (problems.length > 0) {
     throw new ConfigError(`invalid options:\n${problems.map((problem) => `  - ${problem}`).join('\n')}`);
   }
-  const framework = FRAMEWORKS[options.framework ?? 'playwright'];
+  const framework = FRAMEWORKS[options.framework];
   const placeholders = options.placeholders ?? DEFAULT_PLACEHOLDERS;
   const defaultTicket = toSpecs(options.ticket ?? { preset: 'any' });
   const compile = (spec: TicketSpec | TicketSpec[] | undefined): TicketMatcher =>

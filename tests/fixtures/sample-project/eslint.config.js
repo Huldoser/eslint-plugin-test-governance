@@ -6,6 +6,7 @@ export default [
   {
     files: ['tests/**/*.{js,ts}'],
     ...testGovernance.configure({
+      framework: 'playwright',
       ticket: { preset: 'jira', projects: ['TRADE', 'RISK'] },
       lifecycleTags: true,
       customStates: { 'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' } },

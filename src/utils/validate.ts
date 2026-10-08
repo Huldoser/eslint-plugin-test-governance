@@ -7,6 +7,8 @@ export interface Schema {
   pattern?: string;
   /** How to describe `pattern` in messages, e.g. "an uppercase keyword such as NEEDS-DATA". */
   patternHint?: string;
+  /** What to tell a user who left out this value when it is required, e.g. which values it takes. */
+  requiredHint?: string;
   minimum?: number;
   minItems?: number;
   items?: Schema;
@@ -121,7 +123,9 @@ export function validate(value: unknown, schema: Schema, path = ''): string[] {
     const known = Object.keys(properties);
     const problems: string[] = [];
     for (const key of schema.required ?? []) {
-      if (object[key] === undefined) problems.push(`${join(path, key)} is required`);
+      if (object[key] !== undefined) continue;
+      const hint = properties[key].requiredHint;
+      problems.push(`${join(path, key)} is required${hint ? `: ${hint}` : ''}`);
     }
     for (const [key, item] of Object.entries(object)) {
       if (item === undefined) continue;

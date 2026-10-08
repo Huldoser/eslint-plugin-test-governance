@@ -40,7 +40,7 @@ export default defineConfig(
     rules: {
       // Descriptions start with a capital, as ESLint's own rules do: "Require ...".
       'eslint-plugin/require-meta-docs-description': ['error', { pattern: '^(Enforce|Require|Disallow) ' }],
-      // `recommended` holds the severity the recommended config uses.
+      // `recommended` holds the severity the framework configs use.
       'eslint-plugin/require-meta-docs-recommended': ['error', { allowNonBoolean: true }],
       'eslint-plugin/require-meta-docs-url': [
         'error',
@@ -49,7 +49,7 @@ export default defineConfig(
       // Messages are sentences: they start with a capital letter, a quote or a placeholder and end with a full stop.
       'eslint-plugin/report-message-format': ['error', "^[A-Z`'{].*\\.$"],
       // With `meta.languages`, ESLint 10 rejects a config that applies these rules to JSON, Markdown or CSS
-      // files, as `configs.recommended` without `files` does. The rules already skip other languages.
+      // files, as a framework config without `files` does. The rules already skip other languages.
       'eslint-plugin/require-meta-languages': 'off',
     },
   },

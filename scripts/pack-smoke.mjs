@@ -58,8 +58,12 @@ try {
     [
       "import testGovernance, { configure, type GovernanceOptions } from 'eslint-plugin-test-governance';",
       '',
-      "const options: GovernanceOptions = { lifecycleTags: true, ticket: { preset: 'jira', projects: ['TRADE'] } };",
-      'export default [configure(options), testGovernance.configs.recommended];',
+      'const options: GovernanceOptions = {',
+      "  framework: 'playwright',",
+      '  lifecycleTags: true,',
+      "  ticket: { preset: 'jira', projects: ['TRADE'] },",
+      '};',
+      'export default [configure(options), testGovernance.configs.playwright];',
       '',
     ].join('\n'),
   );

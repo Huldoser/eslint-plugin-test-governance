@@ -3,10 +3,10 @@ import { describe, it } from 'node:test';
 import { ConfigError, compileOptions } from '../../src/utils/options.ts';
 import { validate, type Schema } from '../../src/utils/validate.ts';
 
-/** The problems `compileOptions` reports for these options, without the shared prefix. */
+/** The problems `compileOptions` reports for these Playwright options, without the shared prefix. */
 function problems(options: unknown): string[] {
   try {
-    compileOptions(options as never);
+    compileOptions({ framework: 'playwright', ...(options as object) } as never);
   } catch (error) {
     assert.ok(error instanceof ConfigError);
     return error.message
@@ -97,6 +97,12 @@ describe('options validation', () => {
       assert.deepEqual(problems(options), [message]);
     });
   }
+
+  it('names the frameworks when the framework is missing', () => {
+    assert.deepEqual(problems({ framework: undefined }), [
+      'framework is required: set it to "playwright", "jest" or "vitest", or use configs.playwright, configs.jest or configs.vitest',
+    ]);
+  });
 
   it('reports every problem at once', () => {
     assert.deepEqual(problems({ xyzzy: 1, allowNotes: 'no' }), [

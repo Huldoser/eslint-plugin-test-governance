@@ -2,7 +2,7 @@
 
 📝 Require a ticket marker comment above skipped, fixme and tagged tests.
 
-💼 This rule is enabled in the ✅ `recommended` [config](https://github.com/Huldoser/eslint-plugin-test-governance#usage).
+💼 This rule is enabled in the following [configs](https://github.com/Huldoser/eslint-plugin-test-governance#usage): 🃏 `jest`, 🎭 `playwright`, ⚡ `vitest`.
 
 💡 This rule is manually fixable by [editor suggestions](https://eslint.org/docs/latest/use/core-concepts#rule-suggestions).
 
@@ -25,7 +25,7 @@ A test is in a state when it is:
 
 In Jest and Vitest, `xit`, `xdescribe`, Vitest's `{ skip: true }` and `context.skip()`, in a test or
 in `beforeEach`, skip a test too, and `test.failing` and `test.fails` put it in the `fail` state. The
-[README](../../README.md#jest-and-vitest) lists every form.
+[README](../../README.md#frameworks) lists every form.
 
 Tags are read from the title (`'places a limit order @new'`) and from `{ tag: '@new' }` or `{ tag: ['@new', '@smoke'] }`,
 also when they come from a `const` or an enum declared in the same file, as in `{ tag: TAGS.NEW }`.

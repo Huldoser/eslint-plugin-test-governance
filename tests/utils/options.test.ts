@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { compileOptions, ConfigError, resolveOptions } from '../../src/utils/options.ts';
+import { compileOptions, ConfigError, resolveOptions, type GovernanceOptions } from '../../src/utils/options.ts';
 
-const stateNames = (options: Parameters<typeof compileOptions>[0]) => compileOptions(options).states.map((s) => s.name);
+/** Compiles `options` for Playwright, unless they name another framework. */
+const compile = (options: Partial<GovernanceOptions>) => compileOptions({ framework: 'playwright', ...options });
+const stateNames = (options: Partial<GovernanceOptions>) => compile(options).states.map((s) => s.name);
 
 describe('compileOptions', () => {
   it('turns on skip and fixme by default', () => {
-    const resolved = compileOptions({});
+    const resolved = compile({});
     assert.deepEqual(
       resolved.states.map((s) => [s.name, s.marker]),
       [
@@ -33,14 +35,14 @@ describe('compileOptions', () => {
   });
 
   it('adds custom states after the built-ins', () => {
-    const resolved = compileOptions({ customStates: { blocked: { when: '@blocked', marker: 'BLOCKED' } } });
+    const resolved = compile({ customStates: { blocked: { when: '@blocked', marker: 'BLOCKED' } } });
     const { name, tag, marker } = resolved.states.at(-1) ?? {};
     assert.deepEqual({ name, tag, marker }, { name: 'blocked', tag: '@blocked', marker: 'BLOCKED' });
   });
 
   it('accepts options that belong to the preset, and states set to true or false', () => {
     assert.doesNotThrow(() =>
-      compileOptions({
+      compile({
         ticket: [{ preset: 'jira', projects: ['TRADE'], host: 'acme.atlassian.net', minLength: undefined } as never],
         states: { fail: true, slow: { enabled: true } },
         customStates: { blocked: { when: '@blocked', marker: 'BLOCKED', ticket: { preset: 'numeric', maxLength: 6 } } },
@@ -53,23 +55,23 @@ describe('compileOptions', () => {
   });
 
   it('compiles a custom ticket pattern', () => {
-    const resolved = compileOptions({ ticket: { preset: 'pattern', pattern: 'TRADE-\\d+', flags: 'i' } });
+    const resolved = compile({ ticket: { preset: 'pattern', pattern: 'TRADE-\\d+', flags: 'i' } });
     assert.equal(resolved.commentTicket.check('trade-7'), 'ok');
   });
 
   it('checks no comment keywords with comments: false', () => {
-    assert.deepEqual(compileOptions({ comments: false }).commentKeywords, []);
+    assert.deepEqual(compile({ comments: false }).commentKeywords, []);
   });
 
   it('names the error ConfigError', () => {
     assert.throws(
-      () => compileOptions({ lifecycleTags: 'yes' } as never),
+      () => compile({ lifecycleTags: 'yes' } as never),
       /^ConfigError: eslint-plugin-test-governance: invalid options:/,
     );
   });
 
   it('compiles per-state ticket formats', () => {
-    const resolved = compileOptions({
+    const resolved = compile({
       ticket: { preset: 'jira' },
       states: { fixme: { ticket: { preset: 'github' } } },
       customStates: { blocked: { when: '@blocked', marker: 'BLOCKED', ticket: [{ preset: 'numeric' }] } },
@@ -123,8 +125,8 @@ describe('compileOptions', () => {
     ],
   ]) {
     it(`rejects ${JSON.stringify(options)}`, () => {
-      assert.throws(() => compileOptions(options as never), ConfigError);
-      assert.throws(() => compileOptions(options as never), message);
+      assert.throws(() => compile(options as never), ConfigError);
+      assert.throws(() => compile(options as never), message);
     });
   }
 });
@@ -137,19 +139,25 @@ describe('framework', () => {
         stateNames({ framework, lifecycleTags: true, states: { fixme: true, slow: true, fail: true } }),
         ['skip', 'fail', 'todo', 'new', 'unstable'],
       );
-      assert.deepEqual([...compileOptions({ framework }).testFunctions], ['test', 'it']);
-      assert.equal(compileOptions({ framework }).framework.name, framework);
+      assert.deepEqual([...compile({ framework }).testFunctions], ['test', 'it']);
+      assert.equal(compile({ framework }).framework.name, framework);
     });
   }
 
-  it('is Playwright by default, which has no todo state', () => {
-    assert.equal(compileOptions({}).framework.name, 'playwright');
+  it('is required, since there is no default framework', () => {
+    assert.throws(
+      () => compileOptions({} as never),
+      /framework is required: set it to "playwright", "jest" or "vitest", or use configs\.playwright, configs\.jest or configs\.vitest$/,
+    );
+  });
+
+  it('has no todo state in Playwright', () => {
     assert.deepEqual(stateNames({ framework: 'playwright', states: { todo: true } }), ['skip', 'fixme']);
   });
 
   it('rejects an unknown framework', () => {
     assert.throws(
-      () => compileOptions({ framework: 'mocha' } as never),
+      () => compile({ framework: 'mocha' } as never),
       /framework must be one of "playwright", "jest", "vitest" \(got "mocha"\)/,
     );
   });
@@ -157,15 +165,16 @@ describe('framework', () => {
 
 describe('resolveOptions', () => {
   it('compiles shared settings once per settings object', () => {
-    const settings = { 'test-governance': { lifecycleTags: true, allowBlankLine: true } };
+    const settings = { 'test-governance': { framework: 'playwright', lifecycleTags: true, allowBlankLine: true } };
     const resolved = resolveOptions(settings);
     assert.equal(resolved.allowBlankLine, true);
     assert.ok(resolved.states.map((s) => s.name).includes('new'));
     assert.equal(resolveOptions(settings), resolved);
   });
 
-  it('works without settings', () => {
-    assert.equal(resolveOptions(undefined).states.length, 2);
-    assert.equal(resolveOptions({}), resolveOptions({ other: 1 }));
+  it('fails without settings, since they name the framework', () => {
+    for (const settings of [undefined, {}, { other: 1 }]) {
+      assert.throws(() => resolveOptions(settings), /framework is required: .* or use configs\.playwright/);
+    }
   });
 });

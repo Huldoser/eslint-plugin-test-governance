@@ -5,8 +5,12 @@ import prettier from 'prettier';
 export default {
   ruleDocTitleFormat: 'desc-parens-prefix-name',
   ruleListColumns: ['name', 'description', 'configsError', 'configsWarn', 'fixable', 'hasSuggestions'],
-  // The framework configs turn on the same rules as `recommended`; the README explains them.
-  ignoreConfig: ['playwright', 'jest', 'vitest'],
+  // One config per framework, each with the framework's own emoji. They turn on the same rules.
+  configEmoji: [
+    ['jest', '🃏'],
+    ['playwright', '🎭'],
+    ['vitest', '⚡'],
+  ],
   // Options are shared by all rules and documented once in the README.
   ruleDocSectionOptions: false,
   urlConfigs: 'https://github.com/Huldoser/eslint-plugin-test-governance#usage',

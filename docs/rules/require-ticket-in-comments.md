@@ -2,7 +2,7 @@
 
 📝 Require FIXME and TODO comments in test files to start with a ticket.
 
-💼 This rule is enabled in the ✅ `recommended` [config](https://github.com/Huldoser/eslint-plugin-test-governance#usage).
+💼 This rule is enabled in the following [configs](https://github.com/Huldoser/eslint-plugin-test-governance#usage): 🃏 `jest`, 🎭 `playwright`, ⚡ `vitest`.
 
 💡 This rule is manually fixable by [editor suggestions](https://eslint.org/docs/latest/use/core-concepts#rule-suggestions).
 
