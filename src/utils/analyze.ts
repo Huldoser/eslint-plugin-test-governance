@@ -134,19 +134,35 @@ function isFunction(node: Node | undefined): node is TSESTree.FunctionLike {
   return node?.type === 'ArrowFunctionExpression' || node?.type === 'FunctionExpression';
 }
 
-/** Collects the top-level names that refer to Playwright's `test`. */
-function collectTestNames(program: TSESTree.Program, configured: Set<string>): Set<string> {
+interface TestNames {
+  /** Names that refer to Playwright's `test`. */
+  tests: Set<string>;
+  /** Names bound to the whole Playwright module, as in `import * as pw`, whose `test` is `pw.test`. */
+  modules: Set<string>;
+}
+
+/** Collects the top-level names that refer to Playwright's `test` or to its module. */
+function collectTestNames(program: TSESTree.Program, configured: Set<string>): TestNames {
   const names = new Set(configured);
+  const modules = new Set<string>();
   const mergeTests = new Set<string>();
   /** Names bound to another test runner, such as `ava` in `import ava from 'ava'`. */
   const others = new Set<string>();
+  /** `pw.test` or `pw.mergeTests` on the Playwright module. */
+  const isModuleMember = (node: Node, member: string): boolean =>
+    node.type === 'MemberExpression' &&
+    node.object.type === 'Identifier' &&
+    modules.has(node.object.name) &&
+    memberName(node) === member;
   const isTestExpression = (node: Node): boolean => {
     const target = unwrap(node);
     if (target.type === 'Identifier') return names.has(target.name);
+    if (isModuleMember(target, 'test')) return true;
     if (target.type !== 'CallExpression') return false;
-    // mergeTests(dbTest, a11yTest)
+    // mergeTests(dbTest, a11yTest) or pw.mergeTests(dbTest, a11yTest)
     if (target.callee.type === 'Identifier') return mergeTests.has(target.callee.name);
     if (target.callee.type !== 'MemberExpression') return false;
+    if (isModuleMember(target.callee, 'mergeTests')) return true;
     return memberName(target.callee) === 'extend' && isTestExpression(target.callee.object);
   };
   // require('node:test'), ava, ava.serial or `ava as TestFn<Context>`
@@ -169,9 +185,9 @@ function collectTestNames(program: TSESTree.Program, configured: Set<string>): S
       } else if (isPlaywrightModule(source)) {
         for (const spec of statement.specifiers) {
           if (spec.type === 'ImportDefaultSpecifier') names.add(spec.local.name);
-          else if (spec.type === 'ImportSpecifier' && importedName(spec) === 'test') names.add(spec.local.name);
-          else if (spec.type === 'ImportSpecifier' && importedName(spec) === 'mergeTests')
-            mergeTests.add(spec.local.name);
+          else if (spec.type === 'ImportNamespaceSpecifier') modules.add(spec.local.name);
+          else if (importedName(spec) === 'test') names.add(spec.local.name);
+          else if (importedName(spec) === 'mergeTests') mergeTests.add(spec.local.name);
         }
       }
       continue;
@@ -188,6 +204,10 @@ function collectTestNames(program: TSESTree.Program, configured: Set<string>): S
         // `const test = require('node:test')` is another runner's `test`, like an import from it.
         names.delete(declarator.id.name);
         others.add(declarator.id.name);
+      } else if (declarator.id.type === 'Identifier') {
+        // `const pw = require('@playwright/test')`, used as `pw.test`.
+        const source = requireSource(init);
+        if (source !== undefined && isPlaywrightModule(source)) modules.add(declarator.id.name);
       } else if (declarator.id.type === 'ObjectPattern') {
         const source = requireSource(init);
         if (source === undefined) continue;
@@ -201,13 +221,13 @@ function collectTestNames(program: TSESTree.Program, configured: Set<string>): S
       }
     }
   }
-  return names;
+  return { tests: names, modules };
 }
 
 /** The name a property key spells out: `test` in `{ test }`, `{ 'test': t }` or `{ ['test']: t }`. */
 function propertyName(prop: TSESTree.Property): string | undefined {
   if (prop.key.type === 'Literal') return typeof prop.key.value === 'string' ? prop.key.value : undefined;
-  return !prop.computed && prop.key.type === 'Identifier' ? prop.key.name : undefined;
+  return prop.computed ? undefined : prop.key.name;
 }
 
 function importedName(spec: TSESTree.ImportSpecifier): string {
@@ -425,6 +445,18 @@ export function analyze(sourceCode: SourceCode, options: ResolvedOptions): Analy
 function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis {
   const { states } = options;
   const testNames = collectTestNames(sourceCode.ast, options.testFunctions);
+  /**
+   * The members after Playwright's `test` in a callee, such as `['describe', 'skip']` for
+   * `test.describe.skip` or `pw.test.describe.skip`. Undefined when the callee isn't Playwright's `test`.
+   */
+  const testPath = (chain: Chain | undefined): string[] | undefined => {
+    if (chain === undefined) return undefined;
+    const { root, path } = chain;
+    let rest: string[] | undefined;
+    if (testNames.tests.has(root.name)) rest = path;
+    else if (testNames.modules.has(root.name) && path[0] === 'test') rest = path.slice(1);
+    return rest !== undefined && !isLocalVariable(sourceCode, root) ? rest : undefined;
+  };
   let usesTest = sourceCode.ast.body.some(
     (statement) => statement.type === 'ImportDeclaration' && isPlaywrightModule(statement.source.value),
   );
@@ -489,9 +521,9 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const last = args.at(-1);
     let testInfo: string | undefined;
 
-    if (chain && testNames.has(chain.root.name) && !isLocalVariable(sourceCode, chain.root)) {
+    const path = testPath(chain);
+    if (path !== undefined) {
       usesTest = true;
-      const { path } = chain;
       if (isFunction(last)) {
         const param = last.params.at(1);
         if (param?.type === 'Identifier') testInfo = param.name;
@@ -524,11 +556,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       if (name !== undefined && RUNTIME_MODIFIERS.has(name)) {
         const isTestInfo =
           (object.type === 'Identifier' && testInfoNames.includes(object.name)) ||
-          (object.type === 'CallExpression' &&
-            (() => {
-              const inner = chainOf(object.callee);
-              return inner !== undefined && testNames.has(inner.root.name) && inner.path.join('.') === 'info';
-            })());
+          (object.type === 'CallExpression' && testPath(chainOf(object.callee))?.join('.') === 'info');
         if (isTestInfo) return { subject: runtimeSubject(call, name) };
       }
     }

@@ -142,6 +142,15 @@ runRule('require-ticket', rule, {
     },
     // Only `test` itself is taken from a Playwright require.
     "const { expect: e } = require('@playwright/test');\ne.skip('places an order', async () => {});",
+    // Only `test` itself is taken from the whole Playwright module.
+    {
+      code: "import * as pw from '@playwright/test';\nconst config = pw.defineConfig({}), check = pw.expect, deep = market.data.test, other = broker.test;\npw.skip('places an order', async () => {});\npw.expect.skip('cancels an order', async () => {});\ncheck.skip('amends an order', async () => {});\ndeep.skip('fills an order', async () => {});\nother.skip('closes a position', async () => {});",
+      settings: settings({ testFunctions: [] }),
+    },
+    {
+      code: "const helpers = require('./helpers'), broker = connectBroker();\nhelpers.test.skip('places an order', async () => {});\nbroker.test.skip('cancels an order', async () => {});",
+      settings: settings({ testFunctions: [] }),
+    },
     "const config = require('./playwright.config');\ntest('places an order', async () => {});",
     // A local variable that happens to be called `test` is not Playwright's.
     "function validateOrder() {\n  const test = { skip(name, fn) { fn(); } };\n  test.skip('checks the order size', () => {});\n}",
@@ -675,6 +684,22 @@ runRule('require-ticket', rule, {
       code: "import pwTest from '@playwright/test';\npwTest.skip('places an order', async () => {});",
       settings: settings({ testFunctions: [] }),
       errors: [missing('skip', 'SKIP')],
+    },
+    // The whole module, imported or required, with its test used as `pw.test`.
+    {
+      code: "import * as pw from '@playwright/test';\npw.test.skip('places an order', async () => {});\npw.test.describe.fixme('order entry', () => {});\npw.test('fills an order', async () => {\n  pw.test.skip();\n  pw.test.info().fixme();\n});",
+      settings: settings({ testFunctions: [] }),
+      errors: [
+        missing('skip', 'SKIP'),
+        missing('fixme', 'FIXME', 'This describe block'),
+        missing('skip', 'SKIP', 'This skip call'),
+        missing('fixme', 'FIXME', 'This fixme call'),
+      ],
+    },
+    {
+      code: "const pw = require('@playwright/test');\nconst orderTest = pw.test.extend({});\nconst both = pw.mergeTests(orderTest, marketData);\norderTest.skip('places an order', async () => {});\nboth.skip('cancels an order', async () => {});",
+      settings: settings({ testFunctions: [] }),
+      errors: [missing('skip', 'SKIP'), missing('skip', 'SKIP')],
     },
     {
       code: "import { test as base, expect } from '@playwright/test';\nimport other from 'other';\nexport const myTest = base.extend({}).extend({});\nconst made = make(), deep = obj.a.extend({});\nconst x = 1, y = other.extend({});\nlet z;\nexport {};\nmyTest.skip('places an order', async () => {});\ny.skip('cancels an order', async () => {});",

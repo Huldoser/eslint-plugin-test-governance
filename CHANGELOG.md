@@ -26,6 +26,9 @@ All notable changes to this project are documented here. The format follows
   `const { 'test': test } = require('node:test')` still counted as Playwright's `test`, so its
   skipped tests were reported, and `const { 'test': t } = require('@playwright/test')` was not
   followed.
+- Tests written through the whole Playwright module, as in `import * as pw from '@playwright/test'`
+  or `const pw = require('@playwright/test')` followed by `pw.test.skip(...)`, are now checked,
+  including `pw.test.extend()` and `pw.mergeTests()`. Before, they were ignored.
 
 ## [0.3.1] - 2026-10-06
 
