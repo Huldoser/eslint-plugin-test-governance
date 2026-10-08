@@ -30,7 +30,8 @@ const GITHUB_REF_RE = /^[A-Za-z0-9][A-Za-z0-9-]*\/[\w.-]+#\d+$/;
 const GITLAB_REF_RE = /^[\w.-]+(?:\/[\w.-]+)+#\d+$/;
 const AZURE_REF_RE = /^AB#\d+$/;
 const DIGITS_RE = /^\d+$/;
-const JIRA_PATH_RE = /^\/browse\/([A-Z][A-Z0-9_]+-\d+)\/?$/;
+// Jira Server and Data Center can run under a path, as in https://issues.example.com/jira/browse/TRADE-1.
+const JIRA_PATH_RE = /\/browse\/([A-Z][A-Z0-9_]+-\d+)\/?$/;
 const GITHUB_PATH_RE = /^\/[^/]+\/[^/]+\/(?:issues|pull)\/\d+\/?$/;
 const GITLAB_PATH_RE = /\/-\/(?:issues|merge_requests|work_items)\/\d+\/?$/;
 const LINEAR_PATH_RE = /^\/[^/]+\/issue\/([A-Z][A-Z0-9]*-\d+)(?:\/[^/]*)?$/;

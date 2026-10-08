@@ -40,6 +40,9 @@ const tables: Record<string, Table> = {
       'https://acme.atlassian.net/browse/TRADE-123',
       'https://acme.atlassian.net/browse/TRADE-123/',
       'https://acme.atlassian.net/jira/software/projects/TRADE/boards/1?selectedIssue=TRADE-123',
+      // Jira Server and Data Center under a path.
+      'https://issues.example.com/jira/browse/TRADE-123',
+      'https://tools.example.com/tracking/jira/browse/TRADE-123/',
     ],
     rejects: [
       '#4821',
@@ -48,6 +51,8 @@ const tables: Record<string, Table> = {
       'https://acme.atlassian.net/boards/1',
       'https://acme.atlassian.net/x?selectedIssue=nope',
       'https://acme.atlassian.net/browse/TRADE-123x',
+      'https://acme.atlassian.net/browse/TRADE-123/comments',
+      'https://acme.atlassian.net/xbrowse/TRADE-123',
     ],
   },
   'jira with projects and host': {
@@ -325,6 +330,7 @@ describe('backtracking', () => {
     'https://dev.azure.com/' + '/_workitems/edit'.repeat(n / 20) + '/x',
     'https://linear.app/a/issue/' + 'A'.repeat(n) + '-',
     'https://x.io/browse/' + 'A'.repeat(n),
+    'https://x.io' + '/browse/A'.repeat(n / 10) + '-',
   ];
 
   for (const preset of presets) {

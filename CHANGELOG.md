@@ -17,6 +17,9 @@ All notable changes to this project are documented here. The format follows
 - Test files that ESLint parses as CommonJS, such as `.cjs` files, are now checked. Before, their
   top-level variables were taken for local helpers, so a `test` from `require('@playwright/test')`
   was ignored by every rule.
+- The `jira` preset accepts issue URLs on Jira Server and Data Center sites that run under a path,
+  such as `https://issues.example.com/jira/browse/TRADE-123`. Before, only `/browse/...` right
+  after the host was accepted.
 
 ## [0.3.1] - 2026-10-06
 
