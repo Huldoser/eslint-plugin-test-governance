@@ -303,6 +303,8 @@ export function parseTickets(text: string, offset: number, matcher: TicketMatche
     if (!token) break;
     // Punctuation right after a ticket (`TRADE-1:` or `TRADE-1.`) is not part of it.
     const ticket = token.replace(/[.:;]+$/, '');
+    // Punctuation alone, as in `// SKIP: .`, is no ticket at all.
+    if (ticket === '') break;
     tickets.push({ text: ticket, result: matcher.check(ticket) });
     index += ticket.length;
     lastEnd = index;

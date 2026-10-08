@@ -319,6 +319,10 @@ runRule('require-ticket', rule, {
     },
     { code: "// SKIP:\ntest.skip('places an order', async () => {});", errors: [{ messageId: 'missingTicket' }] },
     { code: "/* SKIP: */\ntest.skip('places an order', async () => {});", errors: [{ messageId: 'missingTicket' }] },
+    ...['// SKIP: .', '// SKIP: ...', '/* SKIP: ; */'].map((marker) => ({
+      code: `${marker}\ntest.skip('places an order', async () => {});`,
+      errors: [{ messageId: 'missingTicket' as const }],
+    })),
     {
       code: "// FIXME:\ntest.fixme('cancels an order', async () => {});",
       errors: [{ message: '`FIXME:` needs a ticket right after the colon, e.g. `// FIXME: PROJ-123`.' }],
@@ -358,6 +362,7 @@ runRule('require-ticket', rule, {
       ['// SKIP: TRADE-123 flaky on CI', 'flaky on CI', '// SKIP: TRADE-123'],
       ['// SKIP: TRADE-1: flaky', ': flaky', '// SKIP: TRADE-1'],
       ['// SKIP: TRADE-1,', ',', '// SKIP: TRADE-1'],
+      ['// SKIP: TRADE-1, .', ', .', '// SKIP: TRADE-1'],
       ['// SKIP: TRADE-1, TRADE-2 ,', ',', '// SKIP: TRADE-1, TRADE-2'],
       ['// SKIP: TRADE-1 and TRADE-2', 'and TRADE-2', '// SKIP: TRADE-1'],
       ['// SKIP: TRADE-1 flaky, see thread', 'flaky, see thread', '// SKIP: TRADE-1'],

@@ -36,6 +36,8 @@ All notable changes to this project are documented here. The format follows
 - Block comments with lone CR line breaks, or with the Unicode line and paragraph separators
   (U+2028, U+2029), are read line by line. Before, only LF and CRLF ended a line, so a marker or a
   `TODO` after the first line of such a comment was missed.
+- A marker with only punctuation after the colon, such as `// SKIP: .`, is reported as missing its
+  ticket. Before, the message was `'' is not a valid ticket`.
 
 ## [0.3.1] - 2026-10-06
 
