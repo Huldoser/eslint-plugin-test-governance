@@ -172,5 +172,22 @@ runRule('marker-matches-state', rule, {
         },
       ],
     },
+    {
+      code: "test('places an order', async () => {\n  // FIXME: TRADE-1\n  await test.step.skip('confirms the fill', async () => {});\n});",
+      errors: [
+        {
+          messageId: 'wrongMarker',
+          data: { found: 'FIXME', expected: 'SKIP', state: 'skip', subject: 'this step' },
+          suggestions: [
+            {
+              messageId: 'renameMarker',
+              data: { expected: 'SKIP' },
+              output:
+                "test('places an order', async () => {\n  // SKIP: TRADE-1\n  await test.step.skip('confirms the fill', async () => {});\n});",
+            },
+          ],
+        },
+      ],
+    },
   ],
 });

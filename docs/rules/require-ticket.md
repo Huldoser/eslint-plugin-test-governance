@@ -13,14 +13,14 @@ at the ticket that explains it, so disabled tests show up in planning instead of
 
 A test is in a state when it is:
 
-| State          | Put there by                                                                               | Marker                 | On by default              |
-| -------------- | ------------------------------------------------------------------------------------------ | ---------------------- | -------------------------- |
-| `skip`         | `test.skip('title', fn)`, `test.describe.skip`, `test.skip()` in a body, `testInfo.skip()` | `// SKIP:`             | yes                        |
-| `fixme`        | `test.fixme(...)`, `test.describe.fixme`, `testInfo.fixme()`                               | `// FIXME:`            | yes                        |
-| `new`          | the `@new` tag                                                                             | `// NEW:`              | with `lifecycleTags: true` |
-| `unstable`     | the `@unstable` tag                                                                        | `// UNSTABLE:`         | with `lifecycleTags: true` |
-| `fail`, `slow` | `test.fail(...)`, `test.slow()`, `testInfo.fail()`, `testInfo.slow()`                      | `// FAIL:`, `// SLOW:` | no                         |
-| custom         | any tag you list in `customStates`                                                         | your keyword           | when configured            |
+| State          | Put there by                                                                                                                          | Marker                 | On by default              |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | -------------------------- |
+| `skip`         | `test.skip('title', fn)`, `test.describe.skip`, `test.skip()` in a body, `testInfo.skip()`, `test.step.skip`, `step.skip()` in a step | `// SKIP:`             | yes                        |
+| `fixme`        | `test.fixme(...)`, `test.describe.fixme`, `testInfo.fixme()`                                                                          | `// FIXME:`            | yes                        |
+| `new`          | the `@new` tag                                                                                                                        | `// NEW:`              | with `lifecycleTags: true` |
+| `unstable`     | the `@unstable` tag                                                                                                                   | `// UNSTABLE:`         | with `lifecycleTags: true` |
+| `fail`, `slow` | `test.fail(...)`, `test.slow()`, `testInfo.fail()`, `testInfo.slow()`                                                                 | `// FAIL:`, `// SLOW:` | no                         |
+| custom         | any tag you list in `customStates`                                                                                                    | your keyword           | when configured            |
 
 Tags are read from the title (`'places a limit order @new'`) and from `{ tag: '@new' }` or `{ tag: ['@new', '@smoke'] }`.
 Tags on a `describe` apply to every test inside it.
@@ -43,6 +43,9 @@ Tags on a `describe` apply to every test inside it.
   that want short notes can set `allowNotes: true`.
 - A marker on a skipped or tagged `describe` covers every test inside it.
 - A `test.skip()` inside a test body can have its marker above the call or above the test.
+- A skipped step, `test.step.skip(...)` or `step.skip()` in its body, can have its marker above the
+  call, above the step or above a skipped test around it. A `test.skip()` inside a step skips the
+  whole test, so its marker goes above the call or above the test.
 - Ticket IDs in test titles (`'TRADE-52: closes all positions'`) are never read as tickets.
 
 How ticket lists are read:

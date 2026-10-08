@@ -40,6 +40,9 @@ runRule('no-orphaned-marker', rule, {
 
     '// FIXME: how to restrict it to frames only\nconst matchers = {};',
     "// SKIP: flaky on CI, see TRADE-1\ntest('streams price updates', async () => {});",
+    // A marker above a skipped step, or above a test whose step skips it.
+    "test('places an order', async () => {\n  // SKIP: TRADE-1\n  await test.step.skip('confirms the fill', async () => {});\n});",
+    "// SKIP: TRADE-1\ntest('places an order', async () => {\n  await test.step('fills the order', async () => {\n    test.skip();\n  });\n});",
   ],
   invalid: [
     // A malformed ticket still reads as a marker.
@@ -161,6 +164,22 @@ runRule('no-orphaned-marker', rule, {
           messageId: 'detached',
           suggestions: [
             { messageId: 'removeMarker', output: "\ntest.skip('rebalances the portfolio', async () => {});" },
+          ],
+        },
+      ],
+    },
+    {
+      code: "test('places an order', async () => {\n  // SKIP: TRADE-1\n  await test.step('fills the order', async () => {});\n});",
+      errors: [
+        {
+          messageId: 'orphaned',
+          data: { marker: 'SKIP', state: 'skip', subject: 'this step' },
+          suggestions: [
+            {
+              messageId: 'removeMarker',
+              output:
+                "test('places an order', async () => {\n  await test.step('fills the order', async () => {});\n});",
+            },
           ],
         },
       ],

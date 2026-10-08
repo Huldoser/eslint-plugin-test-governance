@@ -55,6 +55,9 @@ runRule('require-ticket', rule, {
     "// FIXME: TRADE-1\ntest.fixme('places an order', async ({ isMobile }) => {\n  // FIXME: TRADE-2 left over\n  test.skip(isMobile);\n});",
     "// SKIP: https://jira.example.com/browse/TRADE-1\ntest.skip('rebalances the portfolio', async () => {});",
     "// SKIP: #4821\ntest.skip('rebalances the portfolio', async () => {});",
+    // Small issue numbers are real issues, not placeholders.
+    "// SKIP: #123\ntest.skip('rebalances the portfolio', async () => {});",
+    "// SKIP: #12345\ntest.skip('rebalances the portfolio', async () => {});",
     "// SKIP: acme/trading-engine#4821\ntest.skip('rebalances the portfolio', async () => {});",
     "// FIXME: TRADE-9\ntest.fixme('shows the order book', async () => {});",
     "// FIXME: TRADE-9\ntest.fixme('shows the order book', { tag: '@smoke' }, async () => {});",
@@ -68,6 +71,8 @@ runRule('require-ticket', rule, {
     "test.describe('market data', () => { test.skip(({ browserName }) => browserName === 'webkit', 'n/a'); });",
     "test.describe('market data', () => { test.skip(({ browserName }) => browserName === 'webkit'); });",
     "test('places an order', async () => { test.skip(false, 'Order routing is back'); });",
+    // A skip with only a reason is a call the test makes once it is running, so it needs no ticket.
+    "test('places an order', async () => { test.skip('Broker sandbox is down'); });",
     "test('exports the trade history', async ({ page }, testInfo) => { testInfo.skip(process.env.CI === undefined); });",
     // A runtime skip under an `if`, `switch`, ternary or `&&` is conditional too.
     "test('buys shares with margin', async ({ features }) => { if (!features.marginTrading) test.skip(); });",
@@ -233,6 +238,24 @@ runRule('require-ticket', rule, {
       "test.describe(() => { test('places an order', async () => {}); });",
       "test('shows prices', async ({ browserName }) => { test.skip(browserName === 'webkit'); });",
     ].map((code) => ({ code, settings: settings({ lifecycleTags: true, reportDynamicTitles: true }) })),
+    // Steps: `test.step.skip` and `step.skip()` in a step's body.
+    "test('places an order', async () => {\n  // SKIP: TRADE-1\n  await test.step.skip('confirms the fill', async () => {});\n});",
+    "// SKIP: TRADE-1\ntest.skip('places an order', async () => {\n  await test.step.skip('confirms the fill', async () => {});\n});",
+    "test('places an order', async () => {\n  // SKIP: TRADE-1\n  await test.step.skip('confirms the fill', confirmFill, { box: true });\n});",
+    "test('places an order', async () => {\n  await test.step('fills the order', async () => {});\n});",
+    "test('places an order', async () => {\n  await test.step('fills the order', async (step) => {\n    // SKIP: TRADE-1\n    step.skip();\n  });\n});",
+    "test('places an order', async () => {\n  // SKIP: TRADE-1\n  await test.step('fills the order', async (step) => {\n    step.skip();\n  });\n});",
+    "// SKIP: TRADE-1\ntest('places an order', async () => {\n  await test.step('fills the order', async (step) => {\n    step.skip();\n  });\n});",
+    "test('places an order', async ({ isMobile }) => {\n  await test.step('fills the order', async (step) => {\n    step.skip(isMobile, 'No order ticket on mobile');\n  });\n});",
+    // A step's info can only skip, and its parameter hides a `testInfo` of the same name.
+    "test('places an order', async () => {\n  await test.step('fills the order', async (step) => {\n    step.fixme();\n  });\n});",
+    "test('places an order', async ({ page }, info) => {\n  await test.step('fills the order', async (info) => {\n    info.fixme();\n  });\n});",
+    "test('places an order', async () => {\n  await test.step('fills the order', async ({ attach }) => {});\n});",
+    // `test.skip()` and `testInfo.skip()` inside a step skip the whole test, so the test's marker covers them.
+    "// SKIP: TRADE-1\ntest('places an order', async () => {\n  await test.step('fills the order', async () => {\n    test.skip();\n  });\n});",
+    "// FIXME: TRADE-1\ntest('places an order', async ({ page }, testInfo) => {\n  await test.step('fills the order', async (step) => {\n    testInfo.fixme();\n  });\n});",
+    // A step needs a title and a body.
+    "test('places an order', async () => {\n  await test.step.skip('confirms the fill');\n});",
   ],
   invalid: [
     { code: "test.skip('places an order', async () => {});", errors: [missing('skip', 'SKIP')] },
@@ -353,7 +376,7 @@ runRule('require-ticket', rule, {
       code: "// SKIP: TODO\ntest.describe.skip('order entry', () => {\n  // SKIP: TRADE-1\n  test.skip('places an order', async () => {});\n});",
       errors: [{ messageId: 'placeholderTicket', data: { ticket: 'TODO' }, line: 1 }],
     },
-    ...['TODO', 'tbd', 'XXX-1', '#123', '0', '12345', 'TRADE-0'].map((ticket) => ({
+    ...['TODO', 'tbd', 'XXX-1', '0', '#0', 'TRADE-0'].map((ticket) => ({
       code: `// SKIP: ${ticket}\ntest.skip('places an order', async () => {});`,
       errors: [{ messageId: 'placeholderTicket' as const, data: { ticket } }],
     })),
@@ -790,6 +813,24 @@ runRule('require-ticket', rule, {
       errors: [
         { message: "This title isn't static text, so its tags can't be checked. Use a string or template literal." },
       ],
+    },
+    // A skipped step needs its own marker, unless a marker for the same state covers the test around it.
+    {
+      code: "test('places an order', async () => {\n  await test.step.skip('confirms the fill', async () => {});\n});",
+      errors: [{ ...missing('skip', 'SKIP', 'This step'), line: 2, column: 9, endLine: 2, endColumn: 43 }],
+    },
+    {
+      code: "// FIXME: TRADE-1\ntest.fixme('places an order', async () => {\n  await test.step.skip('confirms the fill', async () => {});\n});",
+      errors: [{ ...missing('skip', 'SKIP', 'This step'), line: 3 }],
+    },
+    {
+      code: "test('places an order', async () => {\n  await test.step('fills the order', async (step) => {\n    step.skip();\n  });\n});",
+      errors: [{ ...missing('skip', 'SKIP', 'This skip call'), line: 3 }],
+    },
+    // `test.skip()` inside a step skips the whole test, so a marker above the step doesn't cover it.
+    {
+      code: "test('places an order', async () => {\n  // SKIP: TRADE-1\n  await test.step('fills the order', async () => {\n    test.skip();\n  });\n});",
+      errors: [{ ...missing('skip', 'SKIP', 'This skip call'), line: 4 }],
     },
   ],
 });

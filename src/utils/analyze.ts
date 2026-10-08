@@ -18,6 +18,8 @@ const TEST_MODIFIERS = new Set(['only', 'skip', 'fixme', 'fail', 'slow']);
 const DESCRIBE_MODIFIERS = new Set(['only', 'skip', 'fixme', 'serial', 'parallel']);
 const RUNTIME_MODIFIERS = new Set(['skip', 'fixme', 'fail', 'slow']);
 const SKIPPING_MODIFIERS = new Set(['skip', 'fixme']);
+/** What a step's `TestStepInfo` can do at runtime: `step.skip()`. */
+const STEP_INFO_METHODS = new Set(['skip']);
 const MARKER_LINE_RE = /^\s*\*?\s*([A-Za-z][\w-]*)\s*:(.*)$/;
 const TAG_RE = /(?<![\w@])@[\w-]+/g;
 
@@ -63,7 +65,7 @@ interface StateSource {
 }
 
 export interface Subject {
-  kind: 'test' | 'describe' | 'runtime';
+  kind: 'test' | 'describe' | 'step' | 'runtime';
   node: TSESTree.CallExpression;
   /** The node the marker comment block sits above. */
   anchor: Node;
@@ -103,6 +105,14 @@ export type Evaluation =
 interface Chain {
   root: TSESTree.Identifier;
   path: string[];
+}
+
+/** A parameter that holds `testInfo` or a step's `TestStepInfo`, and the runtime methods it has. */
+interface InfoName {
+  name: string;
+  methods: Set<string>;
+  /** The step a `TestStepInfo` belongs to. Unset for `testInfo`, which acts on the whole test. */
+  step?: Subject;
 }
 
 function memberName(node: TSESTree.MemberExpression): string | undefined {
@@ -494,7 +504,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   const subjects: Subject[] = [];
   const claimed = new Set<Comment>();
   const stack: Subject[] = [];
-  const testInfoNames: string[] = [];
+  const infoNames: InfoName[] = [];
   const keys = sourceCode.visitorKeys as Record<string, readonly string[] | undefined>;
 
   const makeSubject = (
@@ -503,8 +513,8 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     modifiers: string[],
     tagInfo: { tags: TagOccurrence[]; dynamic: boolean },
     required = true,
+    parent = stack.at(-1),
   ): Subject => {
-    const parent = stack.at(-1);
     const anchor = anchorOf(call);
     const block = commentBlock(sourceCode, anchor, options.allowBlankLine);
     // `symbols.forEach((symbol) =>\n  // SKIP: TRADE-1\n  test.skip(...))`: the marker sits above the call itself.
@@ -523,6 +533,9 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     if (parent && kind !== 'runtime') {
       for (const name of parent.inherited) inherited.add(name);
       for (const source of parent.states) inherited.add(source.state.name);
+    }
+    // Tags belong to tests: a step in a `@new` test is not itself new.
+    if (parent && (kind === 'test' || kind === 'describe')) {
       for (const tag of parent.inheritedTags) inheritedTags.add(tag);
       for (const tag of parent.tags) inheritedTags.add(tag.tag);
     }
@@ -546,25 +559,35 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     return subject;
   };
 
-  const visitCall = (call: TSESTree.CallExpression): { subject?: Subject; testInfo?: string } => {
+  const visitCall = (call: TSESTree.CallExpression): { subject?: Subject; info?: InfoName } => {
     const chain = chainOf(call.callee);
     const args = call.arguments;
     const last = args.at(-1);
-    let testInfo: string | undefined;
+    let info: InfoName | undefined;
 
     const path = testPath(chain);
     if (path !== undefined) {
       usesTest = true;
+      // `test.step('fills the order', async (step) => {...})` or `test.step.skip(...)`. The step's body
+      // gets a `TestStepInfo` that can skip the step at runtime.
+      const step = path.join('.');
+      if ((step === 'step' || step === 'step.skip') && args.length >= 2) {
+        const subject = makeSubject('step', call, path.slice(1), { tags: [], dynamic: false });
+        const body = args[1];
+        const param = isFunction(body) ? body.params.at(0) : undefined;
+        if (param?.type === 'Identifier') info = { name: param.name, methods: STEP_INFO_METHODS, step: subject };
+        return { subject, info };
+      }
       if (isFunction(last)) {
         const param = last.params.at(1);
-        if (param?.type === 'Identifier') testInfo = param.name;
+        if (param?.type === 'Identifier') info = { name: param.name, methods: RUNTIME_MODIFIERS };
       }
       // The body is usually written inline, but can be a function defined elsewhere:
       // `test.skip('pays', payWithCard)`. A string title tells that apart from `test.skip(cond, 'why')`.
       const titled = args.length >= 2 && isStaticText(args[0]);
       const isDeclaration = args.length >= 2 && !isFunction(args[0]) && (isFunction(last) || titled);
       if (path.every((p) => TEST_MODIFIERS.has(p)) && isDeclaration) {
-        return { subject: makeSubject('test', call, path, collectTags(sourceCode.text, call, true)), testInfo };
+        return { subject: makeSubject('test', call, path, collectTags(sourceCode.text, call, true)), info };
       }
       if (
         path[0] === 'describe' &&
@@ -572,29 +595,33 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
         (isFunction(last) || titled)
       ) {
         const tagInfo = collectTags(sourceCode.text, call, args.length >= 2);
-        return { subject: makeSubject('describe', call, path.slice(1), tagInfo), testInfo };
+        return { subject: makeSubject('describe', call, path.slice(1), tagInfo), info };
       }
       if (path.length === 1 && RUNTIME_MODIFIERS.has(path[0])) {
-        return { subject: runtimeSubject(call, path[0]), testInfo };
+        return { subject: runtimeSubject(call, path[0]), info };
       }
-      return { testInfo };
+      return { info };
     }
 
-    // testInfo.skip() and test.info().skip()
+    // testInfo.skip(), step.skip() and test.info().skip()
     if (call.callee.type === 'MemberExpression') {
       const name = memberName(call.callee);
       const object = call.callee.object;
       if (name !== undefined && RUNTIME_MODIFIERS.has(name)) {
-        const isTestInfo =
-          (object.type === 'Identifier' && testInfoNames.includes(object.name)) ||
-          (object.type === 'CallExpression' && testPath(chainOf(object.callee))?.join('.') === 'info');
-        if (isTestInfo) return { subject: runtimeSubject(call, name) };
+        if (object.type === 'Identifier') {
+          // The innermost parameter with that name is the one the call uses.
+          const info = infoNames.findLast((i) => i.name === object.name);
+          if (info?.methods.has(name)) return { subject: runtimeSubject(call, name, info.step) };
+        } else if (object.type === 'CallExpression' && testPath(chainOf(object.callee))?.join('.') === 'info') {
+          return { subject: runtimeSubject(call, name) };
+        }
       }
     }
     return {};
   };
 
-  const runtimeSubject = (call: TSESTree.CallExpression, modifier: string): Subject | undefined => {
+  /** `step` is set for `step.skip()`, which skips only its step; the other calls act on the whole test. */
+  const runtimeSubject = (call: TSESTree.CallExpression, modifier: string, step?: Subject): Subject | undefined => {
     if (!states.some((s) => s.modifier === modifier)) return undefined;
     const unconditional = isUnconditional(call);
     const subject = makeSubject(
@@ -603,6 +630,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       [modifier],
       { tags: [], dynamic: false },
       unconditional || options.requireTicketForConditional,
+      step ?? stack.findLast((s) => s.kind !== 'step'),
     );
     subject.skipped = unconditional && SKIPPING_MODIFIERS.has(modifier);
     const parent = subject.parent;
@@ -617,13 +645,13 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     let pushedSubject = false;
     let pushedInfo = false;
     if (node.type === 'CallExpression') {
-      const { subject, testInfo } = visitCall(node);
+      const { subject, info } = visitCall(node);
       if (subject && subject.kind !== 'runtime') {
         stack.push(subject);
         pushedSubject = true;
       }
-      if (testInfo !== undefined) {
-        testInfoNames.push(testInfo);
+      if (info !== undefined) {
+        infoNames.push(info);
         pushedInfo = true;
       }
     }
@@ -632,7 +660,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       for (const item of Array.isArray(child) ? child : [child]) if (isNode(item)) walk(item);
     }
     if (pushedSubject) stack.pop();
-    if (pushedInfo) testInfoNames.pop();
+    if (pushedInfo) infoNames.pop();
   };
   walk(sourceCode.ast);
 
@@ -730,6 +758,7 @@ export function headLoc(subject: Subject): TSESTree.SourceLocation {
 
 export function describeSubject(subject: Subject): string {
   if (subject.kind === 'describe') return 'This describe block';
+  if (subject.kind === 'step') return 'This step';
   if (subject.kind === 'runtime') return `This ${subject.states[0].state.modifier} call`;
   return 'This test';
 }

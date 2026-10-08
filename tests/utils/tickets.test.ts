@@ -188,16 +188,23 @@ for (const [name, { spec, accepts, rejects }] of Object.entries(tables)) {
 
 describe('placeholders', () => {
   const matcher = compileTicketSpec([{ preset: 'any' }], DEFAULT_PLACEHOLDERS);
-  for (const ticket of ['TODO', 'todo', 'TBD', 'XXX-1', 'xxx-999', '0', '#0', '123', '#123', '1234', '12345']) {
+  for (const ticket of ['TODO', 'todo', 'TBD', 'XXX-1', 'xxx-999', '0', '#0']) {
     it(`rejects ${ticket}`, () => {
       assert.equal(matcher.check(ticket), 'placeholder');
     });
   }
-  for (const ticket of ['TRADE-123', '#4821', 'XXXX-1']) {
+  // Small issue numbers are real issues in young repositories.
+  for (const ticket of ['TRADE-123', '#4821', 'XXXX-1', '#123', '#1234', '#12345']) {
     it(`accepts ${ticket}`, () => {
       assert.equal(matcher.check(ticket), 'ok');
     });
   }
+
+  it('ignores a leading # when matching a placeholder from the list', () => {
+    const custom = compileTicketSpec([{ preset: 'any' }], ['123']);
+    assert.equal(custom.check('#123'), 'placeholder');
+    assert.equal(custom.check('#1234'), 'ok');
+  });
 
   for (const ticket of [
     'TRADE-0',
