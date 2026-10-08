@@ -35,7 +35,7 @@ export default createRule({
       for (const marker of strayMarkers(subject, options)) {
         // TODO is the everyday work-comment keyword, so `// TODO: TRADE-12` above a test that isn't a todo
         // is a tracked note about it far more often than a todo test's forgotten marker.
-        if (marker.state.name === 'todo' && options.workCommentKeywords.has(marker.keyword)) continue;
+        if (marker.state.name === 'todo' && options.workCommentKeywords.has(marker.keyword.toUpperCase())) continue;
         markers.push({ marker, messageId: 'orphaned', subject: name });
       }
     }

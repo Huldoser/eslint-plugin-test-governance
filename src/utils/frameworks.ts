@@ -3,9 +3,12 @@ import type { BuiltinStateName, FrameworkName } from './constants.ts';
 /** A state a test enters through its own code, as opposed to a tag. */
 export type Modifier = 'skip' | 'fixme' | 'fail' | 'slow' | 'todo';
 
-/** What a name from a framework stands for: `xit` is a test with `skip`, `suite` a describe block. */
+/**
+ * What a name from a framework stands for: `xit` is a test with `skip`, `suite` a describe block, and
+ * Vitest's `beforeEach` a hook whose callback gets the test context.
+ */
 export interface Root {
-  kind: 'test' | 'describe';
+  kind: 'test' | 'describe' | 'hook';
   modifiers: readonly string[];
 }
 
@@ -42,6 +45,8 @@ export interface Framework {
   optionEffects: ReadonlyMap<string, Modifier>;
   /** The key of the details or options object that holds tags. */
   tagKey?: string;
+  /** Whether that key holds names without their `@`, as Vitest's `tags: ['flaky']`, which stand for `@flaky`. */
+  plainTags: boolean;
   /**
    * The parameter of a test's body that can change its state at runtime, such as Playwright's
    * `testInfo` or Vitest's test context, and the methods it has for that.
@@ -55,6 +60,7 @@ export interface Framework {
 
 const TEST: Root = { kind: 'test', modifiers: [] };
 const DESCRIBE: Root = { kind: 'describe', modifiers: [] };
+const HOOK: Root = { kind: 'hook', modifiers: [] };
 
 const PLAYWRIGHT_MODULES = new Set(['@playwright/test', 'playwright/test']);
 /** Test runners besides Playwright. A name imported from one of them belongs to that runner. */
@@ -89,6 +95,7 @@ const playwright: Framework = {
   ]),
   optionEffects: new Map(),
   tagKey: 'tag',
+  plainTags: false,
   info: { param: 1, methods: RUNTIME_MODIFIERS },
   states: new Set(['skip', 'fixme', 'fail', 'slow', 'new', 'unstable']),
   playwright: true,
@@ -120,6 +127,7 @@ const jest: Framework = {
     ['failing', 'fail'],
   ]),
   optionEffects: new Map(),
+  plainTags: false,
   states: new Set(['skip', 'todo', 'fail', 'new', 'unstable']),
   playwright: false,
 };
@@ -134,10 +142,12 @@ const vitest: Framework = {
     ['it', TEST],
     ['describe', DESCRIBE],
     ['suite', DESCRIBE],
+    ['beforeEach', HOOK],
   ]),
   globals: new Map([
     ['describe', DESCRIBE],
     ['suite', DESCRIBE],
+    ['beforeEach', HOOK],
   ]),
   testFunctions: ['test', 'it'],
   testMembers: new Set(['only', 'skip', 'todo', 'fails', 'concurrent', 'sequential', ...VITEST_FACTORIES]),
@@ -156,6 +166,7 @@ const vitest: Framework = {
     ['fails', 'fail'],
   ]),
   tagKey: 'tags',
+  plainTags: true,
   info: { param: 0, methods: new Set(['skip']) },
   states: new Set(['skip', 'todo', 'fail', 'new', 'unstable']),
   playwright: false,

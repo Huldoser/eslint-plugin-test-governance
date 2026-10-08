@@ -17,7 +17,9 @@ rule reports:
 - a near-miss spelling of a state tag, such as `@unstabel`.
 
 The `@new` checks run when the `new` state is on (`lifecycleTags: true`). Case and typo checks cover
-every tag state that is on, including custom states.
+every tag state that is on, including custom states. A tag kept in a `const` in the same file is
+reported where the test uses it, without an autofix, since other tests may share the constant. Vitest
+tag names are written without the `@`, so `{ tags: ['New'] }` is reported, and fixed, as `'new'`.
 
 ## Examples
 

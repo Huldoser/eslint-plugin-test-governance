@@ -33,6 +33,16 @@ A `FIXME:` or `TODO:` comment that starts with a valid ticket is treated by wher
 Other markers that read as a sentence, such as `// SKIP: this one is flaky`, are left alone too: the rule
 counts a comment as prose when its first word is not a valid ticket and more text follows.
 
+A marker written in the wrong case, such as `// skip: TRADE-1`, is reported once the test is no longer
+in that state, as long as a valid ticket follows the colon. Without one, as in `// skip: not on mobile`,
+it reads as a sentence.
+
+When a test's tags come from another module, as in `{ tag: TAGS.NEW }` with `TAGS` imported, the rule
+can't tell which tags it has, so it leaves markers for tag states such as `// NEW:` alone on that test
+and the tests inside it. The same goes for Vitest's state options, such as `// SKIP:`, when the options
+object itself comes from another module. Tags kept in a `const` or an enum in the same file are read
+and checked as usual.
+
 Files without tests, such as application code, are not checked.
 
 The rule offers a suggestion to delete the comment.
@@ -55,6 +65,13 @@ test('places a limit order', async ({ page }) => {
   // SKIP: TRADE-81
   await page.goto('/orders');
 });
+```
+
+<!-- example: invalid -->
+
+```js
+// skip: TRADE-82
+test('cancels an open order', async ({ page }) => {});
 ```
 
 Correct:
