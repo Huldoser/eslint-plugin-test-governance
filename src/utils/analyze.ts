@@ -181,7 +181,8 @@ function collectTestNames(program: TSESTree.Program, configured: Set<string>): S
     for (const declarator of declaration.declarations) {
       const init = declarator.init && unwrap(declarator.init);
       if (!init) continue;
-      if (declarator.id.type === 'Identifier' && init.type === 'CallExpression' && isTestExpression(init)) {
+      // `const t = base.extend({...})`, `const t = mergeTests(a, b)` or a plain alias, `const t = base`.
+      if (declarator.id.type === 'Identifier' && isTestExpression(init)) {
         names.add(declarator.id.name);
       } else if (declarator.id.type === 'Identifier' && isOtherFramework(init)) {
         // `const test = require('node:test')` is another runner's `test`, like an import from it.

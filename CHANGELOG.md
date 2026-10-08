@@ -20,6 +20,8 @@ All notable changes to this project are documented here. The format follows
 - The `jira` preset accepts issue URLs on Jira Server and Data Center sites that run under a path,
   such as `https://issues.example.com/jira/browse/TRADE-123`. Before, only `/browse/...` right
   after the host was accepted.
+- A plain alias of a Playwright test, as in `const orderTest = base`, is now followed like
+  `base.extend()` and `mergeTests()` are. Before, tests declared through it were not checked.
 
 ## [0.3.1] - 2026-10-06
 

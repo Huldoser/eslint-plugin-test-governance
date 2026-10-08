@@ -634,6 +634,12 @@ runRule('require-ticket', rule, {
       settings: settings({ testFunctions: [] }),
       errors: [missing('skip', 'SKIP')],
     },
+    // A plain alias of a test.
+    {
+      code: "import { test as base } from '@playwright/test';\nconst orderTest = base;\norderTest.skip('places an order', async () => {});",
+      settings: settings({ testFunctions: [] }),
+      errors: [missing('skip', 'SKIP')],
+    },
     // Fixtures combined with mergeTests().
     {
       code: "import { mergeTests, test as base } from '@playwright/test';\nconst broker = base.extend({});\nexport const test2 = mergeTests(broker, marketData);\ntest2.skip('places an order', async () => {});",

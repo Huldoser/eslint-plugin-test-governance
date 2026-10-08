@@ -193,7 +193,7 @@ so keep it free of nested quantifiers.
 
 - `test` imported from `@playwright/test`, `playwright/test` or a component-testing package such as
   `@playwright/experimental-ct-react`, including the default import, aliases such as
-  `import { test as it }`, and `const { test } = require('@playwright/test')`.
+  `import { test as it }` or `const it = test`, and `const { test } = require('@playwright/test')`.
 - Fixtures made with `.extend()` or `mergeTests()` in the same file, such as
   `const test = base.extend({...})`.
 - Any name in `testFunctions`, for fixtures imported from your own modules. The default `['test']`
