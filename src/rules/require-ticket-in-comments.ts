@@ -11,14 +11,15 @@ function escapeRegExp(text: string): string {
 }
 
 export default createRule({
-  name: 'require-ticket-in-comments',
   meta: {
     type: 'suggestion',
-    hasSuggestions: true,
     docs: {
       description: 'Require FIXME and TODO comments in test files to start with a ticket',
       recommended: 'error',
+      url: 'https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/rules/require-ticket-in-comments.md',
     },
+    hasSuggestions: true,
+    schema: [],
     messages: {
       missingTicket:
         '`{{keyword}}` comments must start with a ticket, e.g. `// {{upper}}: {{example}}`. Put the details in the ticket.',
@@ -29,7 +30,7 @@ export default createRule({
       removeExtraText: 'Remove `{{text}}`.',
     },
   },
-  check(context, analysis, options) {
+  create(context, analysis, options) {
     const keywords = options.commentKeywords;
     if (keywords.length === 0 || !analysis.isTestFile) return;
     const { sourceCode } = context;

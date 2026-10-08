@@ -2,14 +2,15 @@ import { appliesTo, describeSubject, evaluate, headLoc } from '../utils/analyze.
 import { createRule } from '../utils/create-rule.ts';
 
 export default createRule({
-  name: 'require-ticket',
   meta: {
     type: 'problem',
-    hasSuggestions: true,
     docs: {
       description: 'Require a ticket marker comment above skipped, fixme and tagged tests',
       recommended: 'error',
+      url: 'https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/rules/require-ticket.md',
     },
+    hasSuggestions: true,
+    schema: [],
     messages: {
       missingMarker:
         "{{subject}} is in the '{{state}}' state but has no `// {{marker}}: <ticket>` comment directly above it, e.g. `// {{marker}}: {{example}}`.",
@@ -23,7 +24,7 @@ export default createRule({
       dynamicTitle: "This title isn't static text, so its tags can't be checked. Use a string or template literal.",
     },
   },
-  check(context, analysis, options) {
+  create(context, analysis, options) {
     const hasTagStates = options.states.some((s) => s.tag !== undefined);
     // A broken marker on a describe can be reached from several tests; report it once.
     const reported = new Set<string>();
@@ -42,7 +43,6 @@ export default createRule({
         ) {
           continue;
         }
-        const data = { state: state.name, marker: state.marker, example: state.ticket.example };
         switch (result.kind) {
           case 'ok':
             break;
@@ -50,7 +50,12 @@ export default createRule({
             context.report({
               loc: headLoc(subject),
               messageId: 'missingMarker',
-              data: { ...data, subject: describeSubject(subject) },
+              data: {
+                subject: describeSubject(subject),
+                state: state.name,
+                marker: state.marker,
+                example: state.ticket.example,
+              },
             });
             break;
           case 'case':
@@ -61,13 +66,17 @@ export default createRule({
             });
             break;
           case 'no-ticket':
-            context.report({ loc: result.marker.comment.loc, messageId: 'missingTicket', data });
+            context.report({
+              loc: result.marker.comment.loc,
+              messageId: 'missingTicket',
+              data: { marker: state.marker, example: state.ticket.example },
+            });
             break;
           case 'bad-ticket':
             context.report({
               loc: result.marker.comment.loc,
               messageId: result.ticket.result === 'placeholder' ? 'placeholderTicket' : 'invalidTicket',
-              data: { ...data, ticket: result.ticket.text, expected: state.ticket.expected },
+              data: { ticket: result.ticket.text, state: state.name, expected: state.ticket.expected },
             });
             break;
         }

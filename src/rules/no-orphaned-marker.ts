@@ -3,21 +3,22 @@ import { createRule } from '../utils/create-rule.ts';
 import { removeComment } from '../utils/fix.ts';
 
 export default createRule({
-  name: 'no-orphaned-marker',
   meta: {
     type: 'problem',
-    hasSuggestions: true,
     docs: {
       description: 'Disallow marker comments that no longer match a test state',
       recommended: 'error',
+      url: 'https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/rules/no-orphaned-marker.md',
     },
+    hasSuggestions: true,
+    schema: [],
     messages: {
       orphaned: "`{{marker}}:` is left over: {{subject}} is not in the '{{state}}' state.",
       detached: '`{{marker}}:` is not directly above a test, describe or skip call, so it has no effect.',
       removeMarker: 'Remove this comment.',
     },
   },
-  check(context, analysis, options) {
+  create(context, analysis, options) {
     // Files without Playwright tests, such as application code, have no markers to check.
     if (!analysis.isTestFile) return;
     const { sourceCode } = context;

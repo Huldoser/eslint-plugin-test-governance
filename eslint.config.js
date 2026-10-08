@@ -1,8 +1,9 @@
 // @ts-check
+import { defineConfig } from 'eslint/config';
 import eslintPlugin from 'eslint-plugin-eslint-plugin';
 import tseslint from 'typescript-eslint';
 
-export default tseslint.config(
+export default defineConfig(
   { ignores: ['dist/', 'coverage/', 'tests/fixtures/'] },
 
   // TypeScript sources and tests, with type information.
@@ -33,8 +34,26 @@ export default tseslint.config(
   },
 
   // Rule implementations follow ESLint's own conventions for plugins.
-  { files: ['src/rules/**/*.ts'], ...eslintPlugin.configs.rules },
-  { files: ['tests/rules/**/*.ts'], ...eslintPlugin.configs.tests },
+  {
+    files: ['src/rules/**/*.ts'],
+    extends: [eslintPlugin.configs.rules],
+    rules: {
+      // Descriptions start with a capital, as ESLint's own rules do: "Require ...".
+      'eslint-plugin/require-meta-docs-description': ['error', { pattern: '^(Enforce|Require|Disallow) ' }],
+      // `recommended` holds the severity the recommended config uses.
+      'eslint-plugin/require-meta-docs-recommended': ['error', { allowNonBoolean: true }],
+      'eslint-plugin/require-meta-docs-url': [
+        'error',
+        { pattern: 'https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/rules/{{name}}.md' },
+      ],
+      // Messages are sentences: they start with a capital letter, a quote or a placeholder and end with a full stop.
+      'eslint-plugin/report-message-format': ['error', "^[A-Z`'{].*\\.$"],
+      // With `meta.languages`, ESLint 10 rejects a config that applies these rules to JSON, Markdown or CSS
+      // files, as `configs.recommended` without `files` does. The rules already skip other languages.
+      'eslint-plugin/require-meta-languages': 'off',
+    },
+  },
+  { files: ['tests/rules/**/*.ts'], extends: [eslintPlugin.configs.tests] },
 
   // Plain JavaScript: scripts and config files.
   {
