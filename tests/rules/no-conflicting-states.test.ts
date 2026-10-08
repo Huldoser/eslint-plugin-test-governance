@@ -35,6 +35,15 @@ runRule('no-conflicting-states', rule, {
       code: "test('rebalances the portfolio @new @unstable', async () => {});",
       settings: settings({ states: { new: true } }),
     },
+    // A skipped step doesn't skip its test, so a new test with one still runs.
+    {
+      code: "test('places an order @new', async () => {\n  await test.step.skip('confirms the fill', async () => {});\n});",
+      settings: lifecycle,
+    },
+    {
+      code: "test('places an order @new', async () => {\n  await test.step('fills the order', async (step) => {\n    step.skip();\n  });\n});",
+      settings: lifecycle,
+    },
   ],
   invalid: [
     {
@@ -170,6 +179,12 @@ runRule('no-conflicting-states', rule, {
       code: "test('caps position size at 2% of equity @qurantiine', async () => {});",
       settings: custom,
       errors: [{ messageId: 'tagTypo', data: { found: '@qurantiine', expected: '@quarantine' } }],
+    },
+    // `test.skip()` inside a step skips the whole test.
+    {
+      code: "test('places an order @new', async () => {\n  await test.step('fills the order', async () => {\n    test.skip();\n  });\n});",
+      settings: lifecycle,
+      errors: [{ messageId: 'newSkipped', line: 1 }],
     },
   ],
 });

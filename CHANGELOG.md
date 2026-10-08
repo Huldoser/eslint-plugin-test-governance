@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Skipped steps need a ticket, like skipped tests: `test.step.skip('title', fn)` and `step.skip()`
+  on the `TestStepInfo` a step's body receives. The marker goes above the call, above the step or
+  above a skipped test around it. A marker above a step that isn't skipped is reported as left over.
+  Before, skipped steps were not checked.
+
+### Changed
+
+- `#123`, `#1234` and `#12345` are real tickets now, not placeholders, since young repositories
+  have issues with small numbers. Add them to `placeholders` to keep rejecting them. `TODO`, `TBD`,
+  `XXX-*` and tickets numbered 0 are still rejected.
+
 ### Fixed
 
 - The type declarations load in TypeScript 5.0 to 5.5. Before, they included a string export name

@@ -20,7 +20,7 @@ export interface TicketMatcher {
   example: string;
 }
 
-export const DEFAULT_PLACEHOLDERS = ['TODO', 'TBD', 'XXX-*', '0', '123', '1234', '12345'];
+export const DEFAULT_PLACEHOLDERS = ['TODO', 'TBD', 'XXX-*', '0'];
 
 // Every pattern below is anchored and has no nested or overlapping quantifiers, so matching is
 // linear in the token length. URLs are parsed with `new URL` rather than a regex.
