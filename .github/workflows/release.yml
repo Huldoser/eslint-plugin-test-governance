@@ -152,7 +152,8 @@ jobs:
           if npm view "eslint-plugin-test-governance@${TAG#v}" version > /dev/null 2>&1; then
             echo "${TAG#v} is already on npm."
           else
-            npm publish pack/eslint-plugin-test-governance-"${TAG#v}".tgz --provenance --access public
+            # The ./ makes npm read the path as a file; `pack/x.tgz` is taken for a GitHub owner/repo.
+            npm publish ./pack/eslint-plugin-test-governance-"${TAG#v}".tgz --provenance --access public
           fi
 
   github-release:
