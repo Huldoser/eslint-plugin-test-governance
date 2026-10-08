@@ -5,26 +5,29 @@ const lifecycle = settings({ lifecycleTags: true });
 
 runRule('marker-matches-state', rule, {
   valid: [
-    "// SKIP: WEB-1\ntest.skip('a', async () => {});",
-    "test.skip('a', async () => {});",
-    "// NOTE: WEB-1\ntest.skip('a', async () => {});",
+    "// SKIP: TRADE-1\ntest.skip('places an order', async () => {});",
+    "test.skip('cancels an order', async () => {});",
+    "// NOTE: TRADE-1\ntest.skip('shows prices', async () => {});",
     // A stray marker on a test with nothing missing is no-orphaned-marker's job.
-    "// FIXME: WEB-1\ntest('a', async () => {});",
-    { code: "// SKIP: WEB-1\n// NEW: WEB-2\ntest.skip('a @new', async () => {});", settings: lifecycle },
+    "// FIXME: TRADE-1\ntest('places a limit order', async () => {});",
+    {
+      code: "// SKIP: TRADE-1\n// NEW: TRADE-2\ntest.skip('places a market order @new', async () => {});",
+      settings: lifecycle,
+    },
     // A broken marker is require-ticket's job, not a mismatch.
-    "// SKIP: TODO\ntest.skip('a', async () => {});",
+    "// SKIP: TODO\ntest.skip('rejects orders after market close', async () => {});",
     // Conditional skips don't need a marker, so nothing is missing.
-    "// FIXME: WEB-1\ntest('a', async ({ browserName }) => { test.skip(browserName === 'webkit'); });",
+    "// FIXME: TRADE-1\ntest('shows the order book', async ({ browserName }) => { test.skip(browserName === 'webkit'); });",
     // A work comment above a skipped test isn't a marker for another state; require-ticket-in-comments
     // and require-ticket report it.
-    "// FIXME: solve test intermitencies\ntest.skip('a', async () => {});",
-    "// FIXME: flaky\ntest.skip('a', async () => {});",
+    "// FIXME: solve test intermitencies\ntest.skip('streams price updates', async () => {});",
+    "// FIXME: flaky\ntest.skip('shows live prices', async () => {});",
     // A marker for an inherited state is redundant, not wrong.
-    "// SKIP: WEB-1\ntest.describe.skip('s', () => {\n  // SKIP: WEB-1\n  test('a', async () => {});\n});",
+    "// SKIP: TRADE-1\ntest.describe.skip('order entry', () => {\n  // SKIP: TRADE-1\n  test('places an order', async () => {});\n});",
   ],
   invalid: [
     {
-      code: "// SKIP: WEB-123 flaky\ntest.fixme('a', async () => {});",
+      code: "// SKIP: TRADE-123 flaky\ntest.fixme('fills a partial order', async () => {});",
       errors: [
         {
           messageId: 'wrongMarker',
@@ -33,14 +36,14 @@ runRule('marker-matches-state', rule, {
             {
               messageId: 'renameMarker',
               data: { expected: 'FIXME' },
-              output: "// FIXME: WEB-123 flaky\ntest.fixme('a', async () => {});",
+              output: "// FIXME: TRADE-123 flaky\ntest.fixme('fills a partial order', async () => {});",
             },
           ],
         },
       ],
     },
     {
-      code: "/*\n * Context first. SKIP: is not a marker here\n * SKIP : WEB-1\n */\ntest.fixme('a', async () => {});",
+      code: "/*\n * Context first. SKIP: is not a marker here\n * SKIP : TRADE-1\n */\ntest.fixme('cancels an open order', async () => {});",
       errors: [
         {
           messageId: 'wrongMarker',
@@ -48,26 +51,29 @@ runRule('marker-matches-state', rule, {
             {
               messageId: 'renameMarker',
               output:
-                "/*\n * Context first. FIXME: is not a marker here\n * SKIP : WEB-1\n */\ntest.fixme('a', async () => {});",
+                "/*\n * Context first. FIXME: is not a marker here\n * SKIP : TRADE-1\n */\ntest.fixme('cancels an open order', async () => {});",
             },
           ],
         },
       ],
     },
     {
-      code: "test('a', async () => {\n  // FIXME: WEB-1\n  test.skip();\n});",
+      code: "test('rebalances the portfolio', async () => {\n  // FIXME: TRADE-1\n  test.skip();\n});",
       errors: [
         {
           messageId: 'wrongMarker',
           data: { found: 'FIXME', expected: 'SKIP', state: 'skip', subject: 'this skip call' },
           suggestions: [
-            { messageId: 'renameMarker', output: "test('a', async () => {\n  // SKIP: WEB-1\n  test.skip();\n});" },
+            {
+              messageId: 'renameMarker',
+              output: "test('rebalances the portfolio', async () => {\n  // SKIP: TRADE-1\n  test.skip();\n});",
+            },
           ],
         },
       ],
     },
     {
-      code: "// UNSTABLE: WEB-1\ntest.describe.skip('s @new', () => {});",
+      code: "// UNSTABLE: TRADE-1\ntest.describe.skip('risk limits @new', () => {});",
       settings: lifecycle,
       errors: [
         {
@@ -77,12 +83,12 @@ runRule('marker-matches-state', rule, {
             {
               messageId: 'renameMarker',
               data: { expected: 'SKIP' },
-              output: "// SKIP: WEB-1\ntest.describe.skip('s @new', () => {});",
+              output: "// SKIP: TRADE-1\ntest.describe.skip('risk limits @new', () => {});",
             },
             {
               messageId: 'renameMarker',
               data: { expected: 'NEW' },
-              output: "// NEW: WEB-1\ntest.describe.skip('s @new', () => {});",
+              output: "// NEW: TRADE-1\ntest.describe.skip('risk limits @new', () => {});",
             },
           ],
         },
@@ -90,7 +96,7 @@ runRule('marker-matches-state', rule, {
     },
     // One marker for a test in two states.
     {
-      code: "// SKIP: WEB-1, WEB-2\ntest.skip('a @unstable', async () => {});",
+      code: "// SKIP: TRADE-1, TRADE-2\ntest.skip('triggers a stop-loss @unstable', async () => {});",
       settings: lifecycle,
       errors: [
         {
@@ -99,15 +105,16 @@ runRule('marker-matches-state', rule, {
           suggestions: [
             {
               messageId: 'addMarker',
-              data: { expected: 'UNSTABLE', tickets: 'WEB-1, WEB-2' },
-              output: "// SKIP: WEB-1, WEB-2\n// UNSTABLE: WEB-1, WEB-2\ntest.skip('a @unstable', async () => {});",
+              data: { expected: 'UNSTABLE', tickets: 'TRADE-1, TRADE-2' },
+              output:
+                "// SKIP: TRADE-1, TRADE-2\n// UNSTABLE: TRADE-1, TRADE-2\ntest.skip('triggers a stop-loss @unstable', async () => {});",
             },
           ],
         },
       ],
     },
     {
-      code: "test.describe('s', () => {\n  /* NEW: WEB-1 */\n  test.fixme('a @new', async () => {});\n});",
+      code: "test.describe('portfolio', () => {\n  /* NEW: TRADE-1 */\n  test.fixme('calculates profit and loss @new', async () => {});\n});",
       settings: lifecycle,
       errors: [
         {
@@ -118,7 +125,7 @@ runRule('marker-matches-state', rule, {
       ],
     },
     {
-      code: "// SKIP:\ntest.skip('a @new', async () => {});",
+      code: "// SKIP:\ntest.skip('exports the trade history @new', async () => {});",
       settings: lifecycle,
       errors: [{ messageId: 'sharedMarker', suggestions: [] }],
     },

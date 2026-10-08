@@ -12,242 +12,270 @@ const missing = (state: string, marker: string, subject = 'This test', example =
 runRule('require-ticket', rule, {
   valid: [
     // A test in an arrow function's expression body takes its marker above the call or the statement.
-    "['a', 'b'].forEach((name) =>\n  // SKIP: WEB-1\n  test.skip(name, async () => {}),\n);",
-    "// SKIP: WEB-1\n['a', 'b'].forEach((name) => test.skip(name, async () => {}));",
-    "test('plain', async () => {});",
-    "test.describe('suite', () => { test('a', async () => {}); });",
-    "// SKIP: WEB-123\ntest.skip('a', async () => {});",
+    "['AAPL', 'MSFT'].forEach((symbol) =>\n  // SKIP: TRADE-1\n  test.skip(symbol, async () => {}),\n);",
+    "// SKIP: TRADE-1\n['AAPL', 'MSFT'].forEach((symbol) => test.skip(symbol, async () => {}));",
+    "test('shows live prices', async () => {});",
+    "test.describe('order entry', () => { test('places an order', async () => {}); });",
+    "// SKIP: TRADE-123\ntest.skip('places a limit order', async () => {});",
     // A body defined elsewhere.
-    "// SKIP: WEB-123\ntest.skip('pays', payWithCard);",
+    "// SKIP: TRADE-123\ntest.skip('buys shares', placeLimitOrder);",
     "test.skip(isMobile, 'Not on mobile');",
-    "/* SKIP: WEB-123 */\ntest.skip('a', async () => {});",
-    "/**\n * Waiting on the new checkout API.\n * SKIP: WEB-123\n */\ntest.skip('a', async () => {});",
-    "// SKIP: WEB-1\n// eslint-disable-next-line no-empty-function\ntest.skip('a', async () => {});",
-    "// SKIP: WEB-1, WEB-2\ntest.skip('a', async () => {});",
-    "// SKIP: WEB-1\n// SKIP: WEB-2\ntest.skip('a', async () => {});",
-    "// SKIP: WEB-1,WEB-2\ntest.skip('a', async () => {});",
-    "// SKIP:   WEB-1  ,  WEB-2   \ntest.skip('a', async () => {});",
-    "// SKIP: https://acme.atlassian.net/browse/WEB-1?focusedCommentId=5#comment-5\ntest.skip('a', async () => {});",
+    "/* SKIP: TRADE-123 */\ntest.skip('places a market order', async () => {});",
+    "/**\n * Waiting on the new order routing API.\n * SKIP: TRADE-123\n */\ntest.skip('cancels an open order', async () => {});",
+    "// SKIP: TRADE-1\n// eslint-disable-next-line no-empty-function\ntest.skip('shows prices', async () => {});",
+    "// SKIP: TRADE-1, TRADE-2\ntest.skip('places an order', async () => {});",
+    "// SKIP: TRADE-1\n// SKIP: TRADE-2\ntest.skip('places an order', async () => {});",
+    "// SKIP: TRADE-1,TRADE-2\ntest.skip('places an order', async () => {});",
+    "// SKIP:   TRADE-1  ,  TRADE-2   \ntest.skip('places an order', async () => {});",
+    "// SKIP: https://acme.atlassian.net/browse/TRADE-1?focusedCommentId=5#comment-5\ntest.skip('fills a partial order', async () => {});",
     // A full stop or colon after the last ticket is punctuation, not a note.
-    "// SKIP: WEB-1.\ntest.skip('a', async () => {});",
-    "// SKIP: WEB-1, WEB-2.\ntest.skip('a', async () => {});",
-    "// SKIP: WEB-1:\ntest.skip('a', async () => {});",
-    "/*\r\n * Context for the skip.\r\n * SKIP: WEB-1\r\n */\r\ntest.skip('a', async () => {});",
+    "// SKIP: TRADE-1.\ntest.skip('cancels an order', async () => {});",
+    "// SKIP: TRADE-1, TRADE-2.\ntest.skip('cancels an order', async () => {});",
+    "// SKIP: TRADE-1:\ntest.skip('cancels an order', async () => {});",
+    "/*\r\n * Waiting on the broker sandbox.\r\n * SKIP: TRADE-1\r\n */\r\ntest.skip('places an order', async () => {});",
     // Notes after the ticket are allowed with allowNotes.
     ...[
-      "// SKIP: WEB-123 flaky on CI\ntest.skip('a', async () => {});",
-      "// SKIP: WEB-1, WEB-2 both needed\ntest.skip('a', async () => {});",
-      "// SKIP: WEB-1: flaky\ntest.skip('a', async () => {});",
+      "// SKIP: TRADE-123 flaky on CI\ntest.skip('streams price updates', async () => {});",
+      "// SKIP: TRADE-1, TRADE-2 both needed\ntest.skip('streams price updates', async () => {});",
+      "// SKIP: TRADE-1: flaky\ntest.skip('streams price updates', async () => {});",
     ].map((code) => ({ code, settings: settings({ allowNotes: true }) })),
     // A note on a marker that doesn't belong here is no-orphaned-marker's job.
-    "// SKIP: WEB-1 left over\ntest('a', async () => {});",
-    "// SKIP: https://jira.example.com/browse/WEB-1\ntest.skip('a', async () => {});",
-    "// SKIP: #4821\ntest.skip('a', async () => {});",
-    "// SKIP: acme/web#4821\ntest.skip('a', async () => {});",
-    "// FIXME: WEB-9\ntest.fixme('a', async () => {});",
-    "// FIXME: WEB-9\ntest.fixme('a', { tag: '@smoke' }, async () => {});",
-    "/* SKIP: WEB-1 */ test.skip('a', async () => {});",
+    "// SKIP: TRADE-1 left over\ntest('shows prices', async () => {});",
+    "// SKIP: https://jira.example.com/browse/TRADE-1\ntest.skip('rebalances the portfolio', async () => {});",
+    "// SKIP: #4821\ntest.skip('rebalances the portfolio', async () => {});",
+    "// SKIP: acme/trading-engine#4821\ntest.skip('rebalances the portfolio', async () => {});",
+    "// FIXME: TRADE-9\ntest.fixme('shows the order book', async () => {});",
+    "// FIXME: TRADE-9\ntest.fixme('shows the order book', { tag: '@smoke' }, async () => {});",
+    "/* SKIP: TRADE-1 */ test.skip('places an order', async () => {});",
     // A marker on a skipped describe covers its tests, even ones skipped again.
-    "// SKIP: WEB-1\ntest.describe.skip('suite', () => {\n  test('a', async () => {});\n  test.skip('b', async () => {});\n});",
-    "// FIXME: WEB-1\ntest.describe.fixme(() => { test('a', async () => {}); });",
+    "// SKIP: TRADE-1\ntest.describe.skip('order entry', () => {\n  test('places an order', async () => {});\n  test.skip('cancels an order', async () => {});\n});",
+    "// FIXME: TRADE-1\ntest.describe.fixme(() => { test('places an order', async () => {}); });",
     // Conditional skips are platform limits and need no ticket by default.
-    "test('a', async ({ browserName }) => { test.skip(browserName === 'webkit', 'Not supported'); });",
-    "test.describe('s', () => { test.skip(({ browserName }) => browserName === 'webkit', 'n/a'); });",
-    "test('a', async ({ page }, testInfo) => { testInfo.skip(process.env.CI === undefined); });",
+    "test('shows the order book', async ({ browserName }) => { test.skip(browserName === 'webkit', 'No order book on WebKit'); });",
+    "test.describe('market data', () => { test.skip(({ browserName }) => browserName === 'webkit', 'n/a'); });",
+    "test('exports the trade history', async ({ page }, testInfo) => { testInfo.skip(process.env.CI === undefined); });",
     // A runtime skip under an `if`, `switch`, ternary or `&&` is conditional too.
-    "test('a', async ({ features }) => { if (!features.email) test.skip(); });",
-    "test('a', async ({ page }, testInfo) => { if (process.env.CI) { testInfo.fixme(); } });",
-    "test('a', async () => { if (process.env.CI) {} else test.skip(); });",
-    "test('a', async () => { process.env.CI ? test.skip() : undefined; });",
-    "test('a', async () => { process.env.CI && test.skip(); });",
-    "test('a', async () => { switch (process.env.BROWSER) { case 'webkit': test.skip(); } });",
+    "test('buys shares with margin', async ({ features }) => { if (!features.marginTrading) test.skip(); });",
+    "test('shows live prices', async ({ page }, testInfo) => { if (process.env.CI) { testInfo.fixme(); } });",
+    "test('shows live prices', async () => { if (process.env.CI) {} else test.skip(); });",
+    "test('shows live prices', async () => { process.env.CI ? test.skip() : undefined; });",
+    "test('shows live prices', async () => { process.env.CI && test.skip(); });",
+    "test('shows the order book', async () => { switch (process.env.BROWSER) { case 'webkit': test.skip(); } });",
     // So is a skip in a `catch` block, or after an early `return` or `throw`.
-    'export async function needsAzurite() {\n  try { await ping(); } catch (error) { test.skip(true, `Azurite is down: ${error}`); }\n}',
-    "test('a', async () => { try { await setup(); } catch { test.skip(); } finally { cleanup(); } });",
-    "test('a', async ({ page }, testInfo) => { try { await setup(); } catch { if (retry) {} testInfo.fixme(); } });",
-    "test('a', async () => { if (ready) return; test.skip(); });",
-    "test('a', async () => { if (!ready) { log('not ready'); return; }\n  await step();\n  test.skip(); });",
-    "test('a', async () => { if (supported) {} else throw new Error('x'); { test.skip(); } });",
-    "test('a', async () => { if (!enabled) { throw new Error('off'); } for (;;) { test.skip(); break; } });",
+    'export async function needsBrokerSandbox() {\n  try { await pingBroker(); } catch (error) { test.skip(true, `Broker sandbox is down: ${error}`); }\n}',
+    "test('places an order', async () => { try { await connectBroker(); } catch { test.skip(); } finally { disconnectBroker(); } });",
+    "test('places an order', async ({ page }, testInfo) => { try { await connectBroker(); } catch { if (retry) {} testInfo.fixme(); } });",
+    "test('places a market order', async () => { if (marketOpen) return; test.skip(); });",
+    "test('places a market order', async () => { if (!marketOpen) { log('market closed'); return; }\n  await step();\n  test.skip(); });",
+    "test('cancels an order', async () => { if (supported) {} else throw new Error('x'); { test.skip(); } });",
+    "test('cancels an order', async () => { if (!tradingEnabled) { throw new Error('off'); } for (;;) { test.skip(); break; } });",
     // Runtime skips: marker above the call or above the enclosing test.
-    "test('a', async () => {\n  // SKIP: WEB-1\n  test.skip();\n});",
-    "// SKIP: WEB-1\ntest('a', async () => {\n  test.skip();\n});",
-    "// SKIP: WEB-1\ntest.describe('s', () => {\n  test('a', async () => {\n    test.skip();\n  });\n});",
-    "// SKIP: WEB-1\ntest('a', async ({ page }, testInfo) => {\n  testInfo.skip();\n});",
-    "test('a', async () => {\n  // FIXME: WEB-1\n  await test.info().fixme();\n});",
-    "test('a', async () => {\n  // FIXME: WEB-1\n  const run = () => test.fixme();\n});",
+    "test('fills a partial order', async () => {\n  // SKIP: TRADE-1\n  test.skip();\n});",
+    "// SKIP: TRADE-1\ntest('fills a partial order', async () => {\n  test.skip();\n});",
+    "// SKIP: TRADE-1\ntest.describe('order entry', () => {\n  test('fills a partial order', async () => {\n    test.skip();\n  });\n});",
+    "// SKIP: TRADE-1\ntest('fills a partial order', async ({ page }, testInfo) => {\n  testInfo.skip();\n});",
+    "test('calculates profit and loss', async () => {\n  // FIXME: TRADE-1\n  await test.info().fixme();\n});",
+    "test('calculates profit and loss', async () => {\n  // FIXME: TRADE-1\n  const run = () => test.fixme();\n});",
     // Tags are off unless lifecycleTags is set.
-    "test('checkout @new', async () => {});",
-    "test('checkout', { tag: '@unstable' }, async () => {});",
-    { code: "// NEW: WEB-1\ntest('checkout @new', async () => {});", settings: lifecycle },
-    { code: "// NEW: WEB-1\ntest('checkout', { tag: ['@new', '@smoke'] }, async () => {});", settings: lifecycle },
-    { code: "// NEW: WEB-1\ntest('checkout', { 'tag': `@new` }, async () => {});", settings: lifecycle },
-    { code: "// NEW: WEB-1\ntest(`checkout ${'x'} @new`, async () => {});", settings: lifecycle },
-    { code: "test('mail user@new.com', async () => {});", settings: lifecycle },
-    { code: "test('checkout @newer', async () => {});", settings: lifecycle },
-    { code: "test('checkout', { tag: [someTag, ...more] }, async () => {});", settings: lifecycle },
-    { code: "test('checkout', { [key]: '@new', ...rest }, async () => {});", settings: lifecycle },
+    "test('places an order @new', async () => {});",
+    "test('places an order', { tag: '@unstable' }, async () => {});",
+    { code: "// NEW: TRADE-1\ntest('places an order @new', async () => {});", settings: lifecycle },
     {
-      code: "// NEW: WEB-1\ntest('checkout', { annotation: { type: 'x' }, tag: '@new' }, async () => {});",
+      code: "// NEW: TRADE-1\ntest('places an order', { tag: ['@new', '@smoke'] }, async () => {});",
       settings: lifecycle,
     },
-    "const list = [, 1];\ntest('a', async () => { const [, b] = list; });",
+    { code: "// NEW: TRADE-1\ntest('places an order', { 'tag': `@new` }, async () => {});", settings: lifecycle },
+    { code: "// NEW: TRADE-1\ntest(`buys ${'AAPL'} @new`, async () => {});", settings: lifecycle },
+    { code: "test('emails the fill report to desk@new.com', async () => {});", settings: lifecycle },
+    { code: "test('places an order @newer', async () => {});", settings: lifecycle },
+    { code: "test('places an order', { tag: [someTag, ...more] }, async () => {});", settings: lifecycle },
+    { code: "test('places an order', { [key]: '@new', ...rest }, async () => {});", settings: lifecycle },
+    {
+      code: "// NEW: TRADE-1\ntest('places an order', { annotation: { type: 'x' }, tag: '@new' }, async () => {});",
+      settings: lifecycle,
+    },
+    "const quotes = [, 1];\ntest('shows prices', async () => { const [, ask] = quotes; });",
     { code: 'test(title, async () => {});', settings: lifecycle },
     {
-      code: "// UNSTABLE: WEB-1\ntest.describe('flows @unstable', () => {\n  test('a @unstable', async () => {});\n  test('b', async () => {});\n});",
+      code: "// UNSTABLE: TRADE-1\ntest.describe('market data @unstable', () => {\n  test('streams price updates @unstable', async () => {});\n  test('shows live prices', async () => {});\n});",
       settings: lifecycle,
     },
     // Other test runners: `test` from these modules is not Playwright's.
-    "import { test } from 'vitest';\ntest.skip('adds', () => {});",
-    "import { test, it } from '@jest/globals';\ntest.skip('adds', () => {});\nit.skip('subtracts', () => {});",
-    "import test from 'node:test';\ntest.skip('adds', () => {});",
-    "const { test } = require('bun:test');\ntest.skip('adds', () => {});",
+    "import { test } from 'vitest';\ntest.skip('calculates profit', () => {});",
+    "import { test, it } from '@jest/globals';\ntest.skip('calculates profit', () => {});\nit.skip('calculates loss', () => {});",
+    "import test from 'node:test';\ntest.skip('calculates profit', () => {});",
+    "const { test } = require('bun:test');\ntest.skip('calculates profit', () => {});",
     // The same runners bound to a variable, as CommonJS and AVA code usually does.
-    "const test = require('node:test');\ntest.skip('adds', () => {});",
-    "const test = require('ava').serial;\ntest.skip('adds', (t) => {});",
-    "import ava from 'ava';\nconst test = ava;\ntest.skip('adds', (t) => {});",
-    "const tap = require('tap');\nconst test = tap.test;\ntest.skip('adds', () => {});",
-    "const { test: base } = require('mocha');\nconst test = base;\ntest.skip('adds', () => {});",
+    "const test = require('node:test');\ntest.skip('calculates profit', () => {});",
+    "const test = require('ava').serial;\ntest.skip('calculates profit', (t) => {});",
+    "import ava from 'ava';\nconst test = ava;\ntest.skip('calculates profit', (t) => {});",
+    "const tap = require('tap');\nconst test = tap.test;\ntest.skip('calculates profit', () => {});",
+    "const { test: base } = require('mocha');\nconst test = base;\ntest.skip('calculates profit', () => {});",
     // Only `test` itself is taken from a Playwright require.
-    "const { expect: e } = require('@playwright/test');\ne.skip('a', async () => {});",
+    "const { expect: e } = require('@playwright/test');\ne.skip('places an order', async () => {});",
     // A local variable that happens to be called `test` is not Playwright's.
-    "function check() {\n  const test = { skip(name, fn) { fn(); } };\n  test.skip('not playwright', () => {});\n}",
-    "{\n  let test = helpers;\n  test.skip('not playwright', () => {});\n}",
+    "function validateOrder() {\n  const test = { skip(name, fn) { fn(); } };\n  test.skip('checks the order size', () => {});\n}",
+    "{\n  let test = orderHelpers;\n  test.skip('checks the order size', () => {});\n}",
     // mergeTests() of something that isn't a test, and calls that aren't mergeTests().
-    "import { test as base } from '@playwright/test';\nconst t = combine(base), u = factory()(), { a } = config, { b } = load('x');\nt.skip('a', async () => {});\nu.skip('b', async () => {});",
+    "import { test as base } from '@playwright/test';\nconst t = combine(base), u = factory()(), { a } = config, { b } = load('x');\nt.skip('places an order', async () => {});\nu.skip('cancels an order', async () => {});",
     // Tickets are never read from titles, even when they look like one.
-    "test('SDQA-52: Successful logout', async () => {});",
+    "test('TRADE-52: closes all positions at market close', async () => {});",
     // fail and slow are off by default.
-    "test.fail('a', async () => {});",
-    "test('a', async () => { test.slow(); });",
+    "test.fail('rejects an order over the position limit', async () => {});",
+    "test('backtests a moving-average strategy', async () => { test.slow(); });",
     // Only Playwright's test function counts.
-    "foo.skip('a', async () => {});",
-    "describe.skip('a', () => {});",
-    "it.skip('a', async () => {});",
-    "test[method]('a', async () => {});",
-    "obj.test.skip('a', async () => {});",
+    "broker.skip('places an order', async () => {});",
+    "describe.skip('order entry', () => {});",
+    "it.skip('places an order', async () => {});",
+    "test[method]('places an order', async () => {});",
+    "account.test.skip('places an order', async () => {});",
     "test.describe.configure({ mode: 'serial' });",
-    "test.step('a', async () => { other.skip(); });",
-    "test.skip.each('a', async () => {});",
+    "test.step('submits the order', async () => { other.skip(); });",
+    "test.skip.each('places an order', async () => {});",
     'fn()();',
     "test.info().annotations.push({ type: 'x' });",
-    'helper().skip();',
-    "test('a', async (fixtures, info) => { other.skip(); });",
-    { code: "// SKIP: WEB-1\n\ntest.skip('a', async () => {});", settings: settings({ allowBlankLine: true }) },
+    'orderHelper().skip();',
+    "test('places an order', async (fixtures, info) => { other.skip(); });",
     {
-      code: "import { test as it } from '@playwright/test';\n// SKIP: WEB-1\nit.skip('a', async () => {});",
+      code: "// SKIP: TRADE-1\n\ntest.skip('places an order', async () => {});",
+      settings: settings({ allowBlankLine: true }),
+    },
+    {
+      code: "import { test as it } from '@playwright/test';\n// SKIP: TRADE-1\nit.skip('places an order', async () => {});",
       settings: settings({ testFunctions: [] }),
     },
     {
-      code: "// SKIP: #4821\ntest.skip('a', async () => {});",
+      code: "// SKIP: #4821\ntest.skip('shows the order book', async () => {});",
       settings: settings({ ticket: { preset: 'github' } }),
     },
     {
-      code: "// FIXME: #4821\ntest.fixme('a', async () => {});\n// SKIP: WEB-1\ntest.skip('b', async () => {});",
+      code: "// FIXME: #4821\ntest.fixme('shows the order book', async () => {});\n// SKIP: TRADE-1\ntest.skip('shows prices', async () => {});",
       settings: settings({ states: { fixme: { ticket: { preset: 'github' } } } }),
     },
     {
-      code: "// QUARANTINE: WEB-1\ntest.skip('a', async () => {});",
+      code: "// QUARANTINE: TRADE-1\ntest.skip('streams price updates', async () => {});",
       settings: settings({ states: { skip: { marker: 'QUARANTINE' } } }),
     },
-    { code: "test.skip('a', async () => {});", settings: settings({ states: { skip: false } }) },
+    { code: "test.skip('places an order', async () => {});", settings: settings({ states: { skip: false } }) },
     {
-      code: "// NEEDS-DATA: WEB-1\ntest('a @needs-data', async () => {});",
+      code: "// NEEDS-DATA: TRADE-1\ntest('backtests a moving-average strategy @needs-data', async () => {});",
       settings: settings({ customStates: { 'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' } } }),
     },
     {
-      code: "// SKIP: 4821\ntest.skip('a', async () => {});",
+      code: "// SKIP: 4821\ntest.skip('exports the trade history', async () => {});",
       settings: settings({ ticket: { preset: 'numeric' }, placeholders: [] }),
     },
-    { code: "test('a', async () => { test.skip(); });", settings: settings({ states: { skip: false } }) },
+    {
+      code: "test('places an order', async () => { test.skip(); });",
+      settings: settings({ states: { skip: false } }),
+    },
     { code: 'test(title, async () => {});', settings: settings({ reportDynamicTitles: true }) },
   ],
   invalid: [
-    { code: "test.skip('a', async () => {});", errors: [missing('skip', 'SKIP')] },
+    { code: "test.skip('places an order', async () => {});", errors: [missing('skip', 'SKIP')] },
     // A variable called `test` that isn't bound to another test runner is still Playwright's.
     {
-      code: "const test = require('@playwright/test').test;\ntest.skip('a', async () => {});",
+      code: "const test = require('@playwright/test').test;\ntest.skip('places an order', async () => {});",
       errors: [missing('skip', 'SKIP')],
     },
-    { code: "const test = fixtures;\ntest.skip('a', async () => {});", errors: [missing('skip', 'SKIP')] },
-    { code: "const test = makeTest();\ntest.skip('a', async () => {});", errors: [missing('skip', 'SKIP')] },
     {
-      code: "import { test as t } from 'playwright/test';\nt.skip('a', async () => {});",
+      code: "const test = brokerFixtures;\ntest.skip('places an order', async () => {});",
+      errors: [missing('skip', 'SKIP')],
+    },
+    {
+      code: "const test = makeTest();\ntest.skip('places an order', async () => {});",
+      errors: [missing('skip', 'SKIP')],
+    },
+    {
+      code: "import { test as t } from 'playwright/test';\nt.skip('places an order', async () => {});",
       errors: [missing('skip', 'SKIP')],
       settings: settings({ testFunctions: [] }),
     },
     // A body defined elsewhere, or wrapped in a helper.
-    { code: "test.skip('pays', payWithCard);", errors: [missing('skip', 'SKIP')] },
-    { code: "test.skip(`pays ${card}`, { tag: '@slow' }, payWith(card));", errors: [missing('skip', 'SKIP')] },
+    { code: "test.skip('buys shares', placeLimitOrder);", errors: [missing('skip', 'SKIP')] },
     {
-      code: "test.describe.fixme('checkout', defineCheckoutTests);",
+      code: "test.skip(`buys ${symbol}`, { tag: '@slow' }, buyShares(symbol));",
+      errors: [missing('skip', 'SKIP')],
+    },
+    {
+      code: "test.describe.fixme('order entry', defineOrderEntryTests);",
       errors: [missing('fixme', 'FIXME', 'This describe block')],
     },
-    { code: "test('pays @new', withPage(async () => {}));", errors: [missing('new', 'NEW')], settings: lifecycle },
+    {
+      code: "test('buys shares @new', withAccount(async () => {}));",
+      errors: [missing('new', 'NEW')],
+      settings: lifecycle,
+    },
     // Only the head of the declaration is reported, not the whole body.
     {
-      code: "test.skip('pays with PayPal', async ({ page }) => {\n  await page.goto('/');\n  await page.click('#pay');\n});",
-      errors: [{ ...missing('skip', 'SKIP'), line: 1, column: 1, endLine: 1, endColumn: 29 }],
+      code: "test.skip('buys shares with margin', async ({ page }) => {\n  await page.goto('/orders');\n  await page.click('#buy');\n});",
+      errors: [{ ...missing('skip', 'SKIP'), line: 1, column: 1, endLine: 1, endColumn: 36 }],
     },
     {
-      code: "test.describe.fixme(() => {\n  test('a', async () => {});\n});",
+      code: "test.describe.fixme(() => {\n  test('places an order', async () => {});\n});",
       errors: [{ ...missing('fixme', 'FIXME', 'This describe block'), line: 1, column: 1, endLine: 1, endColumn: 20 }],
     },
     {
-      code: "test('a', async () => {\n  test.skip(true, 'broken');\n});",
-      errors: [{ ...missing('skip', 'SKIP', 'This skip call'), line: 2, column: 3, endLine: 2, endColumn: 28 }],
+      code: "test('places an order', async () => {\n  test.skip(true, 'broker sandbox is down');\n});",
+      errors: [{ ...missing('skip', 'SKIP', 'This skip call'), line: 2, column: 3, endLine: 2, endColumn: 44 }],
     },
-    { code: "test.fixme('a', async () => {});", errors: [missing('fixme', 'FIXME')] },
+    { code: "test.fixme('cancels an order', async () => {});", errors: [missing('fixme', 'FIXME')] },
     {
-      code: "test.describe.skip('s', () => { test('a', async () => {}); });",
+      code: "test.describe.skip('order entry', () => { test('places an order', async () => {}); });",
       errors: [missing('skip', 'SKIP', 'This describe block')],
     },
     {
-      code: "test.describe.serial.fixme('s', () => {});",
+      code: "test.describe.serial.fixme('order entry', () => {});",
       errors: [missing('fixme', 'FIXME', 'This describe block')],
     },
     // A marker above a plain describe does not cover a test skipped inside it.
     {
-      code: "// SKIP: WEB-1\ntest.describe('s', () => {\n  test.skip('a', async () => {});\n});",
+      code: "// SKIP: TRADE-1\ntest.describe('order entry', () => {\n  test.skip('places an order', async () => {});\n});",
       errors: [missing('skip', 'SKIP')],
     },
-    // The test-case ID in the title is not a ticket.
-    { code: "test.skip('SDQA-52: Successful logout', async () => {});", errors: [missing('skip', 'SKIP')] },
-    { code: "// SKIP:\ntest.skip('a', async () => {});", errors: [{ messageId: 'missingTicket' }] },
-    { code: "/* SKIP: */\ntest.skip('a', async () => {});", errors: [{ messageId: 'missingTicket' }] },
-    { code: "// SKIP: , WEB-1\ntest.skip('a', async () => {});", errors: [{ messageId: 'missingTicket' }] },
+    // A ticket key in the title is not a marker.
     {
-      code: "// SKIP: flaky on CI\ntest.skip('a', async () => {});",
+      code: "test.skip('TRADE-52: cancels all open orders at market close', async () => {});",
+      errors: [missing('skip', 'SKIP')],
+    },
+    { code: "// SKIP:\ntest.skip('places an order', async () => {});", errors: [{ messageId: 'missingTicket' }] },
+    { code: "/* SKIP: */\ntest.skip('places an order', async () => {});", errors: [{ messageId: 'missingTicket' }] },
+    {
+      code: "// SKIP: , TRADE-1\ntest.skip('places an order', async () => {});",
+      errors: [{ messageId: 'missingTicket' }],
+    },
+    {
+      code: "// SKIP: flaky on CI\ntest.skip('streams price updates', async () => {});",
       errors: [{ messageId: 'invalidTicket', data: { ticket: 'flaky', state: 'skip', expected: ANY } }],
     },
     {
-      code: "// SKIP: WEB-1, nope\ntest.skip('a', async () => {});",
+      code: "// SKIP: TRADE-1, nope\ntest.skip('streams price updates', async () => {});",
       errors: [{ messageId: 'invalidTicket', data: { ticket: 'nope', state: 'skip', expected: ANY } }],
     },
     // A broken marker is reported even when another marker for the same state is valid.
     {
-      code: "// SKIP: WEB-1\n// SKIP: nope\ntest.skip('a', async () => {});",
+      code: "// SKIP: TRADE-1\n// SKIP: nope\ntest.skip('streams price updates', async () => {});",
       errors: [{ messageId: 'invalidTicket', data: { ticket: 'nope', state: 'skip', expected: ANY }, line: 2 }],
     },
     {
-      code: "// SKIP: WEB-1\ntest.describe.skip('s', () => {\n  // SKIP: TBD\n  test.skip('a', async () => {});\n});",
+      code: "// SKIP: TRADE-1\ntest.describe.skip('order entry', () => {\n  // SKIP: TBD\n  test.skip('places an order', async () => {});\n});",
       errors: [{ messageId: 'placeholderTicket', data: { ticket: 'TBD' }, line: 3 }],
     },
-    ...['TODO', 'tbd', 'XXX-1', '#123', '0', '12345', 'SDQA-0'].map((ticket) => ({
-      code: `// SKIP: ${ticket}\ntest.skip('a', async () => {});`,
+    ...['TODO', 'tbd', 'XXX-1', '#123', '0', '12345', 'TRADE-0'].map((ticket) => ({
+      code: `// SKIP: ${ticket}\ntest.skip('places an order', async () => {});`,
       errors: [{ messageId: 'placeholderTicket' as const, data: { ticket } }],
     })),
     // Ticket-only markers: anything after the tickets is reported, with a suggestion to remove it.
     ...[
-      ['// SKIP: WEB-123 flaky on CI', 'flaky on CI', '// SKIP: WEB-123'],
-      ['// SKIP: WEB-1: flaky', ': flaky', '// SKIP: WEB-1'],
-      ['// SKIP: WEB-1,', ',', '// SKIP: WEB-1'],
-      ['// SKIP: WEB-1, WEB-2 ,', ',', '// SKIP: WEB-1, WEB-2'],
-      ['// SKIP: WEB-1 and WEB-2', 'and WEB-2', '// SKIP: WEB-1'],
-      ['/* SKIP: WEB-1 flaky */', 'flaky', '/* SKIP: WEB-1 */'],
-      ['/**\r\n * SKIP: WEB-1 see thread\r\n */', 'see thread', '/**\r\n * SKIP: WEB-1\r\n */'],
+      ['// SKIP: TRADE-123 flaky on CI', 'flaky on CI', '// SKIP: TRADE-123'],
+      ['// SKIP: TRADE-1: flaky', ': flaky', '// SKIP: TRADE-1'],
+      ['// SKIP: TRADE-1,', ',', '// SKIP: TRADE-1'],
+      ['// SKIP: TRADE-1, TRADE-2 ,', ',', '// SKIP: TRADE-1, TRADE-2'],
+      ['// SKIP: TRADE-1 and TRADE-2', 'and TRADE-2', '// SKIP: TRADE-1'],
+      ['/* SKIP: TRADE-1 flaky */', 'flaky', '/* SKIP: TRADE-1 */'],
+      ['/**\r\n * SKIP: TRADE-1 see thread\r\n */', 'see thread', '/**\r\n * SKIP: TRADE-1\r\n */'],
     ].map(([marker, text, fixed]) => ({
-      code: `${marker}\ntest.skip('a', async () => {});`,
+      code: `${marker}\ntest.skip('streams price updates', async () => {});`,
       errors: [
         {
           messageId: 'extraText' as const,
@@ -256,35 +284,43 @@ runRule('require-ticket', rule, {
             {
               messageId: 'removeExtraText' as const,
               data: { text },
-              output: `${fixed}\ntest.skip('a', async () => {});`,
+              output: `${fixed}\ntest.skip('streams price updates', async () => {});`,
             },
           ],
         },
       ],
     })),
     {
-      code: "// SKIP: WEB-123 flaky\ntest.skip('a', async () => {});",
+      code: "// SKIP: TRADE-123 flaky\ntest.skip('shows live prices', async () => {});",
       errors: [
         {
           messageId: 'extraText',
           line: 1,
-          column: 17,
+          column: 19,
           endLine: 1,
-          endColumn: 23,
-          suggestions: [{ messageId: 'removeExtraText', output: "// SKIP: WEB-123\ntest.skip('a', async () => {});" }],
+          endColumn: 25,
+          suggestions: [
+            {
+              messageId: 'removeExtraText',
+              output: "// SKIP: TRADE-123\ntest.skip('shows live prices', async () => {});",
+            },
+          ],
         },
       ],
     },
     // Other separators make the ticket itself invalid.
-    ...['WEB-1;WEB-2', 'WEB-1/WEB-2'].map((ticket) => ({
-      code: `// SKIP: ${ticket}\ntest.skip('a', async () => {});`,
+    ...['TRADE-1;TRADE-2', 'TRADE-1/TRADE-2'].map((ticket) => ({
+      code: `// SKIP: ${ticket}\ntest.skip('places an order', async () => {});`,
       errors: [{ messageId: 'invalidTicket' as const, data: { ticket, state: 'skip', expected: ANY } }],
     })),
     // A broken ticket is reported first; its note waits until the ticket is fixed.
-    { code: "// SKIP: TODO later\ntest.skip('a', async () => {});", errors: [{ messageId: 'placeholderTicket' }] },
+    {
+      code: "// SKIP: TODO later\ntest.skip('places an order', async () => {});",
+      errors: [{ messageId: 'placeholderTicket' }],
+    },
     // Notes on a marker that isn't required (conditional skip) are still reported.
     {
-      code: "test('a', async ({ browserName }) => {\n  // SKIP: WEB-1 webkit only\n  test.skip(browserName === 'webkit');\n});",
+      code: "test('shows the order book', async ({ browserName }) => {\n  // SKIP: TRADE-1 webkit only\n  test.skip(browserName === 'webkit');\n});",
       errors: [
         {
           messageId: 'extraText',
@@ -292,7 +328,7 @@ runRule('require-ticket', rule, {
             {
               messageId: 'removeExtraText',
               output:
-                "test('a', async ({ browserName }) => {\n  // SKIP: WEB-1\n  test.skip(browserName === 'webkit');\n});",
+                "test('shows the order book', async ({ browserName }) => {\n  // SKIP: TRADE-1\n  test.skip(browserName === 'webkit');\n});",
             },
           ],
         },
@@ -300,7 +336,7 @@ runRule('require-ticket', rule, {
     },
     // A note on a describe marker shared by several tests is reported once.
     {
-      code: "// SKIP: WEB-1 whole suite\ntest.describe.skip('s', () => {\n  test.skip('a', async () => {});\n  test.skip('b', async () => {});\n});",
+      code: "// SKIP: TRADE-1 whole suite\ntest.describe.skip('order entry', () => {\n  test.skip('places an order', async () => {});\n  test.skip('cancels an order', async () => {});\n});",
       errors: [
         {
           messageId: 'extraText',
@@ -308,76 +344,97 @@ runRule('require-ticket', rule, {
             {
               messageId: 'removeExtraText',
               output:
-                "// SKIP: WEB-1\ntest.describe.skip('s', () => {\n  test.skip('a', async () => {});\n  test.skip('b', async () => {});\n});",
+                "// SKIP: TRADE-1\ntest.describe.skip('order entry', () => {\n  test.skip('places an order', async () => {});\n  test.skip('cancels an order', async () => {});\n});",
             },
           ],
         },
       ],
     },
     {
-      code: "// skip: WEB-1\ntest.skip('a', async () => {});",
+      code: "// skip: TRADE-1\ntest.skip('places an order', async () => {});",
       errors: [{ messageId: 'markerCase', data: { marker: 'SKIP', found: 'skip' }, line: 1 }],
     },
     {
-      code: "// Fixme: WEB-1\ntest.fixme('a', async () => {});",
+      code: "// Fixme: TRADE-1\ntest.fixme('places an order', async () => {});",
       errors: [{ messageId: 'markerCase', data: { marker: 'FIXME', found: 'Fixme' } }],
     },
     // A blank line breaks the block.
-    { code: "// SKIP: WEB-1\n\ntest.skip('a', async () => {});", errors: [missing('skip', 'SKIP')] },
-    // A trailing comment on the previous line belongs to that line.
-    { code: "setup(); // SKIP: WEB-1\ntest.skip('a', async () => {});", errors: [missing('skip', 'SKIP')] },
-    // A marker for another state doesn't count.
-    { code: "// FIXME: WEB-1\ntest.skip('a', async () => {});", errors: [missing('skip', 'SKIP')] },
-    // Unconditional runtime skips.
-    { code: "test('a', async () => {\n  test.skip();\n});", errors: [missing('skip', 'SKIP', 'This skip call')] },
     {
-      code: "test('a', async () => { test.skip(true, 'broken'); });",
+      code: "// SKIP: TRADE-1\n\ntest.skip('places an order', async () => {});",
+      errors: [missing('skip', 'SKIP')],
+    },
+    // A trailing comment on the previous line belongs to that line.
+    {
+      code: "connectBroker(); // SKIP: TRADE-1\ntest.skip('places an order', async () => {});",
+      errors: [missing('skip', 'SKIP')],
+    },
+    // A marker for another state doesn't count.
+    {
+      code: "// FIXME: TRADE-1\ntest.skip('places an order', async () => {});",
+      errors: [missing('skip', 'SKIP')],
+    },
+    // Unconditional runtime skips.
+    {
+      code: "test('cancels an order', async () => {\n  test.skip();\n});",
+      errors: [missing('skip', 'SKIP', 'This skip call')],
+    },
+    {
+      code: "test('cancels an order', async () => { test.skip(true, 'broker sandbox is down'); });",
       errors: [missing('skip', 'SKIP', 'This skip call')],
     },
     { code: 'test.skip();', errors: [missing('skip', 'SKIP', 'This skip call')] },
     // Code before the call that doesn't always leave the function doesn't make it conditional.
     {
-      code: "test('a', async () => { if (ready) { log('ready'); } test.skip(); });",
+      code: "test('places a market order', async () => { if (marketOpen) { log('market open'); } test.skip(); });",
       errors: [missing('skip', 'SKIP', 'This skip call')],
     },
     {
-      code: "test('a', async () => { if (ready) log('ready'); else log('waiting'); test.skip(); });",
+      code: "test('places a market order', async () => { if (marketOpen) log('market open'); else log('waiting for the open'); test.skip(); });",
       errors: [missing('skip', 'SKIP', 'This skip call')],
     },
     {
-      code: "test('a', async () => { test.skip(); if (ready) return; });",
+      code: "test('places a market order', async () => { test.skip(); if (marketOpen) return; });",
       errors: [missing('skip', 'SKIP', 'This skip call')],
     },
     // A `catch` or early return in another function doesn't guard this call.
     {
-      code: "test('a', async () => {\n  try { await setup(); } catch { const retry = () => { if (x) return; }; }\n  test.skip();\n});",
+      code: "test('places an order', async () => {\n  try { await connectBroker(); } catch { const retry = () => { if (x) return; }; }\n  test.skip();\n});",
       errors: [missing('skip', 'SKIP', 'This skip call')],
     },
     {
-      code: "test('a', async () => { try { await setup(); } catch { test.skip(); } });",
+      code: "test('places an order', async () => { try { await connectBroker(); } catch { test.skip(); } });",
       settings: settings({ requireTicketForConditional: true }),
       errors: [missing('skip', 'SKIP', 'This skip call')],
     },
     // A guard outside the enclosing function doesn't make the call conditional.
     {
-      code: "if (process.env.CI) {\n  test('a', async () => { test.skip(); });\n}",
+      code: "if (process.env.CI) {\n  test('streams price updates', async () => { test.skip(); });\n}",
       errors: [missing('skip', 'SKIP', 'This skip call')],
     },
     // The call is the condition itself, so it always runs.
-    { code: "test('a', async () => { if (test.skip()) {} });", errors: [missing('skip', 'SKIP', 'This skip call')] },
-    { code: "test('a', async () => { test.skip() ? 1 : 2; });", errors: [missing('skip', 'SKIP', 'This skip call')] },
-    { code: "test('a', async () => { test.skip() || done(); });", errors: [missing('skip', 'SKIP', 'This skip call')] },
     {
-      code: "test('a', async () => { switch (mode) { case test.skip(): break; } });",
+      code: "test('shows prices', async () => { if (test.skip()) {} });",
       errors: [missing('skip', 'SKIP', 'This skip call')],
     },
     {
-      code: "test('a', async ({ features }) => { if (!features.email) test.skip(); });",
+      code: "test('shows prices', async () => { test.skip() ? 1 : 2; });",
+      errors: [missing('skip', 'SKIP', 'This skip call')],
+    },
+    {
+      code: "test('shows prices', async () => { test.skip() || done(); });",
+      errors: [missing('skip', 'SKIP', 'This skip call')],
+    },
+    {
+      code: "test('shows prices', async () => { switch (mode) { case test.skip(): break; } });",
+      errors: [missing('skip', 'SKIP', 'This skip call')],
+    },
+    {
+      code: "test('buys shares with margin', async ({ features }) => { if (!features.marginTrading) test.skip(); });",
       settings: settings({ requireTicketForConditional: true }),
       errors: [missing('skip', 'SKIP', 'This skip call')],
     },
     {
-      code: "test('a', async ({ page }, testInfo) => { testInfo.fixme(); });",
+      code: "test('exports the trade history', async ({ page }, testInfo) => { testInfo.fixme(); });",
       errors: [missing('fixme', 'FIXME', 'This fixme call')],
     },
     {
@@ -385,117 +442,121 @@ runRule('require-ticket', rule, {
       errors: [missing('skip', 'SKIP', 'This skip call')],
     },
     {
-      code: "test('a', async () => { test.info().skip(); });",
+      code: "test('exports the trade history', async () => { test.info().skip(); });",
       errors: [missing('skip', 'SKIP', 'This skip call')],
     },
     {
-      code: "test('a', async ({ browserName }) => { test.skip(browserName === 'webkit', 'n/a'); });",
+      code: "test('shows the order book', async ({ browserName }) => { test.skip(browserName === 'webkit', 'n/a'); });",
       settings: settings({ requireTicketForConditional: true }),
       errors: [missing('skip', 'SKIP', 'This skip call')],
     },
     // Tags, once lifecycleTags is on.
-    { code: "test('checkout @new', async () => {});", settings: lifecycle, errors: [missing('new', 'NEW')] },
+    { code: "test('places an order @new', async () => {});", settings: lifecycle, errors: [missing('new', 'NEW')] },
     {
-      code: "test('checkout', { tag: '@unstable' }, async () => {});",
+      code: "test('places an order', { tag: '@unstable' }, async () => {});",
       settings: lifecycle,
       errors: [missing('unstable', 'UNSTABLE')],
     },
     {
-      code: "test('checkout', { tag: ['@smoke', '@new'] }, async () => {});",
+      code: "test('places an order', { tag: ['@smoke', '@new'] }, async () => {});",
       settings: lifecycle,
       errors: [missing('new', 'NEW')],
     },
     {
-      code: 'test(`checkout ${step} @new`, async () => {});',
+      code: 'test(`buys ${symbol} @new`, async () => {});',
       settings: lifecycle,
       errors: [missing('new', 'NEW')],
     },
     {
-      code: "test.describe('flows @unstable', () => { test('a', async () => {}); });",
+      code: "test.describe('market data @unstable', () => { test('shows live prices', async () => {}); });",
       settings: lifecycle,
       errors: [missing('unstable', 'UNSTABLE', 'This describe block')],
     },
     // Both states need a marker.
     {
-      code: "// SKIP: WEB-1\ntest.skip('a', { tag: '@new' }, async () => {});",
+      code: "// SKIP: TRADE-1\ntest.skip('places an order', { tag: '@new' }, async () => {});",
       settings: lifecycle,
       errors: [missing('new', 'NEW')],
     },
     // A broken marker on a describe is reported once, not once per test.
     {
-      code: "// UNSTABLE: TODO\ntest.describe('s @unstable', () => {\n  test('a @unstable', async () => {});\n  test('b @unstable', async () => {});\n});",
+      code: "// UNSTABLE: TODO\ntest.describe('market data @unstable', () => {\n  test('shows live prices @unstable', async () => {});\n  test('streams price updates @unstable', async () => {});\n});",
       settings: lifecycle,
       errors: [{ messageId: 'placeholderTicket', data: { ticket: 'TODO' } }],
     },
     {
-      code: "import { test as it } from '@playwright/test';\nit.skip('a', async () => {});",
+      code: "import { test as it } from '@playwright/test';\nit.skip('places an order', async () => {});",
       settings: settings({ testFunctions: [] }),
       errors: [missing('skip', 'SKIP')],
     },
     // Playwright component testing.
     {
-      code: "import { test as ct } from '@playwright/experimental-ct-react';\nct.skip('renders', async ({ mount }) => {});",
+      code: "import { test as ct } from '@playwright/experimental-ct-react';\nct.skip('renders the price chart', async ({ mount }) => {});",
       settings: settings({ testFunctions: [] }),
       errors: [missing('skip', 'SKIP')],
     },
     // Fixtures combined with mergeTests().
     {
-      code: "import { mergeTests, test as base } from '@playwright/test';\nconst db = base.extend({});\nexport const test2 = mergeTests(db, other);\ntest2.skip('a', async () => {});",
+      code: "import { mergeTests, test as base } from '@playwright/test';\nconst broker = base.extend({});\nexport const test2 = mergeTests(broker, marketData);\ntest2.skip('places an order', async () => {});",
       settings: settings({ testFunctions: [] }),
       errors: [missing('skip', 'SKIP')],
     },
     // A parameter named `test` is usually Playwright's test passed to a helper, so it still counts.
     {
-      code: "export function definePaymentTests(test) {\n  test.skip('pays', async () => {});\n}",
+      code: "export function defineOrderTests(test) {\n  test.skip('buys shares', async () => {});\n}",
       errors: [missing('skip', 'SKIP')],
     },
     // A require() that can't be resolved leaves the configured name alone.
     {
-      code: "const { test } = require(fixturesPath);\nconst { other } = require(`x`);\ntest.skip('a', async () => {});",
+      code: "const { test } = require(fixturesPath);\nconst { other } = require(`x`);\ntest.skip('places an order', async () => {});",
       errors: [missing('skip', 'SKIP')],
     },
     {
-      code: "import { 'test' as named } from '@playwright/test';\nnamed.skip('a', async () => {});",
+      code: "import { 'test' as named } from '@playwright/test';\nnamed.skip('places an order', async () => {});",
       settings: settings({ testFunctions: [] }),
       errors: [missing('skip', 'SKIP')],
     },
     {
-      code: "import pwTest from '@playwright/test';\npwTest.skip('a', async () => {});",
+      code: "import pwTest from '@playwright/test';\npwTest.skip('places an order', async () => {});",
       settings: settings({ testFunctions: [] }),
       errors: [missing('skip', 'SKIP')],
     },
     {
-      code: "import { test as base, expect } from '@playwright/test';\nimport other from 'other';\nexport const myTest = base.extend({}).extend({});\nconst made = make(), deep = obj.a.extend({});\nconst x = 1, y = other.extend({});\nlet z;\nexport {};\nmyTest.skip('a', async () => {});\ny.skip('b', async () => {});",
+      code: "import { test as base, expect } from '@playwright/test';\nimport other from 'other';\nexport const myTest = base.extend({}).extend({});\nconst made = make(), deep = obj.a.extend({});\nconst x = 1, y = other.extend({});\nlet z;\nexport {};\nmyTest.skip('places an order', async () => {});\ny.skip('cancels an order', async () => {});",
       settings: settings({ testFunctions: [] }),
       errors: [missing('skip', 'SKIP')],
     },
     {
-      code: "const { test: pwTest, expect } = require('@playwright/test');\nconst { other } = require('other');\nconst { ...rest } = require('@playwright/test');\nconst { test: { nested } } = require('@playwright/test');\npwTest.skip('a', async () => {});",
+      code: "const { test: pwTest, expect } = require('@playwright/test');\nconst { other } = require('other');\nconst { ...rest } = require('@playwright/test');\nconst { test: { nested } } = require('@playwright/test');\npwTest.skip('places an order', async () => {});",
       settings: settings({ testFunctions: [] }),
       errors: [missing('skip', 'SKIP')],
     },
     {
-      code: "test['skip']('a', async () => {});",
+      code: "test['skip']('places an order', async () => {});",
       errors: [missing('skip', 'SKIP')],
     },
     {
-      code: "// SKIP: OPS-1\ntest.skip('a', async () => {});",
-      settings: settings({ ticket: { preset: 'jira', projects: ['WEB'] } }),
+      code: "// SKIP: OPS-1\ntest.skip('closes all positions at market close', async () => {});",
+      settings: settings({ ticket: { preset: 'jira', projects: ['TRADE'] } }),
       errors: [
         {
           messageId: 'invalidTicket',
-          data: { ticket: 'OPS-1', state: 'skip', expected: 'a Jira key like WEB-123 in project WEB, or a Jira URL' },
+          data: {
+            ticket: 'OPS-1',
+            state: 'skip',
+            expected: 'a Jira key like TRADE-123 in project TRADE, or a Jira URL',
+          },
         },
       ],
     },
     {
-      code: "// FIXME: WEB-1\ntest.fixme('a', async () => {});",
+      code: "// FIXME: TRADE-1\ntest.fixme('closes all positions at market close', async () => {});",
       settings: settings({ states: { fixme: { ticket: { preset: 'github' } } } }),
       errors: [
         {
           messageId: 'invalidTicket',
           data: {
-            ticket: 'WEB-1',
+            ticket: 'TRADE-1',
             state: 'fixme',
             expected: 'a GitHub issue like #4821 or owner/repo#4821, or an issue URL on github.com',
           },
@@ -503,22 +564,22 @@ runRule('require-ticket', rule, {
       ],
     },
     {
-      code: "test('a @needs-data', async () => {});",
+      code: "test('backtests a moving-average strategy @needs-data', async () => {});",
       settings: settings({ customStates: { 'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' } } }),
       errors: [missing('needs-data', 'NEEDS-DATA')],
     },
     {
-      code: "test.fail('a', async () => {});\ntest('b', async () => { test.slow(); });",
+      code: "test.fail('rejects an order over the position limit', async () => {});\ntest('backtests a moving-average strategy', async () => { test.slow(); });",
       settings: settings({ states: { fail: true, slow: { enabled: true } } }),
       errors: [missing('fail', 'FAIL'), missing('slow', 'SLOW', 'This slow call')],
     },
     {
-      code: "test.skip('a', async () => {});",
+      code: "test.skip('stops trading at the daily loss limit', async () => {});",
       settings: settings({ ticket: { preset: 'linear', teams: ['ENG'] } }),
       errors: [missing('skip', 'SKIP', 'This test', 'ENG-123')],
     },
     {
-      code: 'test(title, async () => {});\ntest.describe(name, () => {});',
+      code: 'test(title, async () => {});\ntest.describe(symbol, () => {});',
       settings: settings({ lifecycleTags: true, reportDynamicTitles: true }),
       errors: [
         { messageId: 'dynamicTitle', column: 6 },

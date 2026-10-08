@@ -11,7 +11,7 @@ module.exports = defineConfig([
     plugins: { 'test-governance': testGovernance },
     extends: [
       testGovernance.configure({
-        ticket: { preset: 'jira', projects: ['WEB', 'QA'] },
+        ticket: { preset: 'jira', projects: ['TRADE', 'RISK'] },
         lifecycleTags: true,
         customStates: { 'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' } },
       }),

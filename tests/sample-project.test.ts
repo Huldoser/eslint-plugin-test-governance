@@ -19,7 +19,7 @@ const config = [
   {
     files: ['tests/**/*.{js,ts}'],
     ...testGovernance.configure({
-      ticket: { preset: 'jira', projects: ['WEB', 'QA'] },
+      ticket: { preset: 'jira', projects: ['TRADE', 'RISK'] },
       lifecycleTags: true,
       customStates: { 'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' } },
     }),
@@ -43,7 +43,7 @@ test('the recommended config works without options', async () => {
       testGovernance.configs.recommended,
     ] as Linter.Config[],
   });
-  const [result] = await eslint.lintFiles(['tests/checkout.spec.ts']);
+  const [result] = await eslint.lintFiles(['tests/orders.spec.ts']);
   assert.deepEqual(
     result.messages.map((m) => [m.line, m.ruleId]),
     [

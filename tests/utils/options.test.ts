@@ -41,7 +41,7 @@ describe('compileOptions', () => {
   it('accepts options that belong to the preset, and states set to true or false', () => {
     assert.doesNotThrow(() =>
       compileOptions({
-        ticket: [{ preset: 'jira', projects: ['WEB'], host: 'acme.atlassian.net', minLength: undefined } as never],
+        ticket: [{ preset: 'jira', projects: ['TRADE'], host: 'acme.atlassian.net', minLength: undefined } as never],
         states: { fail: true, slow: { enabled: true } },
         customStates: { blocked: { when: '@blocked', marker: 'BLOCKED', ticket: { preset: 'numeric', maxLength: 6 } } },
       }),
@@ -55,8 +55,8 @@ describe('compileOptions', () => {
       customStates: { blocked: { when: '@blocked', marker: 'BLOCKED', ticket: [{ preset: 'numeric' }] } },
     });
     const [skip, fixme, blocked] = resolved.states;
-    assert.equal(skip.ticket.check('WEB-1'), 'ok');
-    assert.equal(fixme.ticket.check('WEB-1'), 'format');
+    assert.equal(skip.ticket.check('TRADE-1'), 'ok');
+    assert.equal(fixme.ticket.check('TRADE-1'), 'format');
     assert.equal(fixme.ticket.check('#4821'), 'ok');
     assert.equal(blocked.ticket.check('4821'), 'ok');
   });
@@ -77,8 +77,8 @@ describe('compileOptions', () => {
     [{ customStates: { x: { when: '@x', marker: 'SKIP' } } }, /two states use the marker "SKIP"/],
     [{ lifecycleTags: true, customStates: { x: { when: '@new', marker: 'X' } } }, /two states use the tag "@new"/],
     [
-      { ticket: { preset: 'jira', projects: ['web'] } },
-      /ticket\.projects\[0\] must be an uppercase key as it appears in tickets, such as WEB for WEB-123 \(got "web"\)/,
+      { ticket: { preset: 'jira', projects: ['trade'] } },
+      /ticket\.projects\[0\] must be an uppercase key as it appears in tickets, such as WEB for WEB-123 \(got "trade"\)/,
     ],
     [{ ticket: { preset: 'linear', teams: ['Eng'] } }, /ticket\.teams\[0\] must be an uppercase key/],
     [
@@ -86,7 +86,7 @@ describe('compileOptions', () => {
       /ticket\.host is not an option of the "any" preset \(it applies to "jira", "github", "gitlab", "azure-devops"\)/,
     ],
     [
-      { ticket: [{ preset: 'jira' }, { preset: 'numeric', projects: ['WEB'] }] },
+      { ticket: [{ preset: 'jira' }, { preset: 'numeric', projects: ['TRADE'] }] },
       /ticket\[1\]\.projects is not an option of the "numeric" preset \(it applies to "jira"\)/,
     ],
     [

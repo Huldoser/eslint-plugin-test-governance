@@ -12,58 +12,58 @@ const tables: Record<string, Table> = {
   any: {
     spec: { preset: 'any' },
     accepts: [
-      'WEB-123',
+      'TRADE-123',
       'AB_C-9',
       '#4821',
-      'acme/web#4821',
+      'acme/trading-engine#4821',
       'group/sub/project#7',
       'https://example.com/x',
-      'http://jira/browse/WEB-1',
+      'http://jira/browse/TRADE-1',
     ],
-    rejects: ['web-123', 'W-1', 'WEB-', '4821', 'flaky', 'ftp://example.com/x', 'https://', 'acme#4821'],
+    rejects: ['trade-123', 'T-1', 'TRADE-', '4821', 'flaky', 'ftp://example.com/x', 'https://', 'acme#4821'],
   },
   jira: {
     spec: { preset: 'jira' },
     accepts: [
-      'WEB-123',
-      'https://acme.atlassian.net/browse/WEB-123',
-      'https://acme.atlassian.net/browse/WEB-123/',
-      'https://acme.atlassian.net/jira/software/projects/WEB/boards/1?selectedIssue=WEB-123',
+      'TRADE-123',
+      'https://acme.atlassian.net/browse/TRADE-123',
+      'https://acme.atlassian.net/browse/TRADE-123/',
+      'https://acme.atlassian.net/jira/software/projects/TRADE/boards/1?selectedIssue=TRADE-123',
     ],
     rejects: [
       '#4821',
-      'web-123',
-      'https://acme.atlassian.net/browse/web-1',
+      'trade-123',
+      'https://acme.atlassian.net/browse/trade-1',
       'https://acme.atlassian.net/boards/1',
       'https://acme.atlassian.net/x?selectedIssue=nope',
     ],
   },
   'jira with projects and host': {
-    spec: { preset: 'jira', projects: ['WEB', 'QA'], host: 'jira.acme.io' },
-    accepts: ['WEB-1', 'QA-22', 'https://JIRA.acme.io/browse/QA-2'],
-    rejects: ['OPS-1', 'https://other.io/browse/WEB-1', 'https://jira.acme.io/browse/OPS-1'],
+    spec: { preset: 'jira', projects: ['TRADE', 'RISK'], host: 'jira.acme.io' },
+    accepts: ['TRADE-1', 'RISK-22', 'https://JIRA.acme.io/browse/RISK-2'],
+    rejects: ['OPS-1', 'https://other.io/browse/TRADE-1', 'https://jira.acme.io/browse/OPS-1'],
   },
   github: {
     spec: { preset: 'github' },
     accepts: [
       '#4821',
-      'acme/web#4821',
-      'acme/web.js#1',
-      'https://github.com/acme/web/issues/4821',
-      'https://github.com/acme/web/pull/7/',
+      'acme/trading-engine#4821',
+      'acme/trading-engine.js#1',
+      'https://github.com/acme/trading-engine/issues/4821',
+      'https://github.com/acme/trading-engine/pull/7/',
     ],
     rejects: [
-      'WEB-1',
+      'TRADE-1',
       'acme#1',
-      'https://github.com/acme/web',
-      'https://gitlab.com/acme/web/issues/1',
-      'https://github.com/acme/web/issues/x',
+      'https://github.com/acme/trading-engine',
+      'https://gitlab.com/acme/trading-engine/issues/1',
+      'https://github.com/acme/trading-engine/issues/x',
     ],
   },
   'github enterprise': {
     spec: { preset: 'github', host: 'git.acme.io' },
-    accepts: ['https://git.acme.io/acme/web/issues/1'],
-    rejects: ['https://github.com/acme/web/issues/1'],
+    accepts: ['https://git.acme.io/acme/trading-engine/issues/1'],
+    rejects: ['https://github.com/acme/trading-engine/issues/1'],
   },
   gitlab: {
     spec: { preset: 'gitlab' },
@@ -78,7 +78,11 @@ const tables: Record<string, Table> = {
   },
   linear: {
     spec: { preset: 'linear', teams: ['ENG'] },
-    accepts: ['ENG-123', 'https://linear.app/acme/issue/ENG-123', 'https://linear.app/acme/issue/ENG-123/fix-checkout'],
+    accepts: [
+      'ENG-123',
+      'https://linear.app/acme/issue/ENG-123',
+      'https://linear.app/acme/issue/ENG-123/fix-stop-loss',
+    ],
     rejects: [
       'OPS-1',
       'https://linear.app/acme/issue/OPS-1',
@@ -90,20 +94,20 @@ const tables: Record<string, Table> = {
     spec: { preset: 'azure-devops' },
     accepts: [
       'AB#4821',
-      'https://dev.azure.com/acme/web/_workitems/edit/4821',
-      'https://acme.visualstudio.com/web/_workitems/edit/4821/',
+      'https://dev.azure.com/acme/trading-engine/_workitems/edit/4821',
+      'https://acme.visualstudio.com/trading-engine/_workitems/edit/4821/',
     ],
     rejects: [
       '#4821',
       'ab#1',
-      'https://example.com/acme/web/_workitems/edit/4821',
-      'https://dev.azure.com/acme/web/_boards',
+      'https://example.com/acme/trading-engine/_workitems/edit/4821',
+      'https://dev.azure.com/acme/trading-engine/_boards',
     ],
   },
   'azure-devops on a server': {
     spec: { preset: 'azure-devops', host: 'tfs.acme.io' },
-    accepts: ['https://tfs.acme.io/acme/web/_workitems/edit/1'],
-    rejects: ['https://dev.azure.com/acme/web/_workitems/edit/1'],
+    accepts: ['https://tfs.acme.io/acme/trading-engine/_workitems/edit/1'],
+    rejects: ['https://dev.azure.com/acme/trading-engine/_workitems/edit/1'],
   },
   numeric: {
     spec: { preset: 'numeric', minLength: 4, maxLength: 6 },
@@ -116,8 +120,8 @@ const tables: Record<string, Table> = {
     rejects: ['BUG', 'xBUG1', 'BUG1x'],
   },
   'combined presets': {
-    spec: [{ preset: 'jira', projects: ['WEB'] }, { preset: 'github' }],
-    accepts: ['WEB-1', '#4821'],
+    spec: [{ preset: 'jira', projects: ['TRADE'] }, { preset: 'github' }],
+    accepts: ['TRADE-1', '#4821'],
     rejects: ['OPS-1', 'AB#1'],
   },
 };
@@ -157,20 +161,20 @@ describe('placeholders', () => {
       assert.equal(matcher.check(ticket), 'placeholder');
     });
   }
-  for (const ticket of ['WEB-123', '#4821', 'XXXX-1']) {
+  for (const ticket of ['TRADE-123', '#4821', 'XXXX-1']) {
     it(`accepts ${ticket}`, () => {
       assert.equal(matcher.check(ticket), 'ok');
     });
   }
 
   for (const ticket of [
-    'WEB-0',
-    'SDQA-000',
+    'TRADE-0',
+    'TRADE-000',
     '#00',
-    'acme/web#0',
+    'acme/trading-engine#0',
     'AB#0',
-    'https://github.com/acme/web/issues/0',
-    'https://x.io/browse/WEB-0/',
+    'https://github.com/acme/trading-engine/issues/0',
+    'https://x.io/browse/TRADE-0/',
     '000',
   ]) {
     it(`rejects ${ticket}, since no tracker issues number 0`, () => {
@@ -180,19 +184,19 @@ describe('placeholders', () => {
       );
     });
   }
-  for (const ticket of ['WEB-10', '#100', 'https://github.com/acme/web/issues/10', '1000']) {
+  for (const ticket of ['TRADE-10', '#100', 'https://github.com/acme/trading-engine/issues/10', '1000']) {
     it(`still accepts ${ticket}`, () => {
       assert.equal(compileTicketSpec([{ preset: 'any' }, { preset: 'numeric' }], []).check(ticket), 'ok');
     });
   }
 
   it('uses a custom list with regex characters taken literally', () => {
-    const custom = compileTicketSpec([{ preset: 'any' }], ['N/A', 'WEB-0*', '(none)']);
+    const custom = compileTicketSpec([{ preset: 'any' }], ['N/A', 'TRADE-0*', '(none)']);
     assert.equal(custom.check('N/A'), 'placeholder');
-    assert.equal(custom.check('WEB-007'), 'placeholder');
+    assert.equal(custom.check('TRADE-007'), 'placeholder');
     assert.equal(custom.check('(none)'), 'placeholder');
     assert.equal(custom.check('TODO'), 'format');
-    assert.equal(custom.check('WEB-70'), 'ok');
+    assert.equal(custom.check('TRADE-70'), 'ok');
   });
 });
 
@@ -201,8 +205,8 @@ describe('messages', () => {
   it('describes each preset', () => {
     assert.equal(expectedOf({ preset: 'jira' }).expected, 'a Jira key like PROJ-123, or a Jira URL');
     assert.equal(
-      expectedOf({ preset: 'jira', projects: ['WEB', 'QA'] }).expected,
-      'a Jira key like WEB-123 in project WEB, QA, or a Jira URL',
+      expectedOf({ preset: 'jira', projects: ['TRADE', 'RISK'] }).expected,
+      'a Jira key like TRADE-123 in project TRADE, RISK, or a Jira URL',
     );
     assert.equal(
       expectedOf({ preset: 'gitlab' }).expected,
