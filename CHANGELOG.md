@@ -38,6 +38,8 @@ All notable changes to this project are documented here. The format follows
   `TODO` after the first line of such a comment was missed.
 - A marker with only punctuation after the colon, such as `// SKIP: .`, is reported as missing its
   ticket. Before, the message was `'' is not a valid ticket`.
+- A regex passed where an option expects a string is shown as written in the error, as in
+  `ticket.pattern must be a string (got /TRADE-\d+/)`. Before, it was shown as `{}`.
 
 ## [0.3.1] - 2026-10-06
 
