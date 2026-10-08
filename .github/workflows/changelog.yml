@@ -1,0 +1,37 @@
+name: Changelog
+
+# A pull request that changes src/ changes what users get, so it needs an entry under [Unreleased] in
+# CHANGELOG.md. A change users won't notice, such as a refactor, gets the "no changelog" label instead.
+
+on:
+  pull_request:
+    # Adding or removing the label runs the check again.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  # Started by prepare-release.yml for the release pull request.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: changelog-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changelog:
+    name: Changelog entry
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the base branch too, to find what the pull request changes
+          persist-credentials: false
+      - name: Require a changelog entry when src/ changes
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'no changelog') }}
+        run: |
+          changed=$(git diff --name-only "origin/${GITHUB_BASE_REF:-main}...HEAD")
+          if grep -q '^src/' <<< "$changed" && ! grep -qx 'CHANGELOG.md' <<< "$changed"; then
+            echo "::error title=No changelog entry::This pull request changes src/ but not CHANGELOG.md. Add an entry under [Unreleased], or the \"no changelog\" label if users won't notice the change."
+            exit 1
+          fi
