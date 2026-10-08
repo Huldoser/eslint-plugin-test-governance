@@ -26,7 +26,7 @@ runRule('require-ticket (Jest)', requireTicket, {
     // Jest tests have no details object, so a second argument never hides a tag.
     {
       code: "test('fills a limit order', orderCase, () => {});",
-      settings: settings({ lifecycleTags: true, reportDynamicTitles: true }),
+      settings: settings({ lifecycleTags: true, reportUnreadableTags: true }),
     },
     // Jest's hooks get no test context to skip with.
     'beforeEach((context) => {\n  context.skip();\n});',

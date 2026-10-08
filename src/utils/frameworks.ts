@@ -12,10 +12,14 @@ export interface Root {
   modifiers: readonly string[];
 }
 
-/** The state a member puts a test in. A conditional one, like Vitest's `skipIf(...)`, may not apply. */
+/**
+ * The state a member puts a test in. A member called with a condition, like Vitest's `skipIf(...)`, puts it
+ * in that state only when the condition is `when`: `skipIf(true)` always skips, `skipIf(false)` never does,
+ * and `skipIf(isMobile)` sometimes does.
+ */
 interface Effect {
   modifier: Modifier;
-  conditional: boolean;
+  when?: boolean;
 }
 
 /** How a test framework declares tests and puts them in states. */
@@ -75,7 +79,7 @@ function isPlaywrightModule(source: string): boolean {
 export const RUNTIME_MODIFIERS: ReadonlySet<string> = new Set(['skip', 'fixme', 'fail', 'slow']);
 
 const effects = (entries: [string, Modifier, boolean?][]): ReadonlyMap<string, Effect> =>
-  new Map(entries.map(([member, modifier, conditional = false]) => [member, { modifier, conditional }]));
+  new Map(entries.map(([member, modifier, when]) => [member, { modifier, when }]));
 
 const playwright: Framework = {
   name: 'playwright',
@@ -158,7 +162,7 @@ const vitest: Framework = {
     ['todo', 'todo'],
     ['fails', 'fail'],
     ['skipIf()', 'skip', true],
-    ['runIf()', 'skip', true],
+    ['runIf()', 'skip', false],
   ]),
   optionEffects: new Map([
     ['skip', 'skip'],

@@ -16,6 +16,8 @@ export interface Schema {
   additionalProperties?: boolean | Schema;
   required?: readonly string[];
   anyOf?: readonly Schema[];
+  /** Old property names, with the name each one has now, so a config that uses one says what to change. */
+  renamed?: Readonly<Record<string, string>>;
 }
 
 type Kind = 'object' | 'array' | 'string' | 'boolean' | 'integer' | 'number' | 'null' | 'other';
@@ -132,6 +134,8 @@ export function validate(value: unknown, schema: Schema, path = ''): string[] {
       const propertySchema = properties[key] ?? schema.additionalProperties;
       if (typeof propertySchema === 'object') {
         problems.push(...validate(item, propertySchema, join(path, key)));
+      } else if (schema.renamed && Object.hasOwn(schema.renamed, key)) {
+        problems.push(`${join(path, key)} was renamed to "${schema.renamed[key]}"`);
       } else if (propertySchema === false) {
         const hint = suggest(key, known);
         problems.push(

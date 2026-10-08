@@ -107,6 +107,8 @@ export type Evaluation =
 interface Chain {
   root: TSESTree.Identifier;
   path: string[];
+  /** The first argument of each member called to build the function: `isMobile` in `test.skipIf(isMobile)`. */
+  args: Map<string, Node | undefined>;
 }
 
 /**
@@ -144,6 +146,7 @@ function memberName(node: TSESTree.MemberExpression): string | undefined {
  */
 function chainOf(node: Node, factories: ReadonlySet<string>): Chain | undefined {
   const path: string[] = [];
+  const args = new Map<string, Node | undefined>();
   let current = node;
   for (;;) {
     if (current.type === 'MemberExpression') {
@@ -163,9 +166,10 @@ function chainOf(node: Node, factories: ReadonlySet<string>): Chain | undefined 
     const name = memberName(factory);
     if (name === undefined || !factories.has(name)) return undefined;
     path.unshift(`${name}()`);
+    if (current.type === 'CallExpression') args.set(`${name}()`, current.arguments.at(0));
     current = factory.object;
   }
-  return current.type === 'Identifier' ? { root: current, path } : undefined;
+  return current.type === 'Identifier' ? { root: current, path, args } : undefined;
 }
 
 function unwrap(node: Node): Node {
@@ -610,9 +614,14 @@ function isDeclaration(kind: Root['kind'], args: TSESTree.CallExpressionArgument
   return isStaticText(first) || args.slice(1).some(isFunction);
 }
 
+/** The value of a `true` or `false` literal; undefined for anything else. */
+function booleanOf(node: Node | undefined): boolean | undefined {
+  return node?.type === 'Literal' && typeof node.value === 'boolean' ? node.value : undefined;
+}
+
 function isUnconditional(call: TSESTree.CallExpression): boolean {
   const first = call.arguments.at(0);
-  return (first === undefined || (first.type === 'Literal' && first.value === true)) && !isGuarded(call);
+  return (first === undefined || booleanOf(first) === true) && !isGuarded(call);
 }
 
 const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression']);
@@ -691,16 +700,16 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
    * `['describe', 'skip']` for `test.describe.skip` or `pw.test.describe.skip`. Undefined when the callee
    * isn't one of the framework's test functions.
    */
-  const target = (chain: Chain | undefined): { root: Root; path: string[] } | undefined => {
+  const target = (chain: Chain | undefined): { root: Root; path: string[]; args: Chain['args'] } | undefined => {
     if (chain === undefined) return undefined;
-    const { root, path } = chain;
+    const { root, path, args } = chain;
     let base = testNames.roots.get(root.name);
     let rest = path;
     if (base === undefined && testNames.modules.has(root.name)) {
       base = framework.exports.get(path[0]);
       rest = path.slice(1);
     }
-    return base !== undefined && !isLocalVariable(sourceCode, root) ? { root: base, path: rest } : undefined;
+    return base !== undefined && !isLocalVariable(sourceCode, root) ? { root: base, path: rest, args } : undefined;
   };
   let usesTest = sourceCode.ast.body.some(
     (statement) => statement.type === 'ImportDeclaration' && framework.ownsModule(statement.source.value),
@@ -783,20 +792,31 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     return subject;
   };
 
-  /** The state modifiers of a declaration, from its members and, in Vitest, its options object. */
-  const modifiersOf = (members: string[], details: [string, Node][]): Map<string, boolean> => {
+  /**
+   * The state modifiers of a declaration, from its members and, in Vitest, its options object. `args`
+   * holds the conditions of members such as `skipIf()`.
+   */
+  const modifiersOf = (members: string[], details: [string, Node][], args: Chain['args']): Map<string, boolean> => {
     const modifiers = new Map<string, boolean>();
     const add = (modifier: string, always: boolean): void => {
       if (!modifiers.get(modifier)) modifiers.set(modifier, always);
     };
     for (const member of members) {
       const effect = framework.effects.get(member);
-      if (effect) add(effect.modifier, !effect.conditional);
+      if (!effect) continue;
+      if (effect.when === undefined) {
+        add(effect.modifier, true);
+        continue;
+      }
+      // `skipIf(true)` always skips and `skipIf(false)` never does, like `{ skip: true }` and `{ skip: false }`.
+      const condition = booleanOf(args.get(member));
+      if (condition === undefined) add(effect.modifier, false);
+      else if (condition === effect.when) add(effect.modifier, true);
     }
     // `{ skip: true }` always skips, `{ skip: isMobile }` only sometimes, `{ skip: false }` never.
     for (const [key, value] of details) {
       const modifier = framework.optionEffects.get(key);
-      const literal = value.type === 'Literal' ? value.value : undefined;
+      const literal = booleanOf(value);
       if (modifier && literal !== false) add(modifier, literal === true);
     }
     return modifiers;
@@ -826,7 +846,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       // gets a `TestStepInfo` that can skip the step at runtime.
       const step = path.join('.');
       if ((step === 'step' || step === 'step.skip') && args.length >= 2) {
-        const subject = makeSubject('step', call, modifiersOf(path.slice(1), []), NO_TAGS);
+        const subject = makeSubject('step', call, modifiersOf(path.slice(1), [], callee.args), NO_TAGS);
         const body = args[1];
         const param = isFunction(body) ? body.params.at(0) : undefined;
         return { subject, infos: infoNames(param, STEP_INFO_METHODS, subject) };
@@ -844,7 +864,10 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       // A declaration always has a first argument: its title, or the body of a describe without one.
       const details = detailsOf(sourceCode, call);
       const tagInfo = collectTags(sourceCode, call, !isFunction(args[0]), framework, details);
-      return { subject: makeSubject(kind, call, modifiersOf(members, details.entries), tagInfo), infos: bodyInfo };
+      return {
+        subject: makeSubject(kind, call, modifiersOf(members, details.entries, callee.args), tagInfo),
+        infos: bodyInfo,
+      };
     }
     // test.skip(), test.fixme(), test.fail() and test.slow() in a test, a describe or a hook.
     if (framework.playwright && path.length === 1 && RUNTIME_MODIFIERS.has(path[0])) {

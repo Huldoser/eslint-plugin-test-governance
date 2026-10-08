@@ -6,6 +6,7 @@ import noOrphanedMarker from './rules/no-orphaned-marker.ts';
 import requireTicketInComments from './rules/require-ticket-in-comments.ts';
 import requireTicket from './rules/require-ticket.ts';
 import { FRAMEWORK_NAMES, type FrameworkName } from './utils/constants.ts';
+import { ConfigError } from './utils/errors.ts';
 import { compileOptions, SETTINGS_KEY, type GovernanceOptions } from './utils/options.ts';
 
 export type { FrameworkName } from './utils/constants.ts';
@@ -87,6 +88,17 @@ export function configure(options: GovernanceOptions): FlatConfig {
 for (const framework of FRAMEWORK_NAMES) {
   plugin.configs[framework] = configure({ framework });
 }
+
+// `configs.recommended` was removed in 0.5.0. Reading it throws, so `...configs.recommended` fails with this
+// message instead of spreading nothing and turning the rules off without a word. It isn't enumerable, so
+// tools that list the configs don't see it.
+Object.defineProperty(plugin.configs, 'recommended', {
+  get(): never {
+    throw new ConfigError(
+      'configs.recommended was removed in 0.5.0. Use the config for your framework: configs.playwright, configs.jest or configs.vitest. See https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/upgrading.md',
+    );
+  },
+});
 
 export const configs = plugin.configs;
 export default plugin;

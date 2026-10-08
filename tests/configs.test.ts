@@ -21,6 +21,17 @@ describe('configs', () => {
     }
   });
 
+  it('fails with a pointer to the guide when a config still reads the removed recommended config', () => {
+    const removed =
+      /configs\.recommended was removed in 0\.5\.0\. Use the config for your framework: .*docs\/upgrading\.md/;
+    // `...configs.recommended` would otherwise spread nothing and leave the rules off.
+    assert.throws(
+      () => ({ files: ['tests/**/*.spec.ts'], ...(configs as Record<string, object>).recommended }),
+      removed,
+    );
+    assert.ok(!Object.keys(configs).includes('recommended'));
+  });
+
   it('names a configure() config after its framework', () => {
     assert.equal(configure({ framework: 'playwright' }).name, 'test-governance/playwright');
     assert.equal(configure({ framework: 'jest' }).name, 'test-governance/jest');

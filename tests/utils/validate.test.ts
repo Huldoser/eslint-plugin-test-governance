@@ -91,7 +91,9 @@ describe('options validation', () => {
     [{ lifecycleTags: () => true }, 'lifecycleTags must be a boolean (got a function)'],
     [{ requireTicketForConditional: 'always' }, 'requireTicketForConditional must be a boolean (got "always")'],
     [{ allowBlankLine: 1 }, 'allowBlankLine must be a boolean (got 1)'],
-    [{ reportDynamicTitles: 'on' }, 'reportDynamicTitles must be a boolean (got "on")'],
+    [{ reportUnreadableTags: 'on' }, 'reportUnreadableTags must be a boolean (got "on")'],
+    // An option renamed before 1.0 names its new name.
+    [{ reportDynamicTitles: true }, 'reportDynamicTitles was renamed to "reportUnreadableTags"'],
   ]) {
     it(JSON.stringify(options), () => {
       assert.deepEqual(problems(options), [message]);
@@ -106,7 +108,7 @@ describe('options validation', () => {
 
   it('reports every problem at once', () => {
     assert.deepEqual(problems({ xyzzy: 1, allowNotes: 'no' }), [
-      'xyzzy is not a known option (expected one of: framework, testFunctions, ticket, placeholders, lifecycleTags, states, customStates, comments, requireTicketForConditional, allowBlankLine, allowNotes, reportDynamicTitles)',
+      'xyzzy is not a known option (expected one of: framework, testFunctions, ticket, placeholders, lifecycleTags, states, customStates, comments, requireTicketForConditional, allowBlankLine, allowNotes, reportUnreadableTags)',
       'allowNotes must be a boolean (got "no")',
     ]);
   });

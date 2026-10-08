@@ -32,7 +32,7 @@ export default createRule({
     const reported = new Set<string>();
     const reportOnce = (key: string): boolean => !reported.has(key) && Boolean(reported.add(key));
     for (const subject of analysis.subjects) {
-      if (options.reportDynamicTitles && hasTagStates) {
+      if (options.reportUnreadableTags && hasTagStates) {
         if (subject.dynamicTitle) context.report({ node: subject.node.arguments[0], messageId: 'dynamicTitle' });
         for (const node of subject.unreadTags) context.report({ node, messageId: 'dynamicTags' });
       }
