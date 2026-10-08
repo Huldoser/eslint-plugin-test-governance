@@ -20,7 +20,18 @@ const tables: Record<string, Table> = {
       'https://example.com/x',
       'http://jira/browse/TRADE-1',
     ],
-    rejects: ['trade-123', 'T-1', 'TRADE-', '4821', 'flaky', 'ftp://example.com/x', 'https://', 'acme#4821'],
+    rejects: [
+      'trade-123',
+      'T-1',
+      'TRADE-',
+      '4821',
+      'flaky',
+      'ftp://example.com/x',
+      'https://',
+      'acme#4821',
+      '#4821x',
+      'git+https://github.com/acme/trading-engine/issues/1',
+    ],
   },
   jira: {
     spec: { preset: 'jira' },
@@ -36,6 +47,7 @@ const tables: Record<string, Table> = {
       'https://acme.atlassian.net/browse/trade-1',
       'https://acme.atlassian.net/boards/1',
       'https://acme.atlassian.net/x?selectedIssue=nope',
+      'https://acme.atlassian.net/browse/TRADE-123x',
     ],
   },
   'jira with projects and host': {
@@ -58,6 +70,9 @@ const tables: Record<string, Table> = {
       'https://github.com/acme/trading-engine',
       'https://gitlab.com/acme/trading-engine/issues/1',
       'https://github.com/acme/trading-engine/issues/x',
+      'https://github.com/acme/trading-engine/issues/4821x',
+      'https://github.com/acme/trading-engine/blob/main/issues/1',
+      'acme/trading-engine#4821x',
     ],
   },
   'github enterprise': {
@@ -73,8 +88,15 @@ const tables: Record<string, Table> = {
       'group/sub/project#1',
       'https://gitlab.com/group/sub/project/-/issues/9',
       'https://gitlab.com/g/p/-/work_items/9',
+      'https://gitlab.com/group/project/-/merge_requests/4821',
     ],
-    rejects: ['project#1', 'https://gitlab.com/g/p/issues/9', 'https://example.com/g/p/-/issues/9'],
+    rejects: [
+      'project#1',
+      'https://gitlab.com/g/p/issues/9',
+      'https://example.com/g/p/-/issues/9',
+      'https://gitlab.com/g/p/-/issues/9x',
+      'group/project#1x',
+    ],
   },
   linear: {
     spec: { preset: 'linear', teams: ['ENG'] },
@@ -88,6 +110,8 @@ const tables: Record<string, Table> = {
       'https://linear.app/acme/issue/OPS-1',
       'https://linear.app/acme/project/x',
       'https://example.com/acme/issue/ENG-1',
+      'https://linear.app/x/acme/issue/ENG-1',
+      'https://linear.app/acme/issue/ENG-123x',
     ],
   },
   'azure-devops': {
@@ -102,6 +126,9 @@ const tables: Record<string, Table> = {
       'ab#1',
       'https://example.com/acme/trading-engine/_workitems/edit/4821',
       'https://dev.azure.com/acme/trading-engine/_boards',
+      'https://dev.azure.com/acme/trading-engine/_workitems/edit/4821x',
+      'XAB#4821',
+      'AB#4821x',
     ],
   },
   'azure-devops on a server': {
@@ -184,7 +211,7 @@ describe('placeholders', () => {
       );
     });
   }
-  for (const ticket of ['TRADE-10', '#100', 'https://github.com/acme/trading-engine/issues/10', '1000']) {
+  for (const ticket of ['TRADE-10', '#100', 'https://github.com/acme/trading-engine/issues/10', '1000', '004821']) {
     it(`still accepts ${ticket}`, () => {
       assert.equal(compileTicketSpec([{ preset: 'any' }, { preset: 'numeric' }], []).check(ticket), 'ok');
     });
@@ -197,6 +224,10 @@ describe('placeholders', () => {
     assert.equal(custom.check('(none)'), 'placeholder');
     assert.equal(custom.check('TODO'), 'format');
     assert.equal(custom.check('TRADE-70'), 'ok');
+  });
+
+  it('ignores a # only at the start of the ticket', () => {
+    assert.equal(compileTicketSpec([{ preset: 'azure-devops' }], ['AB4821']).check('AB#4821'), 'ok');
   });
 });
 
@@ -220,6 +251,31 @@ describe('messages', () => {
     assert.equal(
       compileTicketSpec([{ preset: 'jira' }, { preset: 'github' }], []).expected,
       'a Jira key like PROJ-123, or a Jira URL; or a GitHub issue like #4821 or owner/repo#4821, or an issue URL on github.com',
+    );
+  });
+
+  it('describes Linear and Azure DevOps tickets', () => {
+    assert.equal(expectedOf({ preset: 'linear' }).expected, 'a Linear issue like ENG-123, or a Linear URL');
+    assert.equal(
+      expectedOf({ preset: 'linear', teams: ['TRADE', 'RISK'] }).expected,
+      'a Linear issue like TRADE-123 in team TRADE, RISK, or a Linear URL',
+    );
+    assert.equal(
+      expectedOf({ preset: 'azure-devops' }).expected,
+      'an Azure Boards work item like AB#4821, or a work item URL',
+    );
+  });
+
+  it('gives a sample ticket for each preset', () => {
+    const specs: TicketSpec[] = [
+      { preset: 'jira' },
+      { preset: 'github' },
+      { preset: 'gitlab' },
+      { preset: 'pattern', pattern: 'TRADE-\\d+' },
+    ];
+    assert.deepEqual(
+      specs.map((spec) => expectedOf(spec).example),
+      ['PROJ-123', '#4821', '#4821', 'TICKET'],
     );
   });
 

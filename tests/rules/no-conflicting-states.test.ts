@@ -14,6 +14,11 @@ runRule('no-conflicting-states', rule, {
       code: "test('shows the order book', async ({ browserName }) => { test.skip(browserName === 'webkit'); });",
       settings: lifecycle,
     },
+    // A conditional skip doesn't make a new test skipped.
+    {
+      code: "test('shows the order book @new', async ({ browserName }) => { test.skip(browserName === 'webkit'); });",
+      settings: lifecycle,
+    },
     {
       code: "test.describe('order entry @new', () => { test('places an order', async () => {}); });",
       settings: lifecycle,

@@ -11,6 +11,8 @@ tester.run('require-ticket (TypeScript syntax)', rule as never, {
     "// SKIP: TRADE-1\ntest.skip('places an order', async ({ page }: { page: Page }) => {});",
     // AVA's typed test function is not Playwright's.
     "import anyTest, { type TestFn } from 'ava';\nconst test = anyTest as TestFn<{ broker: string }>;\ntest.skip('shows live prices', async (t) => {});",
+    // A marker inside a namespace sits above the test.
+    "namespace OrderEntry {\n  // SKIP: TRADE-1\n  test.skip('places an order', async () => {});\n}",
   ],
   invalid: [
     {
