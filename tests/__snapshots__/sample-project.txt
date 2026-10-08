@@ -1,3 +1,6 @@
+tests/jest/risk.test.js:6:3 error test-governance/require-ticket This test is in the 'skip' state but has no `// SKIP: <ticket>` comment directly above it, e.g. `// SKIP: TRADE-123`.
+tests/jest/risk.test.js:11:3 error test-governance/marker-matches-state `SKIP:` doesn't match this code: this test is in the 'todo' state, so the marker should be `TODO:`.
+tests/jest/risk.test.js:12:3 error test-governance/require-ticket This test is in the 'todo' state but has no `// TODO: <ticket>` comment directly above it, e.g. `// TODO: TRADE-123`.
 tests/orders.spec.ts:7:8 error test-governance/require-ticket-in-comments `FIXME` comments must start with a ticket, e.g. `// FIXME: TRADE-123`. Put the details in the ticket.
 tests/orders.spec.ts:12:21 error test-governance/require-ticket Only ticket IDs are allowed after `SKIP:`, separated by commas. Put details in the ticket instead of `broker sandbox is down`.
 tests/orders.spec.ts:18:3 error test-governance/require-ticket This test is in the 'skip' state but has no `// SKIP: <ticket>` comment directly above it, e.g. `// SKIP: TRADE-123`.
@@ -14,3 +17,5 @@ tests/portfolio.spec.js:17:3 error test-governance/require-ticket Write the mark
 tests/portfolio.spec.js:22:1 error test-governance/require-ticket This test is in the 'new' state but has no `// NEW: <ticket>` comment directly above it, e.g. `// NEW: TRADE-123`.
 tests/portfolio.spec.js:22:1 error test-governance/require-ticket This test is in the 'unstable' state but has no `// UNSTABLE: <ticket>` comment directly above it, e.g. `// UNSTABLE: TRADE-123`.
 tests/portfolio.spec.js:22:6 warn  test-governance/no-conflicting-states `@new` and `@unstable` are separate stages; a test should be in only one of them.
+tests/unit/pricing.spec.ts:10:3 error test-governance/require-ticket This test is in the 'skip' state but has no `// SKIP: <ticket>` comment directly above it, e.g. `// SKIP: TRADE-123`.
+tests/unit/pricing.spec.ts:16:3 error test-governance/require-ticket This test is in the 'todo' state but has no `// TODO: <ticket>` comment directly above it, e.g. `// TODO: TRADE-123`.

@@ -1,5 +1,11 @@
-import { BUILTIN_STATE_NAMES, DEFAULT_COMMENT_KEYWORDS, type BuiltinStateName } from './constants.ts';
+import {
+  BUILTIN_STATE_NAMES,
+  DEFAULT_COMMENT_KEYWORDS,
+  type BuiltinStateName,
+  type FrameworkName,
+} from './constants.ts';
 import { ConfigError } from './errors.ts';
+import { FRAMEWORKS, type Framework, type Modifier } from './frameworks.ts';
 import { optionsSchema } from './schema.ts';
 import { compileTicketSpec, DEFAULT_PLACEHOLDERS, type TicketMatcher, type TicketSpec } from './tickets.ts';
 import { validate } from './validate.ts';
@@ -23,9 +29,12 @@ export interface CustomState {
 
 /** Options shared by every rule. Set them once in `settings['test-governance']`. */
 export interface GovernanceOptions {
+  /** The test framework of the files the config applies to. Defaults to `'playwright'`. */
+  framework?: FrameworkName;
   /**
-   * Names that are treated as the Playwright `test` function. Defaults to `['test']`. Your list replaces
-   * the default one, so include `'test'` if you still need it.
+   * Names that are treated as the framework's `test` function. Defaults to `['test']` for Playwright and
+   * `['test', 'it']` for Jest and Vitest. Your list replaces the default one, so include those names if
+   * you still need them.
    */
   testFunctions?: string[];
   /** Accepted ticket formats. Defaults to `{ preset: 'any' }`. */
@@ -38,8 +47,9 @@ export interface GovernanceOptions {
   /** Turns on the `@new` and `@unstable` states. */
   lifecycleTags?: boolean;
   /**
-   * Turns built-in states on or off, renames their marker or gives them their own ticket format. `skip` and
-   * `fixme` are on by default, `fail` and `slow` off; a setting for `new` or `unstable` wins over `lifecycleTags`.
+   * Turns built-in states on or off, renames their marker or gives them their own ticket format. `skip`,
+   * `fixme` and `todo` are on by default, `fail` and `slow` off; a setting for `new` or `unstable` wins over
+   * `lifecycleTags`. `fixme` and `slow` exist only in Playwright and `todo` only in Jest and Vitest.
    */
   states?: Partial<Record<BuiltinStateName, boolean | StateOverride>>;
   /** Adds a state for a tag, e.g. `{ quarantine: { when: '@quarantine', marker: 'QUARANTINE' } }`. */
@@ -60,8 +70,6 @@ export interface GovernanceOptions {
   reportDynamicTitles?: boolean;
 }
 
-type Modifier = 'skip' | 'fixme' | 'fail' | 'slow';
-
 interface StateBase {
   name: string;
   marker: string;
@@ -78,6 +86,7 @@ export function isTagState(state: StateDef): state is TagStateDef {
 }
 
 export interface ResolvedOptions {
+  framework: Framework;
   testFunctions: Set<string>;
   states: StateDef[];
   requireTicketForConditional: boolean;
@@ -104,6 +113,7 @@ const BUILTIN_STATES: Record<BuiltinStateName, BuiltinDef> = {
   fixme: { marker: 'FIXME', modifier: 'fixme', enabled: true },
   fail: { marker: 'FAIL', modifier: 'fail', enabled: false },
   slow: { marker: 'SLOW', modifier: 'slow', enabled: false },
+  todo: { marker: 'TODO', modifier: 'todo', enabled: true },
   new: { marker: 'NEW', tag: '@new', lifecycle: true, enabled: false },
   unstable: { marker: 'UNSTABLE', tag: '@unstable', lifecycle: true, enabled: false },
 };
@@ -184,6 +194,7 @@ export function compileOptions(options: GovernanceOptions): ResolvedOptions {
   if (problems.length > 0) {
     throw new ConfigError(`invalid options:\n${problems.map((problem) => `  - ${problem}`).join('\n')}`);
   }
+  const framework = FRAMEWORKS[options.framework ?? 'playwright'];
   const placeholders = options.placeholders ?? DEFAULT_PLACEHOLDERS;
   const defaultTicket = toSpecs(options.ticket ?? { preset: 'any' });
   const compile = (spec: TicketSpec | TicketSpec[] | undefined): TicketMatcher =>
@@ -196,7 +207,8 @@ export function compileOptions(options: GovernanceOptions): ResolvedOptions {
     const raw = overrides[name];
     const override: StateOverride = typeof raw === 'boolean' ? { enabled: raw } : (raw ?? {});
     const enabled = override.enabled ?? (def.lifecycle ? (options.lifecycleTags ?? def.enabled) : def.enabled);
-    if (!enabled) continue;
+    // A state the framework has no way to enter, such as `fixme` in Jest, stays off.
+    if (!enabled || !framework.states.has(name)) continue;
     const base = {
       name,
       marker: override.marker ?? def.marker,
@@ -228,7 +240,8 @@ export function compileOptions(options: GovernanceOptions): ResolvedOptions {
   const commentKeywords = options.comments === false ? [] : (options.comments?.keywords ?? DEFAULT_COMMENT_KEYWORDS);
 
   return {
-    testFunctions: new Set(options.testFunctions ?? ['test']),
+    framework,
+    testFunctions: new Set(options.testFunctions ?? framework.testFunctions),
     states,
     requireTicketForConditional: options.requireTicketForConditional ?? false,
     allowBlankLine: options.allowBlankLine ?? false,

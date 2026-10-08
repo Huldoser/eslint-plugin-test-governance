@@ -31,3 +31,17 @@ export function runRule(name: string, rule: unknown, cases: Cases): void {
 export function settings(options: GovernanceOptions): { 'test-governance': GovernanceOptions } {
   return { 'test-governance': options };
 }
+
+interface CaseObject {
+  code: string;
+  settings?: Record<string, unknown>;
+}
+
+/** Runs every case with `options` added to its shared settings, e.g. `{ framework: 'jest' }`. */
+export function withOptions<T extends CaseObject>(options: GovernanceOptions, cases: (string | T)[]): T[] {
+  return cases.map((c) => {
+    const object = (typeof c === 'string' ? { code: c } : c) as T;
+    const own = (object.settings?.['test-governance'] ?? {}) as GovernanceOptions;
+    return { ...object, settings: settings({ ...options, ...own }) };
+  });
+}

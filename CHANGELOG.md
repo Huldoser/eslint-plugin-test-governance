@@ -8,6 +8,16 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Jest and Vitest support. `configs.jest` and `configs.vitest`, or `configure({ framework })`, check
+  those frameworks' tests with the same rules and markers: `test.skip`, `it.skip`, `describe.skip`,
+  Jest's `xit`, `xtest` and `xdescribe`, Vitest's `{ skip: true }` and `context.skip()`, and their
+  `.each` tables, with globals or imports from `@jest/globals` and `vitest`. Vitest's `skipIf()`,
+  `runIf()` and `{ skip: condition }` are conditional skips, so they need no ticket by default.
+  Point each config at its framework's files with `files`; Playwright files keep using
+  `recommended` or `configs.playwright`.
+- A `todo` state for Jest's and Vitest's `test.todo`, with the `// TODO:` marker, on by default. A
+  `// TODO: TRADE-123` above a test that isn't a todo is left alone as a tracked work comment. Jest's
+  `test.failing` and Vitest's `test.fails` use the `fail` state, which stays off by default.
 - Skipped steps need a ticket, like skipped tests: `test.step.skip('title', fn)` and `step.skip()`
   on the `TestStepInfo` a step's body receives. The marker goes above the call, above the step or
   above a skipped test around it. A marker above a step that isn't skipped is reported as left over.

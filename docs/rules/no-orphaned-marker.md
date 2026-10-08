@@ -22,14 +22,18 @@ one from this.
 A `FIXME:` or `TODO:` comment that starts with a valid ticket is treated by where it sits:
 
 - Above a helper or any other code that isn't a test, it is a tracked work comment and is allowed.
-- Above a test, describe or skip call that is not in the `fixme` state, it reads as a leftover marker
-  and is reported, since `// FIXME: TRADE-12` above a test usually means the test was fixed and the
-  marker forgotten. Move a work comment into the test body, or onto the line of code it is about.
+- Above a test, describe or skip call that is not in the `fixme` state, a `FIXME:` comment reads as a
+  leftover marker and is reported, since `// FIXME: TRADE-12` above a test usually means the test was
+  fixed and the marker forgotten. Move a work comment into the test body, or onto the line of code it
+  is about.
+- Above a Jest or Vitest test that is not a todo, a `TODO:` comment is a tracked work comment about
+  the test and is allowed. `TODO` is the everyday keyword for such comments, so there it is far more
+  often a note than the forgotten marker of a `test.todo`.
 
 Other markers that read as a sentence, such as `// SKIP: this one is flaky`, are left alone too: the rule
 counts a comment as prose when its first word is not a valid ticket and more text follows.
 
-Files that don't use Playwright, such as application code, are not checked.
+Files without tests, such as application code, are not checked.
 
 The rule offers a suggestion to delete the comment.
 
@@ -90,4 +94,5 @@ This rule has no options of its own. It reads the shared options described in th
   leftover marker from a sentence or a work comment.
 - `allowBlankLine`: whether a marker separated from the code below it by a blank line still belongs
   to that code.
-- `testFunctions`: which functions count as Playwright's `test`, and so which files are test files.
+- `framework` and `testFunctions`: which functions count as the framework's `test`, and so which
+  files are test files.

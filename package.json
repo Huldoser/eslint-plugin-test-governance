@@ -1,12 +1,14 @@
 {
   "name": "eslint-plugin-test-governance",
   "version": "0.3.1",
-  "description": "ESLint rules that require a ticket comment above skipped, fixme and tagged Playwright tests.",
+  "description": "ESLint rules that require a ticket comment above skipped, fixme, todo and tagged Playwright, Jest and Vitest tests.",
   "keywords": [
     "eslint",
     "eslintplugin",
     "eslint-plugin",
     "playwright",
+    "jest",
+    "vitest",
     "testing"
   ],
   "homepage": "https://github.com/Huldoser/eslint-plugin-test-governance#readme",

@@ -30,9 +30,10 @@ How comments are read:
   style many teams already use. Anything after the parentheses is a note, as it would be after `TODO: TRADE-512`.
 - The tickets follow the same rules as markers: the shared ticket format, placeholders such as `TBD`
   rejected, and no text after the tickets unless `allowNotes` is set.
-- A `// FIXME:` marker directly above a `test.fixme(...)` is checked by
-  [`require-ticket`](require-ticket.md) instead, so it is reported once.
-- Only files that use Playwright (a Playwright import or a call to a test function) are checked.
+- A `// FIXME:` marker directly above a `test.fixme(...)`, or a `// TODO:` marker above a Jest or
+  Vitest `test.todo(...)`, is checked by [`require-ticket`](require-ticket.md) instead, so it is
+  reported once.
+- Only test files (a test framework import or a call to a test function) are checked.
   Application code is left alone, even if your config applies the plugin to it.
 
 ## Examples
@@ -83,4 +84,5 @@ This rule has no options of its own. It reads the shared options described in th
   `{ keywords: ['FIXME', 'TODO', 'HACK'] }` checks `HACK` too. `comments: false` turns the check
   off, and so does turning the rule off in your config.
 - `ticket`, `placeholders` and `allowNotes` work as they do for markers.
-- `testFunctions`: which functions count as Playwright's `test`, and so which files are test files.
+- `framework` and `testFunctions`: which functions count as the framework's `test`, and so which
+  files are test files.

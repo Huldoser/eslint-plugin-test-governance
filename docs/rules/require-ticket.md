@@ -17,10 +17,15 @@ A test is in a state when it is:
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | -------------------------- |
 | `skip`         | `test.skip('title', fn)`, `test.describe.skip`, `test.skip()` in a body, `testInfo.skip()`, `test.step.skip`, `step.skip()` in a step | `// SKIP:`             | yes                        |
 | `fixme`        | `test.fixme(...)`, `test.describe.fixme`, `testInfo.fixme()`                                                                          | `// FIXME:`            | yes                        |
+| `todo`         | Jest's and Vitest's `test.todo`                                                                                                       | `// TODO:`             | yes, in Jest and Vitest    |
 | `new`          | the `@new` tag                                                                                                                        | `// NEW:`              | with `lifecycleTags: true` |
 | `unstable`     | the `@unstable` tag                                                                                                                   | `// UNSTABLE:`         | with `lifecycleTags: true` |
 | `fail`, `slow` | `test.fail(...)`, `test.slow()`, `testInfo.fail()`, `testInfo.slow()`                                                                 | `// FAIL:`, `// SLOW:` | no                         |
 | custom         | any tag you list in `customStates`                                                                                                    | your keyword           | when configured            |
+
+In Jest and Vitest, `xit`, `xdescribe`, Vitest's `{ skip: true }` and `context.skip()` skip a test
+too, and `test.failing` and `test.fails` put it in the `fail` state. The
+[README](../../README.md#jest-and-vitest) lists every form.
 
 Tags are read from the title (`'places a limit order @new'`) and from `{ tag: '@new' }` or `{ tag: ['@new', '@smoke'] }`.
 Tags on a `describe` apply to every test inside it.
@@ -135,6 +140,12 @@ test.skip('rejects a margin order above the buying power', async ({ page }) => {
 test('closes all positions with one click @new', async ({ page }) => {});
 ```
 
+<!-- example: invalid settings={"framework":"jest"} -->
+
+```js
+it.todo('caps position size at 2% of equity');
+```
+
 Correct:
 
 <!-- example: valid -->
@@ -176,6 +187,19 @@ test.skip('rejects a margin order above the buying power', async ({ page }) => {
 test('closes all positions with one click', { tag: '@new' }, async ({ page }) => {});
 ```
 
+<!-- example: valid settings={"framework":"vitest"} -->
+
+```js
+import { describe, test } from 'vitest';
+
+describe('risk limits', () => {
+  // TODO: TRADE-90
+  test.todo('caps position size at 2% of equity');
+
+  test.skipIf(process.env.CI)('streams live quotes', () => {});
+});
+```
+
 ## Options
 
 This rule has no options of its own. It reads the shared options described in the
@@ -189,4 +213,4 @@ change what it reports:
 - `allowBlankLine`: blank lines may separate a marker from its test.
 - `allowNotes`: text may follow the tickets.
 - `reportDynamicTitles`: report titles whose tags can't be read (see [Dynamic titles](#dynamic-titles)).
-- `testFunctions`: which functions count as Playwright's `test`.
+- `framework` and `testFunctions`: which functions count as the framework's `test`.

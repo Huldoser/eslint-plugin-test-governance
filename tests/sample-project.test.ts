@@ -24,6 +24,8 @@ const config = [
       customStates: { 'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' } },
     }),
   },
+  { files: ['tests/unit/**/*.spec.ts'], ...testGovernance.configs.vitest },
+  { files: ['tests/jest/**/*.test.js'], ...testGovernance.configs.jest },
 ] as Linter.Config[];
 
 test('lints the sample project', async () => {

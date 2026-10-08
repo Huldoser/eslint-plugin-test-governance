@@ -17,4 +17,6 @@ module.exports = defineConfig([
       }),
     ],
   },
+  { files: ['tests/unit/**/*.spec.ts'], extends: [testGovernance.configs.vitest] },
+  { files: ['tests/jest/**/*.test.js'], extends: [testGovernance.configs.jest] },
 ]);

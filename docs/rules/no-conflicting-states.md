@@ -65,4 +65,4 @@ This rule has no options of its own. It reads the shared options described in th
 - `lifecycleTags`, or `states` for `new` and `unstable`: the `@new` checks run when the `new` state
   is on, and `@new` together with `@unstable` is reported when both are on.
 - `customStates`: the tags of custom states get the same case and typo checks.
-- `testFunctions`: which functions count as Playwright's `test`.
+- `framework` and `testFunctions`: which functions count as the framework's `test`.
