@@ -26,7 +26,7 @@ jobs:
     permissions:
       contents: write # push the release branch
       pull-requests: write # open the release pull request
-      actions: write # start CI on it
+      actions: write # start CI and the changelog check on it
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -61,3 +61,4 @@ jobs:
           gh pr create --base main --head "$branch" --title "Release $VERSION" --body-file body.md
           # Pull requests opened with this workflow's token don't start CI on their own.
           gh workflow run ci.yml --ref "$branch"
+          gh workflow run changelog.yml --ref "$branch"
