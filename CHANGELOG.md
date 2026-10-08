@@ -33,6 +33,9 @@ All notable changes to this project are documented here. The format follows
   escape earlier in the title could make it change another one: in `'@New\u002Dbeta @New'` it
   rewrote the start of `@New-beta` and left `@New` as it was. A tag after an escape in its title is
   still reported, without a fix.
+- Block comments with lone CR line breaks, or with the Unicode line and paragraph separators
+  (U+2028, U+2029), are read line by line. Before, only LF and CRLF ended a line, so a marker or a
+  `TODO` after the first line of such a comment was missed.
 
 ## [0.3.1] - 2026-10-06
 

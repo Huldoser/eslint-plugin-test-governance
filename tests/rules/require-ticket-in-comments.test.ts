@@ -63,6 +63,15 @@ runRule('require-ticket-in-comments', rule, {
       errors: [{ ...missing('TODO'), line: 2, column: 4, endLine: 2, endColumn: 18 }],
     },
     {
+      code: `/*\r * Context.\r * TODO: refactor\r */\rtest('rebalances the portfolio', async () => {});`,
+      errors: [{ ...missing('TODO'), line: 3, column: 4, endLine: 3, endColumn: 18 }],
+    },
+    // So do a line separator and a paragraph separator.
+    {
+      code: `/*\u2028 * Context.\u2029 * TODO: refactor\u2028 */\ntest('rebalances the portfolio', async () => {});`,
+      errors: [{ ...missing('TODO'), line: 3, column: 4, endLine: 3, endColumn: 18 }],
+    },
+    {
       code: `// TODO: TBD${TEST}`,
       errors: [{ messageId: 'placeholderTicket', data: { ticket: 'TBD' } }],
     },

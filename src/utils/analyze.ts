@@ -316,14 +316,26 @@ export function parseTickets(text: string, offset: number, matcher: TicketMatche
   return { tickets, extra: { text: rest.trim(), range: [offset + lastEnd, offset + lastEnd + rest.length] } };
 }
 
+const LINE_BREAK_RE = /\r\n|[\r\n\u2028\u2029]/g;
+
+/** The lines of a comment and where each starts in the source, split at every line break JavaScript has. */
+export function commentLines(comment: Comment): { text: string; start: number }[] {
+  const lines: { text: string; start: number }[] = [];
+  // `//` and `/*` are both two characters, so the comment's value starts two characters in.
+  const valueStart = comment.range[0] + 2;
+  let lineStart = 0;
+  for (const lineBreak of comment.value.matchAll(LINE_BREAK_RE)) {
+    lines.push({ text: comment.value.slice(lineStart, lineBreak.index), start: valueStart + lineStart });
+    lineStart = lineBreak.index + lineBreak[0].length;
+  }
+  lines.push({ text: comment.value.slice(lineStart), start: valueStart + lineStart });
+  return lines;
+}
+
 function parseMarkers(comment: Comment, states: StateDef[]): Marker[] {
   const markers: Marker[] = [];
-  // `//` and `/*` are both two characters, so the comment's value starts two characters in.
-  let lineStart = comment.range[0] + 2;
-  for (const line of comment.value.split(/\n/)) {
-    const match = MARKER_LINE_RE.exec(line.replace(/\r$/, ''));
-    const start = lineStart;
-    lineStart += line.length + 1;
+  for (const { text, start } of commentLines(comment)) {
+    const match = MARKER_LINE_RE.exec(text);
     if (!match) continue;
     const [, keyword, rest] = match;
     const state = states.find((s) => s.marker === keyword);

@@ -1,5 +1,5 @@
 import type { TSESTree } from '@typescript-eslint/utils';
-import { appliesTo, isStateMarker, parseTickets } from '../utils/analyze.ts';
+import { appliesTo, commentLines, isStateMarker, parseTickets } from '../utils/analyze.ts';
 import { createRule } from '../utils/create-rule.ts';
 import { compileTicketSpec } from '../utils/tickets.ts';
 
@@ -73,13 +73,7 @@ export default createRule({
 
     for (const comment of sourceCode.getAllComments()) {
       if (owned.has(comment)) continue;
-      // `//` and `/*` are both two characters, so the comment's value starts two characters in.
-      let lineStart = comment.range[0] + 2;
-      for (const rawLine of comment.value.split('\n')) {
-        const line = rawLine.replace(/\r$/, '');
-        const start = lineStart;
-        lineStart += rawLine.length + 1;
-
+      for (const { text: line, start } of commentLines(comment)) {
         const match = keywordRe.exec(line);
         if (!match) continue;
         const [whole, indent, keyword] = match;

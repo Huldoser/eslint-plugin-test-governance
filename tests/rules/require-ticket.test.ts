@@ -41,6 +41,9 @@ runRule('require-ticket', rule, {
     "// SKIP: TRADE-1...\ntest.skip('cancels an order', async () => {});",
     "// SKIP: TRADE-1 .\ntest.skip('cancels an order', async () => {});",
     "/*\r\n * Waiting on the broker sandbox.\r\n * SKIP: TRADE-1\r\n */\r\ntest.skip('places an order', async () => {});",
+    // A lone CR, a line separator and a paragraph separator also end a line.
+    "/*\r * Waiting on the broker sandbox.\r * SKIP: TRADE-1\r */\rtest.skip('places an order', async () => {});",
+    "/*\u2028 * Waiting on the broker sandbox.\u2029 * SKIP: TRADE-1\u2028 */\ntest.skip('places an order', async () => {});",
     // Notes after the ticket are allowed with allowNotes.
     ...[
       "// SKIP: TRADE-123 flaky on CI\ntest.skip('streams price updates', async () => {});",
@@ -360,6 +363,11 @@ runRule('require-ticket', rule, {
       ['// SKIP: TRADE-1 flaky, see thread', 'flaky, see thread', '// SKIP: TRADE-1'],
       ['/* SKIP: TRADE-1 flaky */', 'flaky', '/* SKIP: TRADE-1 */'],
       ['/**\r\n * SKIP: TRADE-1 see thread\r\n */', 'see thread', '/**\r\n * SKIP: TRADE-1\r\n */'],
+      [
+        '/**\r * Waiting on the broker.\r * SKIP: TRADE-1 see thread\r */',
+        'see thread',
+        '/**\r * Waiting on the broker.\r * SKIP: TRADE-1\r */',
+      ],
     ].map(([marker, text, fixed]) => ({
       code: `${marker}\ntest.skip('streams price updates', async () => {});`,
       errors: [
