@@ -54,6 +54,42 @@ describe('options validation', () => {
     [{ testFunctions: [1] }, 'testFunctions[0] must be a string (got 1)'],
     [{ testFunctions: () => ['test'] }, 'testFunctions must be an array (got a function)'],
     [{ placeholders: 'x'.repeat(60) }, `placeholders must be an array (got "${'x'.repeat(36)}...)`],
+    [
+      { testFunctions: 'test, buyOrder, sellOrder, cancelOrder' },
+      'testFunctions must be an array (got "test, buyOrder, sellOrder, cancelOrder")',
+    ],
+    [{ ticket: { preset: 'jira', host: ['jira.acme.io'] } }, 'ticket.host must be a string (got ["jira.acme.io"])'],
+    [{ ticket: { preset: 'numeric', maxLength: 0 } }, 'ticket.maxLength must be at least 1 (got 0)'],
+    [
+      { ticket: { preset: 'pattern', pattern: ['TRADE', 'RISK'] } },
+      'ticket.pattern must be a string (got ["TRADE","RISK"])',
+    ],
+    [{ ticket: { preset: 'pattern', pattern: 'TRADE-\\d+', flags: true } }, 'ticket.flags must be a string (got true)'],
+    [
+      { ticket: { preset: 'numeric', manLength: 6 } },
+      'ticket.manLength is not a known option; did you mean "minLength"?',
+    ],
+    [{ states: { slow: { enabled: 'yes' } } }, 'states.slow.enabled must be a boolean (got "yes")'],
+    [{ states: { skip: { mark: 'SKIPPED' } } }, 'states.skip.mark is not a known option; did you mean "marker"?'],
+    [
+      { customStates: { blocked: { when: '@blocked', marker: 'BLOCKED', tickets: { preset: 'jira' } } } },
+      'customStates.blocked.tickets is not a known option; did you mean "ticket"?',
+    ],
+    [
+      { customStates: { blocked: { when: '@blocked @flaky', marker: 'BLOCKED' } } },
+      'customStates.blocked.when must be a tag such as @needs-data (got "@blocked @flaky")',
+    ],
+    [
+      { customStates: { blocked: { when: '@blocked', marker: '@BLOCKED' } } },
+      'customStates.blocked.marker must be an uppercase keyword such as NEEDS-DATA (letters, digits, "-" and "_") (got "@BLOCKED")',
+    ],
+    [{ comments: 'off' }, 'comments must be false or an object (got "off")'],
+    [{ comments: { keyword: ['HACK'] } }, 'comments.keyword is not a known option; did you mean "keywords"?'],
+    [{ placeholders: [0] }, 'placeholders[0] must be a string (got 0)'],
+    [{ lifecycleTags: () => true }, 'lifecycleTags must be a boolean (got a function)'],
+    [{ requireTicketForConditional: 'always' }, 'requireTicketForConditional must be a boolean (got "always")'],
+    [{ allowBlankLine: 1 }, 'allowBlankLine must be a boolean (got 1)'],
+    [{ reportDynamicTitles: 'on' }, 'reportDynamicTitles must be a boolean (got "on")'],
   ]) {
     it(JSON.stringify(options), () => {
       assert.deepEqual(problems(options), [message]);
@@ -83,6 +119,10 @@ describe('options validation', () => {
     );
     assert.deepEqual(problems({ comments: { keywords: ['FIXME', 'HACK'] } }), []);
   });
+
+  it('accepts a value equal to the minimum', () => {
+    assert.deepEqual(problems({ ticket: { preset: 'numeric', minLength: 1, maxLength: 1 } }), []);
+  });
 });
 
 describe('validate', () => {
@@ -105,5 +145,21 @@ describe('validate', () => {
 
   it('names the top level "options" and pluralises item counts', () => {
     assert.deepEqual(validate([1], { type: 'array', minItems: 2 }), ['options must have at least 2 items']);
+  });
+
+  it('accepts a value that matches a later anyOf branch of the same type', () => {
+    const side: Schema = {
+      anyOf: [
+        { type: 'string', enum: ['buy'] },
+        { type: 'string', enum: ['sell'] },
+      ],
+    };
+    assert.deepEqual(validate('sell', side, 'side'), []);
+  });
+
+  it('applies pattern, minimum and properties only to values of their type', () => {
+    assert.deepEqual(validate(4821, { pattern: '^[A-Z]+$' }), []);
+    assert.deepEqual(validate('0', { minimum: 1 }), []);
+    assert.deepEqual(validate('TRADE', { required: ['preset'], additionalProperties: false }), []);
   });
 });

@@ -13,6 +13,8 @@ describe('editDistance', () => {
     ['bid', '', 3],
     ['', 'bid', 3],
     ['bid', 'ask', 3],
+    // Two letters count as one swap only when both of them match.
+    ['ask', 'swap', 4],
   ];
   for (const [a, b, distance] of cases) {
     it(`${a} → ${b} is ${distance}`, () => {

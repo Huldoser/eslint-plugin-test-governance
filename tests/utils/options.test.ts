@@ -48,6 +48,26 @@ describe('compileOptions', () => {
     );
   });
 
+  it('treats a state set to undefined as not set', () => {
+    assert.deepEqual(stateNames({ states: { skip: undefined } }), ['skip', 'fixme']);
+  });
+
+  it('compiles a custom ticket pattern', () => {
+    const resolved = compileOptions({ ticket: { preset: 'pattern', pattern: 'TRADE-\\d+', flags: 'i' } });
+    assert.equal(resolved.commentTicket.check('trade-7'), 'ok');
+  });
+
+  it('checks no comment keywords with comments: false', () => {
+    assert.deepEqual(compileOptions({ comments: false }).commentKeywords, []);
+  });
+
+  it('names the error ConfigError', () => {
+    assert.throws(
+      () => compileOptions({ lifecycleTags: 'yes' } as never),
+      /^ConfigError: eslint-plugin-test-governance: invalid options:/,
+    );
+  });
+
   it('compiles per-state ticket formats', () => {
     const resolved = compileOptions({
       ticket: { preset: 'jira' },
