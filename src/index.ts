@@ -34,7 +34,8 @@ const ruleModules: Record<RuleName, { meta: { docs: { recommended: 'error' | 'wa
 // Public types come from `eslint` itself, so users don't need typescript-eslint installed.
 export const rules = ruleModules as unknown as Record<RuleName, Rule.RuleModule>;
 
-const recommendedRules = Object.fromEntries(
+// Every framework config turns on all the rules, at the severity in each rule's `meta.docs.recommended`.
+const configRules = Object.fromEntries(
   (Object.keys(ruleModules) as RuleName[]).map((name) => [
     `${PLUGIN_NAME}/${name}`,
     ruleModules[name].meta.docs.recommended,
@@ -49,10 +50,10 @@ export interface FlatConfig {
 }
 
 /**
- * `recommended` is the Playwright config. `playwright`, `jest` and `vitest` turn on the same rules
- * for that framework; point each one at its test files with `files`.
+ * One config per framework. `playwright`, `jest` and `vitest` turn on the same rules for that framework's
+ * tests; point each one at its test files with `files`.
  */
-export type ConfigName = 'recommended' | FrameworkName;
+export type ConfigName = FrameworkName;
 
 export interface TestGovernancePlugin extends ESLint.Plugin {
   meta: { name: string; version: string; namespace: string };
@@ -69,25 +70,19 @@ const plugin: TestGovernancePlugin = {
 };
 
 /**
- * Returns the recommended config with shared options in `settings['test-governance']`,
- * so all rules read the same ticket formats and states. With `framework`, it is that
- * framework's config.
+ * Returns the config of `options.framework` with shared options in `settings['test-governance']`,
+ * so all rules read the same ticket formats and states.
  */
 export function configure(options: GovernanceOptions = {}): FlatConfig {
   compileOptions(options); // fail on a bad config at load time, not on the first lint
   return {
-    name: `${PLUGIN_NAME}/${options.framework ?? 'recommended'}`,
+    name: `${PLUGIN_NAME}/${options.framework ?? 'playwright'}`,
     plugins: { [PLUGIN_NAME]: plugin },
-    rules: { ...recommendedRules },
+    rules: { ...configRules },
     settings: { [SETTINGS_KEY]: options },
   };
 }
 
-plugin.configs.recommended = {
-  name: `${PLUGIN_NAME}/recommended`,
-  plugins: { [PLUGIN_NAME]: plugin },
-  rules: { ...recommendedRules },
-};
 // Each sets its framework, so it wins over a `configure()` that applies to all files when listed after it.
 for (const framework of FRAMEWORK_NAMES) {
   plugin.configs[framework] = configure({ framework });
@@ -98,7 +93,7 @@ export default plugin;
 /**
  * Makes `require('eslint-plugin-test-governance')` return the plugin itself rather than the module
  * namespace. With the namespace, a CommonJS config that registers the plugin next to
- * `configs.recommended` fails with "Cannot redefine plugin".
+ * `configs.playwright` fails with "Cannot redefine plugin".
  *
  * @internal Left out of the type declarations: TypeScript before 5.6 can't parse a string export
  * name, so it would reject the whole file.

@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Removed
+
+- **Breaking:** `configs.recommended` is gone. It checked every file as Playwright tests, so pick the
+  config for your framework instead: `configs.playwright`, `configs.jest` or `configs.vitest`. For
+  Playwright, replace `configs.recommended` with `configs.playwright`, and
+  `extends: ['test-governance/recommended']` with `extends: ['test-governance/playwright']`. The
+  rules and their severities are the same.
+
 ### Fixed
 
 - Tags kept in a `const` or an enum in the same file count, as in `{ tag: TAGS.NEW }` after

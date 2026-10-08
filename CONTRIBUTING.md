@@ -46,7 +46,7 @@ reached, remove it rather than excluding it.
   case, and assert the full message data and any suggestion output.
 - Each rule has a page in `docs/rules/`. Examples marked `<!-- example: valid -->` or
   `<!-- example: invalid -->` run as tests, so keep them correct. Code samples in the README marked
-  the same way run with all the recommended rules on.
+  the same way run with all the rules on.
 - The rules list in the README and the header of each rule page are generated. After changing rule
   metadata, run `npm run docs` and commit the result.
 - If the change affects what the sample project reports, update the snapshot with

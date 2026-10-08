@@ -36,13 +36,13 @@ test('lints the sample project', async () => {
   assert.equal(actual, readFileSync(snapshot, 'utf8'));
 });
 
-test('the recommended config works without options', async () => {
+test('the Playwright config works without options', async () => {
   const eslint = new ESLint({
     cwd,
     overrideConfigFile: true,
     overrideConfig: [
       { files: ['**/*.ts'], languageOptions: { parser: tsParser } },
-      testGovernance.configs.recommended,
+      testGovernance.configs.playwright,
     ] as Linter.Config[],
   });
   const [result] = await eslint.lintFiles(['tests/orders.spec.ts']);

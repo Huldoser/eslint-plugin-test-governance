@@ -33,6 +33,9 @@ Requires ESLint 9 or 10 with flat config, and Node.js 22.12 or later. For TypeSc
 
 ## Usage
 
+Pick the config for the framework your tests use, `configs.playwright`, `configs.jest` or
+`configs.vitest`, and point it at those test files with `files`:
+
 ```js
 // eslint.config.js
 import tsParser from '@typescript-eslint/parser';
@@ -42,10 +45,15 @@ export default [
   { files: ['**/*.ts'], languageOptions: { parser: tsParser } },
   {
     files: ['tests/**/*.{js,ts}'],
-    ...testGovernance.configs.recommended,
+    ...testGovernance.configs.playwright,
   },
 ];
 ```
+
+There is no default config. Each framework declares, skips and tags tests its own way, so the rules
+need to know which one a file uses. In a Jest or Vitest config, `test`, `it` and `describe` belong to
+that framework, whether they are globals or imported from `@jest/globals` or `vitest`, the way the
+Jest and Vitest ESLint plugins are set up.
 
 With ESLint's `defineConfig()` (ESLint 9.22 or later), put the config in `extends`:
 
@@ -59,25 +67,26 @@ export default defineConfig([
   { files: ['**/*.ts'], languageOptions: { parser: tsParser } },
   {
     files: ['tests/**/*.{js,ts}'],
-    extends: [testGovernance.configs.recommended],
+    extends: [testGovernance.configs.playwright],
   },
 ]);
 ```
 
 Any flat config file works. The package is ESM, and `require('eslint-plugin-test-governance')` in an
 `eslint.config.cjs` returns the plugin itself. Inside `defineConfig()`, once the plugin is registered
-under `plugins`, the string form `extends: ['test-governance/recommended']` works too. ESLint loads
+under `plugins`, the string form `extends: ['test-governance/playwright']` works too. ESLint loads
 an `eslint.config.ts` through [`jiti`](https://github.com/unjs/jiti), so install it as a dev
 dependency too.
 
-To change the defaults, use `configure()`. It returns the same recommended config with your options
-stored in `settings['test-governance']`, which all the rules read:
+To change the defaults, use `configure()`. It takes the framework and your options, and returns that
+framework's config with the options stored in `settings['test-governance']`, which all the rules read:
 
 ```js
 export default [
   {
     files: ['tests/**/*.{js,ts}'],
     ...testGovernance.configure({
+      framework: 'playwright',
       // Only accept Jira keys from these projects (or Jira URLs).
       ticket: { preset: 'jira', projects: ['TRADE', 'RISK'] },
       // Turn on the @new and @unstable states.
@@ -100,28 +109,24 @@ eslint-plugin-test-governance: invalid options:
   - ticket.preset must be one of "any", "jira", "github", … (got "jria")
 ```
 
-### Jest and Vitest
+### Frameworks
 
-`recommended` is for Playwright. For Jest and Vitest, use `configs.jest` or `configs.vitest` and
-point it at those test files with `files`, the way the Jest and Vitest ESLint plugins are set up.
-In those files, `test`, `it` and `describe` belong to that framework, whether they are globals or
-imported from `@jest/globals` or `vitest`. Each framework config sets only the framework, so the
-options of an earlier `configure()` still apply to its files:
+A project with tests in more than one framework gives each framework its own config, pointed at its
+files. To share options between them, pass the same options to each `configure()`:
 
 ```js
+const options = { ticket: { preset: 'jira', projects: ['TRADE'] } };
+
 export default [
-  {
-    files: ['e2e/**/*.spec.ts', 'src/**/*.test.ts'],
-    ...testGovernance.configure({ ticket: { preset: 'jira', projects: ['TRADE'] } }),
-  },
-  // Unit tests run on Vitest; the e2e specs stay on Playwright.
-  { files: ['src/**/*.test.ts'], ...testGovernance.configs.vitest },
+  // The e2e specs run on Playwright, the unit tests on Vitest.
+  { files: ['e2e/**/*.spec.ts'], ...testGovernance.configure({ framework: 'playwright', ...options }) },
+  { files: ['src/**/*.test.ts'], ...testGovernance.configure({ framework: 'vitest', ...options }) },
 ];
 ```
 
-`configure({ framework: 'jest', ... })` gives the Jest config with options in one call, and
-`configs.playwright` is the Playwright config with its framework set, for a file list that needs it.
-All four configs turn on the same rules. What puts a test in a state in each framework:
+`configs.playwright`, `configs.jest` and `configs.vitest` set only the framework, so one listed after a
+`configure()` for the same files keeps that config's options and changes only the framework. All three
+turn on the same rules. What puts a test in a state in each framework:
 
 | State (marker)                         | Playwright                                                                                                          | Jest                                                                 | Vitest                                                                                                                             |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
@@ -143,23 +148,25 @@ tag with an `@` in front: `'flaky'` is `@flaky`, and a custom state with `when: 
 
 💼 [Configurations](https://github.com/Huldoser/eslint-plugin-test-governance#usage) enabled in.\
 ⚠️ [Configurations](https://github.com/Huldoser/eslint-plugin-test-governance#usage) set to warn in.\
-✅ Set in the `recommended` [configuration](https://github.com/Huldoser/eslint-plugin-test-governance#usage).\
+🃏 Set in the `jest` [configuration](https://github.com/Huldoser/eslint-plugin-test-governance#usage).\
+🎭 Set in the `playwright` [configuration](https://github.com/Huldoser/eslint-plugin-test-governance#usage).\
+⚡ Set in the `vitest` [configuration](https://github.com/Huldoser/eslint-plugin-test-governance#usage).\
 🔧 Automatically fixable by the [`--fix` CLI option](https://eslint.org/docs/user-guide/command-line-interface#--fix).\
 💡 Manually fixable by [editor suggestions](https://eslint.org/docs/latest/use/core-concepts#rule-suggestions).
 
-| Name                                                                   | Description                                                                       | 💼  | ⚠️  | 🔧  | 💡  |
-| :--------------------------------------------------------------------- | :-------------------------------------------------------------------------------- | :-- | :-- | :-- | :-- |
-| [marker-matches-state](docs/rules/marker-matches-state.md)             | Require the marker keyword to match the test's state                              | ✅  |     |     | 💡  |
-| [no-conflicting-states](docs/rules/no-conflicting-states.md)           | Disallow state tags that contradict each other, differ in case or look like typos |     | ✅  | 🔧  |     |
-| [no-orphaned-marker](docs/rules/no-orphaned-marker.md)                 | Disallow marker comments that no longer match a test state                        | ✅  |     |     | 💡  |
-| [require-ticket](docs/rules/require-ticket.md)                         | Require a ticket marker comment above skipped, fixme and tagged tests             | ✅  |     |     | 💡  |
-| [require-ticket-in-comments](docs/rules/require-ticket-in-comments.md) | Require FIXME and TODO comments in test files to start with a ticket              | ✅  |     |     | 💡  |
+| Name                                                                   | Description                                                                       | 💼       | ⚠️       | 🔧  | 💡  |
+| :--------------------------------------------------------------------- | :-------------------------------------------------------------------------------- | :------- | :------- | :-- | :-- |
+| [marker-matches-state](docs/rules/marker-matches-state.md)             | Require the marker keyword to match the test's state                              | 🃏 🎭 ⚡ |          |     | 💡  |
+| [no-conflicting-states](docs/rules/no-conflicting-states.md)           | Disallow state tags that contradict each other, differ in case or look like typos |          | 🃏 🎭 ⚡ | 🔧  |     |
+| [no-orphaned-marker](docs/rules/no-orphaned-marker.md)                 | Disallow marker comments that no longer match a test state                        | 🃏 🎭 ⚡ |          |     | 💡  |
+| [require-ticket](docs/rules/require-ticket.md)                         | Require a ticket marker comment above skipped, fixme and tagged tests             | 🃏 🎭 ⚡ |          |     | 💡  |
+| [require-ticket-in-comments](docs/rules/require-ticket-in-comments.md) | Require FIXME and TODO comments in test files to start with a ticket              | 🃏 🎭 ⚡ |          |     | 💡  |
 
 <!-- end auto-generated rules list -->
 
 ## Defaults
 
-The defaults follow how most teams already work, so `recommended` is useful with no options.
+The defaults follow how most teams already work, so each framework config is useful with no options.
 
 | Setting                                                                                                   | Default                                                                      | Why                                                                                                                      |
 | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -184,7 +191,7 @@ always agree on ticket formats, states and markers. To turn a rule off, set it t
 
 | Option                        | Type                                                     | Default                           | Description                                                                                                                                                                                                                                                                                                                                                                                   |
 | ----------------------------- | -------------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `framework`                   | `'playwright' \| 'jest' \| 'vitest'`                     | `'playwright'`                    | The test framework of the files the config applies to. `configs.jest` and `configs.vitest` set it. See [Jest and Vitest](#jest-and-vitest).                                                                                                                                                                                                                                                   |
+| `framework`                   | `'playwright' \| 'jest' \| 'vitest'`                     | `'playwright'`                    | The test framework of the files the config applies to. `configs.playwright`, `configs.jest` and `configs.vitest` set it. See [Frameworks](#frameworks).                                                                                                                                                                                                                                       |
 | `ticket`                      | `TicketSpec \| TicketSpec[]`                             | `{ preset: 'any' }`               | Accepted ticket formats. An array accepts a ticket that matches any entry. See [Ticket presets](#ticket-presets).                                                                                                                                                                                                                                                                             |
 | `placeholders`                | `string[]`                                               | see above                         | Tickets rejected as placeholders. `*` matches any characters. Case-insensitive; a leading `#` is ignored. Your list replaces the default one, so repeat the defaults you want to keep. Tickets numbered 0 are always rejected.                                                                                                                                                                |
 | `lifecycleTags`               | `boolean`                                                | `false`                           | Turns on the `new` (`@new`) and `unstable` (`@unstable`) states.                                                                                                                                                                                                                                                                                                                              |
@@ -258,7 +265,7 @@ variable declared inside a function that happens to be called `test`.
 
 ### Syntax the rules understand
 
-The [Jest and Vitest](#jest-and-vitest) table lists what each framework's tests can do. In Playwright:
+The [Frameworks](#frameworks) table lists what each framework's tests can do. In Playwright:
 
 - `test.skip('title', fn)`, `test.fixme(...)`, `test.fail(...)`, with or without a details object,
   and with a body defined elsewhere, as in `test.skip('places a limit order', placeLimitOrder)`.
@@ -292,6 +299,7 @@ import tsParser from '@typescript-eslint/parser';
 import testGovernance, { type GovernanceOptions } from 'eslint-plugin-test-governance';
 
 const options: GovernanceOptions = {
+  framework: 'playwright',
   lifecycleTags: true,
   ticket: { preset: 'jira', projects: ['TRADE'] },
 };

@@ -1,25 +1,28 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { Linter } from 'eslint';
-import testGovernance, { configs, configure } from '../src/index.ts';
+import testGovernance, { configs, configure, rules } from '../src/index.ts';
+import { FRAMEWORK_NAMES } from '../src/utils/constants.ts';
 
 const SKIPPED_VITEST_TEST = "import { test } from 'vitest';\ntest.skip('fills a limit order', () => {});";
 
 describe('configs', () => {
-  it('has a config for each framework, with the same rules as recommended', () => {
-    assert.deepEqual(Object.keys(configs).sort(), ['jest', 'playwright', 'recommended', 'vitest']);
-    for (const framework of ['playwright', 'jest', 'vitest'] as const) {
+  it('has a config for each framework and no other', () => {
+    assert.deepEqual(Object.keys(configs).sort(), [...FRAMEWORK_NAMES].sort());
+    const ruleNames = Object.keys(rules).map((name) => `test-governance/${name}`);
+    for (const framework of FRAMEWORK_NAMES) {
       const config = configs[framework];
       assert.equal(config.name, `test-governance/${framework}`);
-      assert.deepEqual(config.rules, configs.recommended.rules);
+      // Every config turns on every rule, at the same severity.
+      assert.deepEqual(Object.keys(config.rules).sort(), ruleNames.sort());
+      assert.deepEqual(config.rules, configs.playwright.rules);
       assert.deepEqual(config.settings, { 'test-governance': { framework } });
       assert.equal(config.plugins['test-governance'], testGovernance);
     }
-    assert.equal(configs.recommended.settings, undefined);
   });
 
   it('names a configure() config after its framework', () => {
-    assert.equal(configure().name, 'test-governance/recommended');
+    assert.equal(configure().name, 'test-governance/playwright');
     assert.equal(configure({ framework: 'jest' }).name, 'test-governance/jest');
   });
 
