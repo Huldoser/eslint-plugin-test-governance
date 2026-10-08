@@ -192,16 +192,22 @@ function collectTestNames(program: TSESTree.Program, configured: Set<string>): S
         const source = requireSource(init);
         if (source === undefined) continue;
         for (const prop of declarator.id.properties) {
-          if (prop.type !== 'Property' || prop.key.type !== 'Identifier' || prop.value.type !== 'Identifier') continue;
+          if (prop.type !== 'Property' || prop.value.type !== 'Identifier') continue;
           if (OTHER_FRAMEWORKS.has(source)) {
             names.delete(prop.value.name);
             others.add(prop.value.name);
-          } else if (isPlaywrightModule(source) && prop.key.name === 'test') names.add(prop.value.name);
+          } else if (isPlaywrightModule(source) && propertyName(prop) === 'test') names.add(prop.value.name);
         }
       }
     }
   }
   return names;
+}
+
+/** The name a property key spells out: `test` in `{ test }`, `{ 'test': t }` or `{ ['test']: t }`. */
+function propertyName(prop: TSESTree.Property): string | undefined {
+  if (prop.key.type === 'Literal') return typeof prop.key.value === 'string' ? prop.key.value : undefined;
+  return !prop.computed && prop.key.type === 'Identifier' ? prop.key.name : undefined;
 }
 
 function importedName(spec: TSESTree.ImportSpecifier): string {

@@ -134,6 +134,12 @@ runRule('require-ticket', rule, {
     "import ava from 'ava';\nconst test = ava;\ntest.skip('calculates profit', (t) => {});",
     "const tap = require('tap');\nconst test = tap.test;\ntest.skip('calculates profit', () => {});",
     "const { test: base } = require('mocha');\nconst test = base;\ntest.skip('calculates profit', () => {});",
+    "const { 'test': test } = require('node:test');\ntest.skip('calculates profit', () => {});",
+    // Only a key that spells out `test` takes Playwright's test.
+    {
+      code: "const { [test]: byName, 0: first } = require('@playwright/test');\nbyName.skip('places an order', async () => {});\nfirst.skip('cancels an order', async () => {});",
+      settings: settings({ testFunctions: [] }),
+    },
     // Only `test` itself is taken from a Playwright require.
     "const { expect: e } = require('@playwright/test');\ne.skip('places an order', async () => {});",
     "const config = require('./playwright.config');\ntest('places an order', async () => {});",
@@ -674,6 +680,11 @@ runRule('require-ticket', rule, {
       code: "import { test as base, expect } from '@playwright/test';\nimport other from 'other';\nexport const myTest = base.extend({}).extend({});\nconst made = make(), deep = obj.a.extend({});\nconst x = 1, y = other.extend({});\nlet z;\nexport {};\nmyTest.skip('places an order', async () => {});\ny.skip('cancels an order', async () => {});",
       settings: settings({ testFunctions: [] }),
       errors: [missing('skip', 'SKIP')],
+    },
+    {
+      code: "const { 'test': quoted, ['test']: computed } = require('@playwright/test');\nquoted.skip('places an order', async () => {});\ncomputed.skip('cancels an order', async () => {});",
+      settings: settings({ testFunctions: [] }),
+      errors: [missing('skip', 'SKIP'), missing('skip', 'SKIP')],
     },
     {
       code: "const { test: pwTest, expect } = require('@playwright/test');\nconst { other } = require('other');\nconst { ...rest } = require('@playwright/test');\nconst { test: { nested } } = require('@playwright/test');\npwTest.skip('places an order', async () => {});",

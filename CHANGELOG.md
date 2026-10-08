@@ -22,6 +22,10 @@ All notable changes to this project are documented here. The format follows
   after the host was accepted.
 - A plain alias of a Playwright test, as in `const orderTest = base`, is now followed like
   `base.extend()` and `mergeTests()` are. Before, tests declared through it were not checked.
+- A quoted key in a destructured `require()` is read like a plain one. Before,
+  `const { 'test': test } = require('node:test')` still counted as Playwright's `test`, so its
+  skipped tests were reported, and `const { 'test': t } = require('@playwright/test')` was not
+  followed.
 
 ## [0.3.1] - 2026-10-06
 
