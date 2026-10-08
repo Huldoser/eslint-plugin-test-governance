@@ -49,6 +49,11 @@ export function isStateMarker(marker: Marker): marker is StateMarker {
 export interface TagOccurrence {
   tag: string;
   node: TSESTree.Literal | TSESTree.TemplateLiteral;
+  /**
+   * Where the tag is written in the source. Unset when an escape such as `\u002D` comes before the
+   * tag or inside it, since the source then no longer lines up with the title.
+   */
+  range?: TSESTree.Range;
 }
 
 interface StateSource {
@@ -333,15 +338,23 @@ function parseMarkers(comment: Comment, states: StateDef[]): Marker[] {
   return markers;
 }
 
-function scanTags(node: TSESTree.Literal | TSESTree.TemplateLiteral, out: TagOccurrence[]): void {
-  const texts =
+function scanTags(source: string, node: TSESTree.Literal | TSESTree.TemplateLiteral, out: TagOccurrence[]): void {
+  // Each piece of text with where it starts in the source, after its opening quote, backtick or `}`.
+  const parts =
     node.type === 'Literal'
-      ? [String(node.value)]
-      : // `cooked` is only null in tagged templates, which are never titles.
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
-        node.quasis.map((quasi) => quasi.value.cooked!);
-  for (const text of texts) {
-    for (const match of text.matchAll(TAG_RE)) out.push({ tag: match[0], node });
+      ? [{ text: String(node.value), start: node.range[0] + 1 }]
+      : node.quasis.map((quasi) => ({
+          // `cooked` is only null in tagged templates, which are never titles.
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
+          text: quasi.value.cooked!,
+          start: quasi.range[0] + 1,
+        }));
+  for (const { text, start } of parts) {
+    for (const match of text.matchAll(TAG_RE)) {
+      const end = match.index + match[0].length;
+      const written = source.slice(start, start + end) === text.slice(0, end);
+      out.push({ tag: match[0], node, ...(written && { range: [start + match.index, start + end] }) });
+    }
   }
 }
 
@@ -349,12 +362,16 @@ function isStaticText(node: Node): node is TSESTree.StringLiteral | TSESTree.Tem
   return (node.type === 'Literal' && typeof node.value === 'string') || node.type === 'TemplateLiteral';
 }
 
-function collectTags(call: TSESTree.CallExpression, hasTitle: boolean): { tags: TagOccurrence[]; dynamic: boolean } {
+function collectTags(
+  source: string,
+  call: TSESTree.CallExpression,
+  hasTitle: boolean,
+): { tags: TagOccurrence[]; dynamic: boolean } {
   const tags: TagOccurrence[] = [];
   if (!hasTitle) return { tags, dynamic: false };
   const [title, details] = call.arguments;
   const dynamic = !isStaticText(title);
-  if (!dynamic) scanTags(title, tags);
+  if (!dynamic) scanTags(source, title, tags);
   if (call.arguments.length >= 3 && details.type === 'ObjectExpression') {
     for (const prop of details.properties) {
       if (prop.type !== 'Property' || prop.computed) continue;
@@ -362,7 +379,7 @@ function collectTags(call: TSESTree.CallExpression, hasTitle: boolean): { tags: 
       if (key !== 'tag') continue;
       const values = prop.value.type === 'ArrayExpression' ? prop.value.elements : [prop.value];
       for (const value of values) {
-        if (value && isStaticText(value)) scanTags(value, tags);
+        if (value && isStaticText(value)) scanTags(source, value, tags);
       }
     }
   }
@@ -533,14 +550,14 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       const titled = args.length >= 2 && isStaticText(args[0]);
       const isDeclaration = args.length >= 2 && !isFunction(args[0]) && (isFunction(last) || titled);
       if (path.every((p) => TEST_MODIFIERS.has(p)) && isDeclaration) {
-        return { subject: makeSubject('test', call, path, collectTags(call, true)), testInfo };
+        return { subject: makeSubject('test', call, path, collectTags(sourceCode.text, call, true)), testInfo };
       }
       if (
         path[0] === 'describe' &&
         path.slice(1).every((p) => DESCRIBE_MODIFIERS.has(p)) &&
         (isFunction(last) || titled)
       ) {
-        const tagInfo = collectTags(call, args.length >= 2);
+        const tagInfo = collectTags(sourceCode.text, call, args.length >= 2);
         return { subject: makeSubject('describe', call, path.slice(1), tagInfo), testInfo };
       }
       if (path.length === 1 && RUNTIME_MODIFIERS.has(path[0])) {

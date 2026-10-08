@@ -29,6 +29,10 @@ All notable changes to this project are documented here. The format follows
 - Tests written through the whole Playwright module, as in `import * as pw from '@playwright/test'`
   or `const pw = require('@playwright/test')` followed by `pw.test.skip(...)`, are now checked,
   including `pw.test.extend()` and `pw.mergeTests()`. Before, they were ignored.
+- The `no-conflicting-states` fix for a tag in the wrong case changes only that tag. Before, an
+  escape earlier in the title could make it change another one: in `'@New\u002Dbeta @New'` it
+  rewrote the start of `@New-beta` and left `@New` as it was. A tag after an escape in its title is
+  still reported, without a fix.
 
 ## [0.3.1] - 2026-10-06
 

@@ -2,7 +2,6 @@ import { headLoc, type TagOccurrence } from '../utils/analyze.ts';
 import { createRule } from '../utils/create-rule.ts';
 import { isTagState } from '../utils/options.ts';
 import { editDistance, typoThreshold } from '../utils/distance.ts';
-import { tagRange } from '../utils/fix.ts';
 
 export default createRule({
   meta: {
@@ -23,19 +22,12 @@ export default createRule({
     },
   },
   create(context, analysis, options) {
-    const { sourceCode } = context;
     const tagStates = options.states.filter(isTagState);
     const newTag = options.states.find((s) => s.name === 'new')?.tag;
     const unstableTag = options.states.find((s) => s.name === 'unstable')?.tag;
 
     for (const subject of analysis.subjects) {
-      const ownIndex = new Map<string, number>();
-      for (const occurrence of subject.tags) {
-        const key = `${occurrence.tag}\0${occurrence.node.range[0]}`;
-        const index = ownIndex.get(key) ?? 0;
-        ownIndex.set(key, index + 1);
-        checkSpelling(occurrence, index);
-      }
+      for (const occurrence of subject.tags) checkSpelling(occurrence);
 
       if (newTag === undefined) continue;
       const own = (tag: string): TagOccurrence | undefined => subject.tags.find((t) => t.tag === tag);
@@ -61,13 +53,12 @@ export default createRule({
       }
     }
 
-    function checkSpelling(occurrence: TagOccurrence, index: number): void {
-      const { tag } = occurrence;
+    function checkSpelling(occurrence: TagOccurrence): void {
+      const { tag, range } = occurrence;
       if (tagStates.some((s) => s.tag === tag)) return;
       const lower = tag.toLowerCase();
       const sameLetters = tagStates.find((s) => s.tag.toLowerCase() === lower);
       if (sameLetters) {
-        const range = tagRange(sourceCode, occurrence.node, tag, index);
         context.report({
           node: occurrence.node,
           messageId: 'tagCase',

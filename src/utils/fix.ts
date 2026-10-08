@@ -32,16 +32,3 @@ export function indentOf(sourceCode: SourceCode, comment: TSESTree.Comment): str
   const line = sourceCode.lines[comment.loc.start.line - 1];
   return line.slice(0, line.length - line.trimStart().length);
 }
-
-/** Range of the `index`-th occurrence of `tag` in the source text of `node`. */
-export function tagRange(
-  sourceCode: SourceCode,
-  node: TSESTree.Node,
-  tag: string,
-  index: number,
-): TSESTree.Range | undefined {
-  const text = sourceCode.getText(node);
-  const re = new RegExp(`(?<![\\w@])${escapeRegExp(tag)}(?![\\w-])`, 'g');
-  const match = [...text.matchAll(re)].at(index);
-  return match === undefined ? undefined : [node.range[0] + match.index, node.range[0] + match.index + tag.length];
-}

@@ -130,6 +130,27 @@ runRule('no-conflicting-states', rule, {
       output: "test('places an order @new and amends it @new @New\\u002Dbeta', async () => {});",
       errors: [{ messageId: 'tagCase' }, { messageId: 'tagCase' }],
     },
+    // After an escape the source no longer lines up with the title, so there is no fix.
+    {
+      code: "test('places an order @New\\u002Dbeta @New', async () => {});",
+      settings: lifecycle,
+      output: null,
+      errors: [{ messageId: 'tagCase', data: { found: '@New', expected: '@new' } }],
+    },
+    // A template reads a CRLF line break as LF, so it doesn't line up either.
+    {
+      code: 'test(`places an order\r\n@New`, async () => {});',
+      settings: lifecycle,
+      output: null,
+      errors: [{ messageId: 'tagCase' }],
+    },
+    // A tag after a template expression is fixed in its own part of the template.
+    {
+      code: 'test(`places a ${side} order @New`, async () => {});',
+      settings: lifecycle,
+      output: 'test(`places a ${side} order @new`, async () => {});',
+      errors: [{ messageId: 'tagCase' }],
+    },
     {
       code: "test('amends the order price @unstabel', async () => {});",
       settings: lifecycle,
