@@ -11,14 +11,15 @@ function escapeRegExp(text: string): string {
 }
 
 export default createRule({
-  name: 'require-ticket-in-comments',
   meta: {
     type: 'suggestion',
-    hasSuggestions: true,
     docs: {
       description: 'Require FIXME and TODO comments in test files to start with a ticket',
       recommended: 'error',
+      url: 'https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/rules/require-ticket-in-comments.md',
     },
+    hasSuggestions: true,
+    schema: [],
     messages: {
       missingTicket:
         '`{{keyword}}` comments must start with a ticket, e.g. `// {{upper}}: {{example}}`. Put the details in the ticket.',
@@ -29,7 +30,7 @@ export default createRule({
       removeExtraText: 'Remove `{{text}}`.',
     },
   },
-  check(context, analysis, options) {
+  create(context, analysis, options) {
     const keywords = options.commentKeywords;
     if (keywords.length === 0 || !analysis.isTestFile) return;
     const { sourceCode } = context;
@@ -45,13 +46,13 @@ export default createRule({
 
     // `TODO`/`FIXME` in capitals counts with or without a colon. Other casings need the colon, so a
     // sentence that happens to start with "Todo" is not mistaken for a work comment. The keyword can
-    // carry its ticket in parentheses, `TODO(WEB-123): ...`, a common style that tools also use for
+    // carry its ticket in parentheses, `TODO(TRADE-123): ...`, a common style that tools also use for
     // a name, `TODO(alice)`, which is not a ticket. Some teams put a space before the parenthesis.
     const alternatives = keywords.map(escapeRegExp).join('|');
     const keywordRe = new RegExp(`^(\\s*\\*?\\s*)(${alternatives})(?:\\s*\\(([^)]*)\\))?(?:\\s*:|(?=\\s|$))`, 'i');
 
     /**
-     * `TODO(WEB-1, WEB-2): text`: the tickets are in the parentheses, and anything after them, from the
+     * `TODO(TRADE-1, TRADE-2): text`: the tickets are in the parentheses, and anything after them, from the
      * closing parenthesis on, is a note.
      */
     function parseParenthesized(

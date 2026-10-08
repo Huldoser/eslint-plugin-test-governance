@@ -4,8 +4,7 @@
     "noEmit": true,
     "rootDir": ".",
     "types": ["node"],
-    "declaration": false,
-    "declarationMap": false
+    "declaration": false
   },
   "include": ["src", "tests"],
   "exclude": ["tests/fixtures"]

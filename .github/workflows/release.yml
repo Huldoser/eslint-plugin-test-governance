@@ -30,11 +30,12 @@ jobs:
     name: Find the version to release
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       tag: ${{ steps.find.outputs.tag }}
       release: ${{ steps.find.outputs.release }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - id: find
@@ -54,27 +55,27 @@ jobs:
             echo "release=true" >> "$GITHUB_OUTPUT"
           fi
 
-  publish:
-    name: Publish to npm
+  # Checks and packs the release without the npm publishing token, so no dependency or build script
+  # ever runs where it could publish.
+  build:
+    name: Check and pack
     needs: version
     if: needs.version.outputs.release == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
-      id-token: write # trusted publishing and provenance
     env:
       TAG: ${{ needs.version.outputs.tag }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # full history, to check the tag is on main
-      - uses: actions/setup-node@v7
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org
           package-manager-cache: false # never restore a cache in a release build
-      # Trusted publishing needs a newer npm than Node ships with.
-      - run: npm install -g npm@11.21.0
       - run: npm ci
       - name: Check the tag matches the package version
         run: |
@@ -111,13 +112,47 @@ jobs:
               console.error('::error::meta.version is ' + plugin.meta.version + ', expected ' + expected);
               process.exit(1);
             }"
+      - name: Pack
+        run: |
+          mkdir pack
+          npm pack --pack-destination pack
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: package
+          path: pack/*.tgz
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish to npm
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write # trusted publishing and provenance
+    env:
+      TAG: ${{ needs.version.outputs.tag }}
+    steps:
+      # No checkout and no install: this job only publishes the tarball the build job checked.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package
+          path: pack
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false # never restore a cache in a release build
+      # Trusted publishing needs a newer npm than Node ships with.
+      - run: npm install -g npm@11.21.0
       - name: Publish
         run: |
           # A re-run after a later step failed must not try to publish the same version again.
           if npm view "eslint-plugin-test-governance@${TAG#v}" version > /dev/null 2>&1; then
             echo "${TAG#v} is already on npm."
           else
-            npm publish --provenance --access public
+            npm publish pack/eslint-plugin-test-governance-"${TAG#v}".tgz --provenance --access public
           fi
 
   github-release:
@@ -126,13 +161,14 @@ jobs:
     # On a push, only after the version is published; when run by hand, on its own.
     if: always() && (needs.publish.result == 'success' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: write
     env:
       TAG: ${{ inputs.tag || needs.version.outputs.tag }}
     steps:
       # The changelog on the checked-out branch or tag also holds the entries of older versions.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - run: node scripts/changelog-section.mjs "$TAG" > notes.md

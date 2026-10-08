@@ -13,12 +13,12 @@ A `// TODO: clean this up` comment is a promise nobody tracks. This rule makes e
 source of truth and nothing is forgotten in a comment.
 
 ```ts
-// TODO: WEB-512                 ✓
-// FIXME: WEB-77, WEB-78         ✓ several tickets, separated by commas
-// TODO(WEB-512)                 ✓ the ticket can go in parentheses
-// TODO(alice): refactor this    ✖ a name is not a ticket
-// TODO: refactor this           ✖ no ticket
-// FIXME: WEB-77 flaky locator   ✖ only tickets are allowed (allowNotes: true allows the note)
+// TODO: TRADE-512                 ✓
+// FIXME: TRADE-77, TRADE-78       ✓ several tickets, separated by commas
+// TODO(TRADE-512)                 ✓ the ticket can go in parentheses
+// TODO(alice): refactor this      ✖ a name is not a ticket
+// TODO: refactor this             ✖ no ticket
+// FIXME: TRADE-77 flaky locator   ✖ only tickets are allowed (allowNotes: true allows the note)
 ```
 
 How comments are read:
@@ -26,8 +26,8 @@ How comments are read:
 - The keyword starts the comment (or a line of a block comment). `TODO` and `FIXME` in capitals
   count with or without a colon. Other casings, such as `todo:`, need the colon, so a sentence that
   happens to start with "Todo" is left alone.
-- The tickets can also go in parentheses after the keyword, `TODO(WEB-512)` or `TODO (WEB-512)`, a
-  style many teams already use. Anything after the parentheses is a note, as it would be after `TODO: WEB-512`.
+- The tickets can also go in parentheses after the keyword, `TODO(TRADE-512)` or `TODO (TRADE-512)`, a
+  style many teams already use. Anything after the parentheses is a note, as it would be after `TODO: TRADE-512`.
 - The tickets follow the same rules as markers: the shared ticket format, placeholders such as `TBD`
   rejected, and no text after the tickets unless `allowNotes` is set.
 - A `// FIXME:` marker directly above a `test.fixme(...)` is checked by
@@ -42,9 +42,9 @@ Incorrect:
 <!-- example: invalid -->
 
 ```js
-test('checkout', async ({ page }) => {
+test('places a limit order', async ({ page }) => {
   // FIXME: this locator breaks on mobile
-  await page.click('#pay');
+  await page.click('#buy');
 });
 ```
 
@@ -52,7 +52,7 @@ test('checkout', async ({ page }) => {
 
 ```js
 // TODO: TBD
-test('refund', async ({ page }) => {});
+test('cancels an open order', async ({ page }) => {});
 ```
 
 Correct:
@@ -60,17 +60,17 @@ Correct:
 <!-- example: valid -->
 
 ```js
-test('checkout', async ({ page }) => {
-  // FIXME: WEB-81
-  await page.click('#pay');
+test('places a limit order', async ({ page }) => {
+  // FIXME: TRADE-81
+  await page.click('#buy');
 });
 ```
 
 <!-- example: valid settings={"comments":{"keywords":["FIXME"]}} -->
 
 ```js
-// TODO: add a refund test once the API is stable
-test('checkout', async ({ page }) => {});
+// TODO: add a test for cancelled orders once the API is stable
+test('places a limit order', async ({ page }) => {});
 ```
 
 ## Options
@@ -78,7 +78,9 @@ test('checkout', async ({ page }) => {});
 This rule has no options of its own. It reads the shared options described in the
 [README](../../README.md#options):
 
-- `comments`: the keywords to check, `{ keywords: ['FIXME', 'TODO'] }` by default. Use
-  `{ keywords: ['FIXME'] }` to allow free-form `TODO`s, add your own such as `HACK`, or set
-  `comments: false` to turn the check off. Turning the rule off in your config works too.
+- `comments`: the keywords to check, `{ keywords: ['FIXME', 'TODO'] }` by default. Your list
+  replaces the default one: `{ keywords: ['FIXME'] }` allows free-form `TODO`s, and
+  `{ keywords: ['FIXME', 'TODO', 'HACK'] }` checks `HACK` too. `comments: false` turns the check
+  off, and so does turning the rule off in your config.
 - `ticket`, `placeholders` and `allowNotes` work as they do for markers.
+- `testFunctions`: which functions count as Playwright's `test`, and so which files are test files.

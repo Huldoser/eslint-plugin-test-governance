@@ -3,14 +3,15 @@ import { createRule } from '../utils/create-rule.ts';
 import { indentOf, keywordRange } from '../utils/fix.ts';
 
 export default createRule({
-  name: 'marker-matches-state',
   meta: {
     type: 'problem',
-    hasSuggestions: true,
     docs: {
       description: "Require the marker keyword to match the test's state",
       recommended: 'error',
+      url: 'https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/rules/marker-matches-state.md',
     },
+    hasSuggestions: true,
+    schema: [],
     messages: {
       wrongMarker:
         "`{{found}}:` doesn't match this code: {{subject}} is in the '{{state}}' state, so the marker should be `{{expected}}:`.",
@@ -20,7 +21,7 @@ export default createRule({
       addMarker: 'Add `// {{expected}}: {{tickets}}` with the same ticket.',
     },
   },
-  check(context, analysis, options) {
+  create(context, analysis, options) {
     const { sourceCode } = context;
     for (const subject of analysis.subjects) {
       const missing = missingStates(subject);

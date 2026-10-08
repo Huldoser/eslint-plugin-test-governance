@@ -82,7 +82,12 @@ plugin.configs.recommended = {
 
 export const configs = plugin.configs;
 export default plugin;
-// Makes `require('eslint-plugin-test-governance')` return the plugin itself rather than the module
-// namespace. With the namespace, a CommonJS config that registers the plugin next to
-// `configs.recommended` fails with "Cannot redefine plugin".
+/**
+ * Makes `require('eslint-plugin-test-governance')` return the plugin itself rather than the module
+ * namespace. With the namespace, a CommonJS config that registers the plugin next to
+ * `configs.recommended` fails with "Cannot redefine plugin".
+ *
+ * @internal Left out of the type declarations: TypeScript before 5.6 can't parse a string export
+ * name, so it would reject the whole file.
+ */
 export { plugin as 'module.exports' };
