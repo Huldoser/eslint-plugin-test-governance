@@ -11,6 +11,7 @@ body:
         - marker-matches-state
         - no-orphaned-marker
         - no-conflicting-states
+        - require-ticket-in-comments
     validations:
       required: true
   - type: dropdown
