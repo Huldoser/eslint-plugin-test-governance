@@ -23,7 +23,7 @@ A `FIXME:` or `TODO:` comment that starts with a valid ticket is treated by wher
 
 - Above a helper or any other code that isn't a test, it is a tracked work comment and is allowed.
 - Above a test, describe or skip call that is not in the `fixme` state, it reads as a leftover marker
-  and is reported, since `// FIXME: WEB-12` above a test usually means the test was fixed and the
+  and is reported, since `// FIXME: TRADE-12` above a test usually means the test was fixed and the
   marker forgotten. Move a work comment into the test body, or onto the line of code it is about.
 
 Other markers that read as a sentence, such as `// SKIP: this one is flaky`, are left alone too: the rule
@@ -40,16 +40,16 @@ Incorrect:
 <!-- example: invalid settings={"lifecycleTags":true} -->
 
 ```js
-// NEW: WEB-80 promoted last sprint
-test('saved addresses', async () => {});
+// NEW: TRADE-80 promoted last sprint
+test('saves a watchlist', async () => {});
 ```
 
 <!-- example: invalid -->
 
 ```js
-test('checkout', async ({ page }) => {
-  // SKIP: WEB-81
-  await page.goto('/checkout');
+test('places a limit order', async ({ page }) => {
+  // SKIP: TRADE-81
+  await page.goto('/orders');
 });
 ```
 
@@ -58,27 +58,36 @@ Correct:
 <!-- example: valid settings={"lifecycleTags":true} -->
 
 ```js
-test('saved addresses', async () => {});
+test('saves a watchlist', async () => {});
 ```
 
 <!-- example: valid -->
 
 ```js
-test('checkout', async ({ page }) => {
-  // FIXME: the banner sometimes covers the button on slow machines
-  await page.goto('/checkout');
+test('places a limit order', async ({ page }) => {
+  // FIXME: the price field sometimes loses focus on slow machines
+  await page.goto('/orders');
 });
 ```
 
 <!-- example: valid -->
 
 ```js
-// FIXME: WEB-81
-test.fixme('checkout', async ({ page }) => {
-  await page.goto('/checkout');
+// FIXME: TRADE-81
+test.fixme('places a limit order', async ({ page }) => {
+  await page.goto('/orders');
 });
 ```
 
 ## Options
 
-Uses the shared options described in the [README](../../README.md#options).
+This rule has no options of its own. It reads the shared options described in the
+[README](../../README.md#options). These change what it reports:
+
+- `lifecycleTags`, `states` and `customStates`: which keywords are markers. `// NEW:` is a marker
+  only while the `new` state is on, so with `lifecycleTags` off it is an ordinary comment.
+- `ticket` and `placeholders`: whether a comment starts with a valid ticket, which separates a
+  leftover marker from a sentence or a work comment.
+- `allowBlankLine`: whether a marker separated from the code below it by a blank line still belongs
+  to that code.
+- `testFunctions`: which functions count as Playwright's `test`, and so which files are test files.

@@ -267,7 +267,7 @@ export function parseTickets(text: string, offset: number, matcher: TicketMatche
   for (;;) {
     const token = /^[^\s,]+/.exec(text.slice(index))?.[0];
     if (!token) break;
-    // Punctuation right after a ticket (`WEB-1:` or `WEB-1.`) is not part of it.
+    // Punctuation right after a ticket (`TRADE-1:` or `TRADE-1.`) is not part of it.
     const ticket = token.replace(/[.:;]+$/, '');
     tickets.push({ text: ticket, result: matcher.check(ticket) });
     index += ticket.length;
@@ -277,7 +277,7 @@ export function parseTickets(text: string, offset: number, matcher: TicketMatche
     index += separator.length;
   }
   const rest = text.slice(lastEnd).trimEnd();
-  // A sentence-ending `WEB-1.` has nothing after the ticket; `WEB-1: flaky` has a note.
+  // A sentence-ending `TRADE-1.` has nothing after the ticket; `TRADE-1: flaky` has a note.
   if (tickets.length === 0 || /^[.:;]*$/.test(rest.trim())) return { tickets };
   return { tickets, extra: { text: rest.trim(), range: [offset + lastEnd, offset + lastEnd + rest.length] } };
 }
@@ -420,7 +420,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const parent = stack.at(-1);
     const anchor = anchorOf(call);
     const block = commentBlock(sourceCode, anchor, options.allowBlankLine);
-    // `rows.forEach((row) =>\n  // SKIP: WEB-1\n  test.skip(...))`: the marker sits above the call itself.
+    // `symbols.forEach((symbol) =>\n  // SKIP: TRADE-1\n  test.skip(...))`: the marker sits above the call itself.
     if (call.parent.type === 'ArrowFunctionExpression' && call.parent.body === call) {
       block.push(...commentBlock(sourceCode, call, options.allowBlankLine));
     }
@@ -599,7 +599,7 @@ export function evaluate(subject: Subject, state: StateDef): Evaluation {
   }
   const isValid = (m: Marker): boolean => m.tickets.length > 0 && m.tickets.every((t) => t.result === 'ok');
   // A broken marker in the subject's own block is reported even when another marker is valid: in
-  // `// SKIP: WEB-1` + `// SKIP: nope`, the second line is still wrong. Broken markers further up
+  // `// SKIP: TRADE-1` + `// SKIP: nope`, the second line is still wrong. Broken markers further up
   // are reported for the test or describe they sit above.
   const brokenOwn = markers.find((m) => subject.markers.includes(m) && !isValid(m));
   if (!brokenOwn && markers.some(isValid)) return { kind: 'ok' };
@@ -641,7 +641,7 @@ export function strayMarkers(subject: Subject, options: ResolvedOptions): StateM
 
 /**
  * Where to report a problem with a test or describe: from the callee to the end of the title
- * (`test.skip('pays with PayPal'`), so editors underline the declaration rather than the whole body.
+ * (`test.skip('places a limit order'`), so editors underline the declaration rather than the whole body.
  * Runtime calls such as `test.skip()` are short, so they are reported whole.
  */
 export function headLoc(subject: Subject): TSESTree.SourceLocation {

@@ -32,7 +32,7 @@ support EditorConfig, ESLint and Prettier pick up the settings automatically; VS
 Prefer fixing a lint error over disabling the rule. When a line really needs an exception, use
 `eslint-disable-next-line <rule> -- <reason>`.
 
-Coverage must stay at 100% for statements, branches, functions and lines. If a branch can't be
+Coverage must stay at 100% for lines, branches and functions. If a branch can't be
 reached, remove it rather than excluding it.
 
 ## Changing a rule
