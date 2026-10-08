@@ -7,6 +7,8 @@
 ESLint rules that keep a Playwright, Jest or Vitest suite honest. Every skipped, fixme, todo, `@new`
 or `@unstable` test must point at the ticket that tracks it:
 
+<!-- example: valid -->
+
 ```ts
 // SKIP: TRADE-123
 test.skip('rejects a margin order above the buying power', async ({ page }) => {
