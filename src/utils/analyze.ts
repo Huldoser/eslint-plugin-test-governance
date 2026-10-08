@@ -49,6 +49,11 @@ export function isStateMarker(marker: Marker): marker is StateMarker {
 export interface TagOccurrence {
   tag: string;
   node: TSESTree.Literal | TSESTree.TemplateLiteral;
+  /**
+   * Where the tag is written in the source. Unset when an escape such as `\u002D` comes before the
+   * tag or inside it, since the source then no longer lines up with the title.
+   */
+  range?: TSESTree.Range;
 }
 
 interface StateSource {
@@ -134,19 +139,35 @@ function isFunction(node: Node | undefined): node is TSESTree.FunctionLike {
   return node?.type === 'ArrowFunctionExpression' || node?.type === 'FunctionExpression';
 }
 
-/** Collects the top-level names that refer to Playwright's `test`. */
-function collectTestNames(program: TSESTree.Program, configured: Set<string>): Set<string> {
+interface TestNames {
+  /** Names that refer to Playwright's `test`. */
+  tests: Set<string>;
+  /** Names bound to the whole Playwright module, as in `import * as pw`, whose `test` is `pw.test`. */
+  modules: Set<string>;
+}
+
+/** Collects the top-level names that refer to Playwright's `test` or to its module. */
+function collectTestNames(program: TSESTree.Program, configured: Set<string>): TestNames {
   const names = new Set(configured);
+  const modules = new Set<string>();
   const mergeTests = new Set<string>();
   /** Names bound to another test runner, such as `ava` in `import ava from 'ava'`. */
   const others = new Set<string>();
+  /** `pw.test` or `pw.mergeTests` on the Playwright module. */
+  const isModuleMember = (node: Node, member: string): boolean =>
+    node.type === 'MemberExpression' &&
+    node.object.type === 'Identifier' &&
+    modules.has(node.object.name) &&
+    memberName(node) === member;
   const isTestExpression = (node: Node): boolean => {
     const target = unwrap(node);
     if (target.type === 'Identifier') return names.has(target.name);
+    if (isModuleMember(target, 'test')) return true;
     if (target.type !== 'CallExpression') return false;
-    // mergeTests(dbTest, a11yTest)
+    // mergeTests(dbTest, a11yTest) or pw.mergeTests(dbTest, a11yTest)
     if (target.callee.type === 'Identifier') return mergeTests.has(target.callee.name);
     if (target.callee.type !== 'MemberExpression') return false;
+    if (isModuleMember(target.callee, 'mergeTests')) return true;
     return memberName(target.callee) === 'extend' && isTestExpression(target.callee.object);
   };
   // require('node:test'), ava, ava.serial or `ava as TestFn<Context>`
@@ -169,9 +190,9 @@ function collectTestNames(program: TSESTree.Program, configured: Set<string>): S
       } else if (isPlaywrightModule(source)) {
         for (const spec of statement.specifiers) {
           if (spec.type === 'ImportDefaultSpecifier') names.add(spec.local.name);
-          else if (spec.type === 'ImportSpecifier' && importedName(spec) === 'test') names.add(spec.local.name);
-          else if (spec.type === 'ImportSpecifier' && importedName(spec) === 'mergeTests')
-            mergeTests.add(spec.local.name);
+          else if (spec.type === 'ImportNamespaceSpecifier') modules.add(spec.local.name);
+          else if (importedName(spec) === 'test') names.add(spec.local.name);
+          else if (importedName(spec) === 'mergeTests') mergeTests.add(spec.local.name);
         }
       }
       continue;
@@ -181,26 +202,37 @@ function collectTestNames(program: TSESTree.Program, configured: Set<string>): S
     for (const declarator of declaration.declarations) {
       const init = declarator.init && unwrap(declarator.init);
       if (!init) continue;
-      if (declarator.id.type === 'Identifier' && init.type === 'CallExpression' && isTestExpression(init)) {
+      // `const t = base.extend({...})`, `const t = mergeTests(a, b)` or a plain alias, `const t = base`.
+      if (declarator.id.type === 'Identifier' && isTestExpression(init)) {
         names.add(declarator.id.name);
       } else if (declarator.id.type === 'Identifier' && isOtherFramework(init)) {
         // `const test = require('node:test')` is another runner's `test`, like an import from it.
         names.delete(declarator.id.name);
         others.add(declarator.id.name);
+      } else if (declarator.id.type === 'Identifier') {
+        // `const pw = require('@playwright/test')`, used as `pw.test`.
+        const source = requireSource(init);
+        if (source !== undefined && isPlaywrightModule(source)) modules.add(declarator.id.name);
       } else if (declarator.id.type === 'ObjectPattern') {
         const source = requireSource(init);
         if (source === undefined) continue;
         for (const prop of declarator.id.properties) {
-          if (prop.type !== 'Property' || prop.key.type !== 'Identifier' || prop.value.type !== 'Identifier') continue;
+          if (prop.type !== 'Property' || prop.value.type !== 'Identifier') continue;
           if (OTHER_FRAMEWORKS.has(source)) {
             names.delete(prop.value.name);
             others.add(prop.value.name);
-          } else if (isPlaywrightModule(source) && prop.key.name === 'test') names.add(prop.value.name);
+          } else if (isPlaywrightModule(source) && propertyName(prop) === 'test') names.add(prop.value.name);
         }
       }
     }
   }
-  return names;
+  return { tests: names, modules };
+}
+
+/** The name a property key spells out: `test` in `{ test }`, `{ 'test': t }` or `{ ['test']: t }`. */
+function propertyName(prop: TSESTree.Property): string | undefined {
+  if (prop.key.type === 'Literal') return typeof prop.key.value === 'string' ? prop.key.value : undefined;
+  return prop.computed ? undefined : prop.key.name;
 }
 
 function importedName(spec: TSESTree.ImportSpecifier): string {
@@ -223,7 +255,9 @@ function isLocalVariable(sourceCode: SourceCode, id: TSESTree.Identifier): boole
   for (let scope: TSESLint.Scope.Scope | null = sourceCode.getScope(id); scope; scope = scope.upper) {
     const variable = scope.set.get(id.name);
     if (!variable) continue;
-    if (scope.type === 'module' || scope.type === 'global') return false;
+    // A top-level scope: the global scope, a module's scope, or in CommonJS the function scope that
+    // wraps the module.
+    if (scope.block.type === 'Program') return false;
     return variable.defs.some((def) => def.type === 'Variable');
   }
   return false;
@@ -269,6 +303,8 @@ export function parseTickets(text: string, offset: number, matcher: TicketMatche
     if (!token) break;
     // Punctuation right after a ticket (`TRADE-1:` or `TRADE-1.`) is not part of it.
     const ticket = token.replace(/[.:;]+$/, '');
+    // Punctuation alone, as in `// SKIP: .`, is no ticket at all.
+    if (ticket === '') break;
     tickets.push({ text: ticket, result: matcher.check(ticket) });
     index += ticket.length;
     lastEnd = index;
@@ -282,14 +318,26 @@ export function parseTickets(text: string, offset: number, matcher: TicketMatche
   return { tickets, extra: { text: rest.trim(), range: [offset + lastEnd, offset + lastEnd + rest.length] } };
 }
 
+const LINE_BREAK_RE = /\r\n|[\r\n\u2028\u2029]/g;
+
+/** The lines of a comment and where each starts in the source, split at every line break JavaScript has. */
+export function commentLines(comment: Comment): { text: string; start: number }[] {
+  const lines: { text: string; start: number }[] = [];
+  // `//` and `/*` are both two characters, so the comment's value starts two characters in.
+  const valueStart = comment.range[0] + 2;
+  let lineStart = 0;
+  for (const lineBreak of comment.value.matchAll(LINE_BREAK_RE)) {
+    lines.push({ text: comment.value.slice(lineStart, lineBreak.index), start: valueStart + lineStart });
+    lineStart = lineBreak.index + lineBreak[0].length;
+  }
+  lines.push({ text: comment.value.slice(lineStart), start: valueStart + lineStart });
+  return lines;
+}
+
 function parseMarkers(comment: Comment, states: StateDef[]): Marker[] {
   const markers: Marker[] = [];
-  // `//` and `/*` are both two characters, so the comment's value starts two characters in.
-  let lineStart = comment.range[0] + 2;
-  for (const line of comment.value.split(/\n/)) {
-    const match = MARKER_LINE_RE.exec(line.replace(/\r$/, ''));
-    const start = lineStart;
-    lineStart += line.length + 1;
+  for (const { text, start } of commentLines(comment)) {
+    const match = MARKER_LINE_RE.exec(text);
     if (!match) continue;
     const [, keyword, rest] = match;
     const state = states.find((s) => s.marker === keyword);
@@ -304,15 +352,23 @@ function parseMarkers(comment: Comment, states: StateDef[]): Marker[] {
   return markers;
 }
 
-function scanTags(node: TSESTree.Literal | TSESTree.TemplateLiteral, out: TagOccurrence[]): void {
-  const texts =
+function scanTags(source: string, node: TSESTree.Literal | TSESTree.TemplateLiteral, out: TagOccurrence[]): void {
+  // Each piece of text with where it starts in the source, after its opening quote, backtick or `}`.
+  const parts =
     node.type === 'Literal'
-      ? [String(node.value)]
-      : // `cooked` is only null in tagged templates, which are never titles.
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
-        node.quasis.map((quasi) => quasi.value.cooked!);
-  for (const text of texts) {
-    for (const match of text.matchAll(TAG_RE)) out.push({ tag: match[0], node });
+      ? [{ text: String(node.value), start: node.range[0] + 1 }]
+      : node.quasis.map((quasi) => ({
+          // `cooked` is only null in tagged templates, which are never titles.
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
+          text: quasi.value.cooked!,
+          start: quasi.range[0] + 1,
+        }));
+  for (const { text, start } of parts) {
+    for (const match of text.matchAll(TAG_RE)) {
+      const end = match.index + match[0].length;
+      const written = source.slice(start, start + end) === text.slice(0, end);
+      out.push({ tag: match[0], node, ...(written && { range: [start + match.index, start + end] }) });
+    }
   }
 }
 
@@ -320,12 +376,16 @@ function isStaticText(node: Node): node is TSESTree.StringLiteral | TSESTree.Tem
   return (node.type === 'Literal' && typeof node.value === 'string') || node.type === 'TemplateLiteral';
 }
 
-function collectTags(call: TSESTree.CallExpression, hasTitle: boolean): { tags: TagOccurrence[]; dynamic: boolean } {
+function collectTags(
+  source: string,
+  call: TSESTree.CallExpression,
+  hasTitle: boolean,
+): { tags: TagOccurrence[]; dynamic: boolean } {
   const tags: TagOccurrence[] = [];
   if (!hasTitle) return { tags, dynamic: false };
   const [title, details] = call.arguments;
   const dynamic = !isStaticText(title);
-  if (!dynamic) scanTags(title, tags);
+  if (!dynamic) scanTags(source, title, tags);
   if (call.arguments.length >= 3 && details.type === 'ObjectExpression') {
     for (const prop of details.properties) {
       if (prop.type !== 'Property' || prop.computed) continue;
@@ -333,7 +393,7 @@ function collectTags(call: TSESTree.CallExpression, hasTitle: boolean): { tags: 
       if (key !== 'tag') continue;
       const values = prop.value.type === 'ArrayExpression' ? prop.value.elements : [prop.value];
       for (const value of values) {
-        if (value && isStaticText(value)) scanTags(value, tags);
+        if (value && isStaticText(value)) scanTags(source, value, tags);
       }
     }
   }
@@ -416,6 +476,18 @@ export function analyze(sourceCode: SourceCode, options: ResolvedOptions): Analy
 function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis {
   const { states } = options;
   const testNames = collectTestNames(sourceCode.ast, options.testFunctions);
+  /**
+   * The members after Playwright's `test` in a callee, such as `['describe', 'skip']` for
+   * `test.describe.skip` or `pw.test.describe.skip`. Undefined when the callee isn't Playwright's `test`.
+   */
+  const testPath = (chain: Chain | undefined): string[] | undefined => {
+    if (chain === undefined) return undefined;
+    const { root, path } = chain;
+    let rest: string[] | undefined;
+    if (testNames.tests.has(root.name)) rest = path;
+    else if (testNames.modules.has(root.name) && path[0] === 'test') rest = path.slice(1);
+    return rest !== undefined && !isLocalVariable(sourceCode, root) ? rest : undefined;
+  };
   let usesTest = sourceCode.ast.body.some(
     (statement) => statement.type === 'ImportDeclaration' && isPlaywrightModule(statement.source.value),
   );
@@ -480,9 +552,9 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const last = args.at(-1);
     let testInfo: string | undefined;
 
-    if (chain && testNames.has(chain.root.name) && !isLocalVariable(sourceCode, chain.root)) {
+    const path = testPath(chain);
+    if (path !== undefined) {
       usesTest = true;
-      const { path } = chain;
       if (isFunction(last)) {
         const param = last.params.at(1);
         if (param?.type === 'Identifier') testInfo = param.name;
@@ -492,14 +564,14 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       const titled = args.length >= 2 && isStaticText(args[0]);
       const isDeclaration = args.length >= 2 && !isFunction(args[0]) && (isFunction(last) || titled);
       if (path.every((p) => TEST_MODIFIERS.has(p)) && isDeclaration) {
-        return { subject: makeSubject('test', call, path, collectTags(call, true)), testInfo };
+        return { subject: makeSubject('test', call, path, collectTags(sourceCode.text, call, true)), testInfo };
       }
       if (
         path[0] === 'describe' &&
         path.slice(1).every((p) => DESCRIBE_MODIFIERS.has(p)) &&
         (isFunction(last) || titled)
       ) {
-        const tagInfo = collectTags(call, args.length >= 2);
+        const tagInfo = collectTags(sourceCode.text, call, args.length >= 2);
         return { subject: makeSubject('describe', call, path.slice(1), tagInfo), testInfo };
       }
       if (path.length === 1 && RUNTIME_MODIFIERS.has(path[0])) {
@@ -515,11 +587,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       if (name !== undefined && RUNTIME_MODIFIERS.has(name)) {
         const isTestInfo =
           (object.type === 'Identifier' && testInfoNames.includes(object.name)) ||
-          (object.type === 'CallExpression' &&
-            (() => {
-              const inner = chainOf(object.callee);
-              return inner !== undefined && testNames.has(inner.root.name) && inner.path.join('.') === 'info';
-            })());
+          (object.type === 'CallExpression' && testPath(chainOf(object.callee))?.join('.') === 'info');
         if (isTestInfo) return { subject: runtimeSubject(call, name) };
       }
     }

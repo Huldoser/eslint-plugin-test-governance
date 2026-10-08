@@ -64,6 +64,8 @@ describe('options validation', () => {
       { ticket: { preset: 'pattern', pattern: ['TRADE', 'RISK'] } },
       'ticket.pattern must be a string (got ["TRADE","RISK"])',
     ],
+    // A regex shows as written, not as JSON's `{}`.
+    [{ ticket: { preset: 'pattern', pattern: /TRADE-\d+/i } }, 'ticket.pattern must be a string (got /TRADE-\\d+/i)'],
     [{ ticket: { preset: 'pattern', pattern: 'TRADE-\\d+', flags: true } }, 'ticket.flags must be a string (got true)'],
     [
       { ticket: { preset: 'numeric', manLength: 6 } },

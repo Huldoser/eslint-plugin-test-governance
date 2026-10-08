@@ -14,6 +14,32 @@ All notable changes to this project are documented here. The format follows
 - Tests inside a node type that a custom parser gives no visitor keys for are now checked. ESLint
   reads such nodes' children from the node itself, and the rules now do the same. Before, everything
   inside such a node was skipped.
+- Test files that ESLint parses as CommonJS, such as `.cjs` files, are now checked. Before, their
+  top-level variables were taken for local helpers, so a `test` from `require('@playwright/test')`
+  was ignored by every rule.
+- The `jira` preset accepts issue URLs on Jira Server and Data Center sites that run under a path,
+  such as `https://issues.example.com/jira/browse/TRADE-123`. Before, only `/browse/...` right
+  after the host was accepted.
+- A plain alias of a Playwright test, as in `const orderTest = base`, is now followed like
+  `base.extend()` and `mergeTests()` are. Before, tests declared through it were not checked.
+- A quoted key in a destructured `require()` is read like a plain one. Before,
+  `const { 'test': test } = require('node:test')` still counted as Playwright's `test`, so its
+  skipped tests were reported, and `const { 'test': t } = require('@playwright/test')` was not
+  followed.
+- Tests written through the whole Playwright module, as in `import * as pw from '@playwright/test'`
+  or `const pw = require('@playwright/test')` followed by `pw.test.skip(...)`, are now checked,
+  including `pw.test.extend()` and `pw.mergeTests()`. Before, they were ignored.
+- The `no-conflicting-states` fix for a tag in the wrong case changes only that tag. Before, an
+  escape earlier in the title could make it change another one: in `'@New\u002Dbeta @New'` it
+  rewrote the start of `@New-beta` and left `@New` as it was. A tag after an escape in its title is
+  still reported, without a fix.
+- Block comments with lone CR line breaks, or with the Unicode line and paragraph separators
+  (U+2028, U+2029), are read line by line. Before, only LF and CRLF ended a line, so a marker or a
+  `TODO` after the first line of such a comment was missed.
+- A marker with only punctuation after the colon, such as `// SKIP: .`, is reported as missing its
+  ticket. Before, the message was `'' is not a valid ticket`.
+- A regex passed where an option expects a string is shown as written in the error, as in
+  `ticket.pattern must be a string (got /TRADE-\d+/)`. Before, it was shown as `{}`.
 
 ## [0.3.1] - 2026-10-06
 

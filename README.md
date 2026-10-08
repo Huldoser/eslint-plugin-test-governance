@@ -159,16 +159,16 @@ always agree on ticket formats, states and markers. To turn a rule off, set it t
 
 ### Ticket presets
 
-| Preset         | Accepts                                                                                   | Options                                                                              |
-| -------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `any`          | `PROJ-123`, `#123`, `owner/repo#123`, any http(s) URL                                     |                                                                                      |
-| `jira`         | `TRADE-123`, `https://<host>/browse/TRADE-123`, board URLs with `selectedIssue=TRADE-123` | `projects`; `host` (any host by default)                                             |
-| `github`       | `#123`, `owner/repo#123`, `https://github.com/owner/repo/issues/123` (or `/pull/`)        | `host` for GitHub Enterprise (`github.com` by default)                               |
-| `gitlab`       | `#123`, `group/project#123`, `https://gitlab.com/group/project/-/issues/123`              | `host` for self-managed (`gitlab.com` by default)                                    |
-| `linear`       | `RISK-123`, `https://linear.app/<workspace>/issue/RISK-123/...`                           | `teams`                                                                              |
-| `azure-devops` | `AB#123`, `https://dev.azure.com/<org>/<project>/_workitems/edit/123`                     | `host` for Azure DevOps Server (`dev.azure.com` and `*.visualstudio.com` by default) |
-| `numeric`      | `4821`                                                                                    | `minLength` (1), `maxLength` (20)                                                    |
-| `pattern`      | anything matching your regex, anchored at both ends                                       | `pattern`, `flags`                                                                   |
+| Preset         | Accepts                                                                                                                                       | Options                                                                              |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `any`          | `PROJ-123`, `#123`, `owner/repo#123`, any http(s) URL                                                                                         |                                                                                      |
+| `jira`         | `TRADE-123`, `https://<host>/browse/TRADE-123` (also under a path, as in `/jira/browse/TRADE-123`), board URLs with `selectedIssue=TRADE-123` | `projects`; `host` (any host by default)                                             |
+| `github`       | `#123`, `owner/repo#123`, `https://github.com/owner/repo/issues/123` (or `/pull/`)                                                            | `host` for GitHub Enterprise (`github.com` by default)                               |
+| `gitlab`       | `#123`, `group/project#123`, `https://gitlab.com/group/project/-/issues/123`                                                                  | `host` for self-managed (`gitlab.com` by default)                                    |
+| `linear`       | `RISK-123`, `https://linear.app/<workspace>/issue/RISK-123/...`                                                                               | `teams`                                                                              |
+| `azure-devops` | `AB#123`, `https://dev.azure.com/<org>/<project>/_workitems/edit/123`                                                                         | `host` for Azure DevOps Server (`dev.azure.com` and `*.visualstudio.com` by default) |
+| `numeric`      | `4821`                                                                                                                                        | `minLength` (1), `maxLength` (20)                                                    |
+| `pattern`      | anything matching your regex, anchored at both ends                                                                                           | `pattern`, `flags`                                                                   |
 
 `projects` (Jira) and `teams` (Linear) are keys as they appear in tickets, in uppercase: `TRADE` for
 `TRADE-123`. Each preset takes only its own options, so `host` on the `any` preset fails with a clear
@@ -193,7 +193,9 @@ so keep it free of nested quantifiers.
 
 - `test` imported from `@playwright/test`, `playwright/test` or a component-testing package such as
   `@playwright/experimental-ct-react`, including the default import, aliases such as
-  `import { test as it }`, and `const { test } = require('@playwright/test')`.
+  `import { test as it }` or `const it = test`, and `const { test } = require('@playwright/test')`.
+- `pw.test` on the whole module, after `import * as pw from '@playwright/test'` or
+  `const pw = require('@playwright/test')`.
 - Fixtures made with `.extend()` or `mergeTests()` in the same file, such as
   `const test = base.extend({...})`.
 - Any name in `testFunctions`, for fixtures imported from your own modules. The default `['test']`

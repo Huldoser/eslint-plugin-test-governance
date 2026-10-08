@@ -45,7 +45,8 @@ const toJson: (value: unknown) => string | undefined = JSON.stringify;
 
 function show(value: unknown): string {
   if (typeof value === 'function') return 'a function';
-  const text = toJson(value) ?? String(value);
+  // JSON shows a regex as `{}`.
+  const text = value instanceof RegExp ? String(value) : (toJson(value) ?? String(value));
   return text.length > 40 ? `${text.slice(0, 37)}...` : text;
 }
 

@@ -41,6 +41,9 @@ runRule('require-ticket', rule, {
     "// SKIP: TRADE-1...\ntest.skip('cancels an order', async () => {});",
     "// SKIP: TRADE-1 .\ntest.skip('cancels an order', async () => {});",
     "/*\r\n * Waiting on the broker sandbox.\r\n * SKIP: TRADE-1\r\n */\r\ntest.skip('places an order', async () => {});",
+    // A lone CR, a line separator and a paragraph separator also end a line.
+    "/*\r * Waiting on the broker sandbox.\r * SKIP: TRADE-1\r */\rtest.skip('places an order', async () => {});",
+    "/*\u2028 * Waiting on the broker sandbox.\u2029 * SKIP: TRADE-1\u2028 */\ntest.skip('places an order', async () => {});",
     // Notes after the ticket are allowed with allowNotes.
     ...[
       "// SKIP: TRADE-123 flaky on CI\ntest.skip('streams price updates', async () => {});",
@@ -134,12 +137,31 @@ runRule('require-ticket', rule, {
     "import ava from 'ava';\nconst test = ava;\ntest.skip('calculates profit', (t) => {});",
     "const tap = require('tap');\nconst test = tap.test;\ntest.skip('calculates profit', () => {});",
     "const { test: base } = require('mocha');\nconst test = base;\ntest.skip('calculates profit', () => {});",
+    "const { 'test': test } = require('node:test');\ntest.skip('calculates profit', () => {});",
+    // Only a key that spells out `test` takes Playwright's test.
+    {
+      code: "const { [test]: byName, 0: first } = require('@playwright/test');\nbyName.skip('places an order', async () => {});\nfirst.skip('cancels an order', async () => {});",
+      settings: settings({ testFunctions: [] }),
+    },
     // Only `test` itself is taken from a Playwright require.
     "const { expect: e } = require('@playwright/test');\ne.skip('places an order', async () => {});",
+    // Only `test` itself is taken from the whole Playwright module.
+    {
+      code: "import * as pw from '@playwright/test';\nconst config = pw.defineConfig({}), check = pw.expect, deep = market.data.test, other = broker.test;\npw.skip('places an order', async () => {});\npw.expect.skip('cancels an order', async () => {});\ncheck.skip('amends an order', async () => {});\ndeep.skip('fills an order', async () => {});\nother.skip('closes a position', async () => {});",
+      settings: settings({ testFunctions: [] }),
+    },
+    {
+      code: "const helpers = require('./helpers'), broker = connectBroker();\nhelpers.test.skip('places an order', async () => {});\nbroker.test.skip('cancels an order', async () => {});",
+      settings: settings({ testFunctions: [] }),
+    },
     "const config = require('./playwright.config');\ntest('places an order', async () => {});",
     // A local variable that happens to be called `test` is not Playwright's.
     "function validateOrder() {\n  const test = { skip(name, fn) { fn(); } };\n  test.skip('checks the order size', () => {});\n}",
     "{\n  let test = orderHelpers;\n  test.skip('checks the order size', () => {});\n}",
+    {
+      code: "function validateOrder() {\n  const test = orderHelpers;\n  test.skip('checks the order size', () => {});\n}",
+      languageOptions: { sourceType: 'commonjs' },
+    },
     "function validateOrder(test) {\n  var test = orderHelpers;\n  test.skip('checks the order size', () => {});\n}",
     // A private method called #skip is not Playwright's skip.
     "class OrderForm {\n  #skip() {}\n  submit(test) {\n    test.#skip('places an order', async () => {});\n  }\n}",
@@ -237,6 +259,12 @@ runRule('require-ticket', rule, {
       languageOptions: { sourceType: 'script' },
       errors: [missing('skip', 'SKIP')],
     },
+    // In CommonJS, top-level variables belong to the function that wraps the module.
+    {
+      code: "const { test } = require('@playwright/test');\ntest.skip('places an order', async () => {});",
+      languageOptions: { sourceType: 'commonjs' },
+      errors: [missing('skip', 'SKIP')],
+    },
     {
       code: "import { test as t } from 'playwright/test';\nt.skip('places an order', async () => {});",
       errors: [missing('skip', 'SKIP')],
@@ -291,6 +319,10 @@ runRule('require-ticket', rule, {
     },
     { code: "// SKIP:\ntest.skip('places an order', async () => {});", errors: [{ messageId: 'missingTicket' }] },
     { code: "/* SKIP: */\ntest.skip('places an order', async () => {});", errors: [{ messageId: 'missingTicket' }] },
+    ...['// SKIP: .', '// SKIP: ...', '/* SKIP: ; */'].map((marker) => ({
+      code: `${marker}\ntest.skip('places an order', async () => {});`,
+      errors: [{ messageId: 'missingTicket' as const }],
+    })),
     {
       code: "// FIXME:\ntest.fixme('cancels an order', async () => {});",
       errors: [{ message: '`FIXME:` needs a ticket right after the colon, e.g. `// FIXME: PROJ-123`.' }],
@@ -330,11 +362,17 @@ runRule('require-ticket', rule, {
       ['// SKIP: TRADE-123 flaky on CI', 'flaky on CI', '// SKIP: TRADE-123'],
       ['// SKIP: TRADE-1: flaky', ': flaky', '// SKIP: TRADE-1'],
       ['// SKIP: TRADE-1,', ',', '// SKIP: TRADE-1'],
+      ['// SKIP: TRADE-1, .', ', .', '// SKIP: TRADE-1'],
       ['// SKIP: TRADE-1, TRADE-2 ,', ',', '// SKIP: TRADE-1, TRADE-2'],
       ['// SKIP: TRADE-1 and TRADE-2', 'and TRADE-2', '// SKIP: TRADE-1'],
       ['// SKIP: TRADE-1 flaky, see thread', 'flaky, see thread', '// SKIP: TRADE-1'],
       ['/* SKIP: TRADE-1 flaky */', 'flaky', '/* SKIP: TRADE-1 */'],
       ['/**\r\n * SKIP: TRADE-1 see thread\r\n */', 'see thread', '/**\r\n * SKIP: TRADE-1\r\n */'],
+      [
+        '/**\r * Waiting on the broker.\r * SKIP: TRADE-1 see thread\r */',
+        'see thread',
+        '/**\r * Waiting on the broker.\r * SKIP: TRADE-1\r */',
+      ],
     ].map(([marker, text, fixed]) => ({
       code: `${marker}\ntest.skip('streams price updates', async () => {});`,
       errors: [
@@ -624,6 +662,12 @@ runRule('require-ticket', rule, {
       settings: settings({ testFunctions: [] }),
       errors: [missing('skip', 'SKIP')],
     },
+    // A plain alias of a test.
+    {
+      code: "import { test as base } from '@playwright/test';\nconst orderTest = base;\norderTest.skip('places an order', async () => {});",
+      settings: settings({ testFunctions: [] }),
+      errors: [missing('skip', 'SKIP')],
+    },
     // Fixtures combined with mergeTests().
     {
       code: "import { mergeTests, test as base } from '@playwright/test';\nconst broker = base.extend({});\nexport const test2 = mergeTests(broker, marketData);\ntest2.skip('places an order', async () => {});",
@@ -654,10 +698,31 @@ runRule('require-ticket', rule, {
       settings: settings({ testFunctions: [] }),
       errors: [missing('skip', 'SKIP')],
     },
+    // The whole module, imported or required, with its test used as `pw.test`.
+    {
+      code: "import * as pw from '@playwright/test';\npw.test.skip('places an order', async () => {});\npw.test.describe.fixme('order entry', () => {});\npw.test('fills an order', async () => {\n  pw.test.skip();\n  pw.test.info().fixme();\n});",
+      settings: settings({ testFunctions: [] }),
+      errors: [
+        missing('skip', 'SKIP'),
+        missing('fixme', 'FIXME', 'This describe block'),
+        missing('skip', 'SKIP', 'This skip call'),
+        missing('fixme', 'FIXME', 'This fixme call'),
+      ],
+    },
+    {
+      code: "const pw = require('@playwright/test');\nconst orderTest = pw.test.extend({});\nconst both = pw.mergeTests(orderTest, marketData);\norderTest.skip('places an order', async () => {});\nboth.skip('cancels an order', async () => {});",
+      settings: settings({ testFunctions: [] }),
+      errors: [missing('skip', 'SKIP'), missing('skip', 'SKIP')],
+    },
     {
       code: "import { test as base, expect } from '@playwright/test';\nimport other from 'other';\nexport const myTest = base.extend({}).extend({});\nconst made = make(), deep = obj.a.extend({});\nconst x = 1, y = other.extend({});\nlet z;\nexport {};\nmyTest.skip('places an order', async () => {});\ny.skip('cancels an order', async () => {});",
       settings: settings({ testFunctions: [] }),
       errors: [missing('skip', 'SKIP')],
+    },
+    {
+      code: "const { 'test': quoted, ['test']: computed } = require('@playwright/test');\nquoted.skip('places an order', async () => {});\ncomputed.skip('cancels an order', async () => {});",
+      settings: settings({ testFunctions: [] }),
+      errors: [missing('skip', 'SKIP'), missing('skip', 'SKIP')],
     },
     {
       code: "const { test: pwTest, expect } = require('@playwright/test');\nconst { other } = require('other');\nconst { ...rest } = require('@playwright/test');\nconst { test: { nested } } = require('@playwright/test');\npwTest.skip('places an order', async () => {});",
