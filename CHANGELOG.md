@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The type declarations load in TypeScript 5.0 to 5.5. Before, they included a string export name
+  that only TypeScript 5.6 and later can parse, so older versions failed on the plugin's types even
+  with `skipLibCheck`.
+
 ## [0.3.1] - 2026-10-06
 
 ### Fixed
