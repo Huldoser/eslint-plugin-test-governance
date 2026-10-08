@@ -22,6 +22,8 @@ export default createRule({
         'Only ticket IDs are allowed after `{{marker}}:`, separated by commas. Put details in the ticket instead of `{{text}}`.',
       removeExtraText: 'Remove `{{text}}`.',
       dynamicTitle: "This title isn't static text, so its tags can't be checked. Use a string or template literal.",
+      dynamicTags:
+        "These tags can't be read in this file, so they can't be checked. Use strings, or constants declared in this file.",
     },
   },
   create(context, analysis, options) {
@@ -30,8 +32,9 @@ export default createRule({
     const reported = new Set<string>();
     const reportOnce = (key: string): boolean => !reported.has(key) && Boolean(reported.add(key));
     for (const subject of analysis.subjects) {
-      if (subject.dynamicTitle && options.reportDynamicTitles && hasTagStates) {
-        context.report({ node: subject.node.arguments[0], messageId: 'dynamicTitle' });
+      if (options.reportDynamicTitles && hasTagStates) {
+        if (subject.dynamicTitle) context.report({ node: subject.node.arguments[0], messageId: 'dynamicTitle' });
+        for (const node of subject.unreadTags) context.report({ node, messageId: 'dynamicTags' });
       }
       for (const { state, required } of subject.states) {
         if (!required) continue;

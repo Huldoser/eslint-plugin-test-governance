@@ -23,6 +23,13 @@ runRule('require-ticket (Jest)', requireTicket, {
     "// SKIP: TRADE-1\ntest.concurrent.skip('streams quotes', async () => {});",
     // A timeout after the body, with a title that isn't static text.
     '// SKIP: TRADE-1\ntest.skip(title, async () => {}, 10_000);',
+    // Jest tests have no details object, so a second argument never hides a tag.
+    {
+      code: "test('fills a limit order', orderCase, () => {});",
+      settings: settings({ lifecycleTags: true, reportDynamicTitles: true }),
+    },
+    // Jest's hooks get no test context to skip with.
+    'beforeEach((context) => {\n  context.skip();\n});',
     // Tests built from a table.
     "test.each([[1], [2]])('buys %i shares', (shares) => {});",
     "// SKIP: TRADE-1\ntest.skip.each([[1], [2]])('buys %i shares', (shares) => {});",
@@ -152,6 +159,7 @@ runRule('no-orphaned-marker (Jest)', noOrphanedMarker, {
     "// TODO: TRADE-1\ntest('fills a partial order', () => {});",
     "// TODO: TRADE-1\ndescribe('order book', () => {\n  it('shows the best bid', () => {});\n});",
     "// TODO: #7348 keep the fills in time order\ntest('fills a partial order', () => {});",
+    "// Todo: TRADE-1\ntest('fills a partial order', () => {});",
   ]),
   invalid: withOptions(jest, [
     // A todo marker under its own keyword is still checked.

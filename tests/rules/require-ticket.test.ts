@@ -3,6 +3,7 @@ import { runRule, settings } from '../helpers.ts';
 
 const ANY = 'a ticket key like PROJ-123, an issue like #4821 or owner/repo#4821, or a URL';
 const lifecycle = settings({ lifecycleTags: true });
+const dynamic = settings({ lifecycleTags: true, reportDynamicTitles: true });
 
 const missing = (state: string, marker: string, subject = 'This test', example = 'PROJ-123') => ({
   messageId: 'missingMarker' as const,
@@ -114,7 +115,39 @@ runRule('require-ticket', rule, {
     { code: "test('places an order @newer', async () => {});", settings: lifecycle },
     { code: "test('places an order', { tag: [someTag, ...more] }, async () => {});", settings: lifecycle },
     { code: "test('places an order', { [key]: '@new', ...rest }, async () => {});", settings: lifecycle },
-    // Only the tag detail holds tags, and details passed as a variable can't be read.
+    // Tags kept in constants declared in this file count like tags written in the call.
+    {
+      code: "const tag = '@new';\n// NEW: TRADE-1\ntest('places an order', { tag }, async () => {});",
+      settings: lifecycle,
+    },
+    {
+      code: "const TAGS = { SMOKE: '@smoke', 'NEW': '@new' };\n// NEW: TRADE-1\ntest('places an order', { tag: [TAGS.SMOKE, TAGS['NEW']] }, async () => {});",
+      settings: lifecycle,
+    },
+    {
+      code: "const TAGS = { lifecycle: { NEW: '@new' } };\nconst LIFECYCLE = [, TAGS.lifecycle.NEW];\ntest.describe('order entry', () => {\n  // NEW: TRADE-1\n  test('places an order', { tag: [...LIFECYCLE, '@smoke'] }, async () => {});\n});",
+      settings: lifecycle,
+    },
+    {
+      code: "const NEW = '@new';\nconst details = { tag: NEW };\n// NEW: TRADE-1\ntest('places an order', details, async () => {});",
+      settings: lifecycle,
+    },
+    {
+      code: "const TITLE = 'places an order @new';\n// NEW: TRADE-1\ntest(TITLE, async () => {});",
+      settings: dynamic,
+    },
+    // A body kept in a constant is not a details object.
+    {
+      code: "const placeOrder = async () => {};\n// SKIP: TRADE-1\ntest.skip('places an order', placeOrder);",
+      settings: dynamic,
+    },
+    // Tags that can't be read are reported only with reportDynamicTitles, and only while a tag state is on.
+    { code: "test('places an order', { tag: TAGS.NEW }, async () => {});", settings: lifecycle },
+    {
+      code: "test('places an order', { tag: TAGS.NEW }, async () => {});",
+      settings: settings({ reportDynamicTitles: true }),
+    },
+    // Only the tag detail holds tags, and details from another file can't be read.
     {
       code: "test('places an order', { description: 'Covers the @new order form' }, async () => {});",
       settings: lifecycle,
@@ -813,6 +846,72 @@ runRule('require-ticket', rule, {
       errors: [
         { message: "This title isn't static text, so its tags can't be checked. Use a string or template literal." },
       ],
+    },
+    // Tags from constants declared in this file count, so a missing marker is reported.
+    {
+      code: "const TAGS = { NEW: '@new' };\ntest('places an order', { tag: TAGS.NEW }, async () => {});",
+      settings: lifecycle,
+      errors: [{ ...missing('new', 'NEW'), line: 2 }],
+    },
+    {
+      code: "const UNSTABLE = ['@unstable'];\nconst details = { tag: [...UNSTABLE] };\ntest.describe('market data', details, () => {});",
+      settings: lifecycle,
+      errors: [{ ...missing('unstable', 'UNSTABLE', 'This describe block'), line: 3 }],
+    },
+    {
+      code: "import { orderDetails } from './details';\ntest('places an order', orderDetails, async () => {});",
+      settings: dynamic,
+      errors: [
+        {
+          message:
+            "These tags can't be read in this file, so they can't be checked. Use strings, or constants declared in this file.",
+          line: 2,
+          column: 25,
+          endColumn: 37,
+        },
+      ],
+    },
+    {
+      code: "const details = detailsFor('AAPL');\ntest.describe('order entry', details, () => {});",
+      settings: dynamic,
+      errors: [{ messageId: 'dynamicTags', line: 2, column: 30 }],
+    },
+    {
+      code: [
+        "import { TAGS } from './tags';",
+        "let SMOKE = '@smoke';",
+        "var REGION = '@us'; var REGION = '@eu';",
+        'const { NEW } = TAGS;',
+        "const SYMBOL = 'AAPL';",
+        'const BOOK = { ...TAGS, depth: 10 };',
+        'const DEPTH = { levels: 10 };',
+        'const MIXED = [TAGS.NEW, TAGS.UNSTABLE];',
+        'const a = b;',
+        'const b = a;',
+        "for (const tag of ['@new']) {",
+        "  test('places an order', {",
+        '    tag: [',
+        '      TAGS.NEW,',
+        '      SMOKE,',
+        '      REGION,',
+        '      NEW,',
+        '      SYMBOL.length,',
+        '      BOOK.NEW,',
+        '      DEPTH.NEW,',
+        '      BOOK[key],',
+        '      MIXED,',
+        '      undefined,',
+        '      globalTags,',
+        "      tagFor('new'),",
+        '      tag,',
+        '      a,',
+        "      '@smoke',",
+        '    ],',
+        '  }, async () => {});',
+        '}',
+      ].join('\n'),
+      settings: dynamic,
+      errors: Array.from({ length: 14 }, (_, i) => ({ messageId: 'dynamicTags' as const, line: 14 + i })),
     },
     // A skipped step needs its own marker, unless a marker for the same state covers the test around it.
     {

@@ -55,6 +55,8 @@ export default createRule({
 
     function checkSpelling(occurrence: TagOccurrence): void {
       const { tag, range } = occurrence;
+      // A Vitest tag name is written without its `@`, so show it, and fix it, the same way.
+      const written = (name: string): string => (occurrence.plain ? name.slice(1) : name);
       if (tagStates.some((s) => s.tag === tag)) return;
       const lower = tag.toLowerCase();
       const sameLetters = tagStates.find((s) => s.tag.toLowerCase() === lower);
@@ -62,8 +64,8 @@ export default createRule({
         context.report({
           node: occurrence.node,
           messageId: 'tagCase',
-          data: { found: tag, expected: sameLetters.tag },
-          fix: range && ((fixer) => fixer.replaceTextRange(range, sameLetters.tag)),
+          data: { found: written(tag), expected: written(sameLetters.tag) },
+          fix: range && ((fixer) => fixer.replaceTextRange(range, written(sameLetters.tag))),
         });
         return;
       }
@@ -77,7 +79,11 @@ export default createRule({
         );
       });
       if (near) {
-        context.report({ node: occurrence.node, messageId: 'tagTypo', data: { found: tag, expected: near.tag } });
+        context.report({
+          node: occurrence.node,
+          messageId: 'tagTypo',
+          data: { found: written(tag), expected: written(near.tag) },
+        });
       }
     }
   },

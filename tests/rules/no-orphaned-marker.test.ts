@@ -43,8 +43,76 @@ runRule('no-orphaned-marker', rule, {
     // A marker above a skipped step, or above a test whose step skips it.
     "test('places an order', async () => {\n  // SKIP: TRADE-1\n  await test.step.skip('confirms the fill', async () => {});\n});",
     "// SKIP: TRADE-1\ntest('places an order', async () => {\n  await test.step('fills the order', async () => {\n    test.skip();\n  });\n});",
+    // Tags from another file can't be read, so a marker for a tag state may well be right.
+    {
+      code: "import { TAGS } from './tags';\n// NEW: TRADE-1\ntest('places an order', { tag: TAGS.NEW }, async () => {});",
+      settings: lifecycle,
+    },
+    {
+      code: "import { orderDetails } from './details';\ntest.describe('order entry', orderDetails, () => {\n  // UNSTABLE: TRADE-1\n  test('places an order', async () => {});\n});",
+      settings: lifecycle,
+    },
+    // A marker in the wrong case reads as a sentence unless a valid ticket follows it.
+    "// skip: not on mobile\ntest('places an order', async () => {});",
+    "// Skip:\ntest('places an order', async () => {});",
   ],
   invalid: [
+    // A marker in the wrong case is left over too once it has a ticket.
+    {
+      code: "// skip: TRADE-1\ntest('places an order', async () => {});",
+      errors: [
+        {
+          messageId: 'orphaned',
+          data: { marker: 'skip', state: 'skip', subject: 'this test' },
+          suggestions: [{ messageId: 'removeMarker', output: "test('places an order', async () => {});" }],
+        },
+      ],
+    },
+    {
+      code: "// New: TRADE-1, TRADE-2\ntest.describe('order entry', () => {});",
+      settings: lifecycle,
+      errors: [
+        {
+          messageId: 'orphaned',
+          data: { marker: 'New', state: 'new', subject: 'this describe block' },
+          suggestions: [{ messageId: 'removeMarker', output: "test.describe('order entry', () => {});" }],
+        },
+      ],
+    },
+    // Tags that can be read are checked, and tags that can't don't hide other states.
+    {
+      code: "const SMOKE = '@smoke';\n// NEW: TRADE-1\ntest('places an order', { tag: SMOKE }, async () => {});",
+      settings: lifecycle,
+      errors: [
+        {
+          messageId: 'orphaned',
+          data: { marker: 'NEW', state: 'new', subject: 'this test' },
+          suggestions: [
+            {
+              messageId: 'removeMarker',
+              output: "const SMOKE = '@smoke';\ntest('places an order', { tag: SMOKE }, async () => {});",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: "import { orderDetails } from './details';\n// SKIP: TRADE-1\ntest('places an order', orderDetails, async () => {});",
+      settings: lifecycle,
+      errors: [
+        {
+          messageId: 'orphaned',
+          data: { marker: 'SKIP', state: 'skip', subject: 'this test' },
+          suggestions: [
+            {
+              messageId: 'removeMarker',
+              output:
+                "import { orderDetails } from './details';\ntest('places an order', orderDetails, async () => {});",
+            },
+          ],
+        },
+      ],
+    },
     // A malformed ticket still reads as a marker.
     {
       code: "// SKIP: trade-12\ntest('cancels an order', async () => {});",

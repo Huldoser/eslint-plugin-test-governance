@@ -32,6 +32,22 @@ runRule('marker-matches-state', rule, {
   ],
   invalid: [
     {
+      code: "// skip: TRADE-123\ntest.fixme('fills a partial order', async () => {});",
+      errors: [
+        {
+          messageId: 'wrongMarker',
+          data: { found: 'skip', expected: 'FIXME', state: 'fixme', subject: 'this test' },
+          suggestions: [
+            {
+              messageId: 'renameMarker',
+              data: { expected: 'FIXME' },
+              output: "// FIXME: TRADE-123\ntest.fixme('fills a partial order', async () => {});",
+            },
+          ],
+        },
+      ],
+    },
+    {
       code: "// SKIP: TRADE-123 flaky\ntest.fixme('fills a partial order', async () => {});",
       errors: [
         {

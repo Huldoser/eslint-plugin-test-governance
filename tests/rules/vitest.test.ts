@@ -1,5 +1,6 @@
 import markerMatchesState from '../../src/rules/marker-matches-state.ts';
 import noConflictingStates from '../../src/rules/no-conflicting-states.ts';
+import noOrphanedMarker from '../../src/rules/no-orphaned-marker.ts';
 import requireTicket from '../../src/rules/require-ticket.ts';
 import { runRule, settings, withOptions } from '../helpers.ts';
 
@@ -61,6 +62,19 @@ runRule('require-ticket (Vitest)', requireTicket, {
       code: "// NEW: TRADE-1\ntest('fills a limit order', { tags: ['@new', 'smoke'] }, () => {});\n// NEW: TRADE-2\ntest('fills a market order @new', () => {});",
       settings: settings({ lifecycleTags: true }),
     },
+    // Vitest tag names are written without the `@`: `new` is the `@new` tag.
+    {
+      code: "// NEW: TRADE-1\ntest('fills a limit order', { tags: ['new', `smoke`] }, () => {});",
+      settings: settings({ lifecycleTags: true }),
+    },
+    {
+      code: "const QUARANTINE = 'quarantine';\n// QUARANTINE: TRADE-1\ndescribe('order book', { tags: [QUARANTINE] }, () => {});",
+      settings: settings({ customStates: { quarantine: { when: '@quarantine', marker: 'QUARANTINE' } } }),
+    },
+    // A skip in beforeEach, global or imported, skips the tests it runs before.
+    "// SKIP: TRADE-1\ndescribe('order book', () => {\n  beforeEach(({ skip }) => {\n    skip();\n  });\n  test('fills a limit order', () => {});\n});",
+    "import { beforeEach as setup } from 'vitest';\nsetup((context) => {\n  // SKIP: TRADE-1\n  context.skip();\n});",
+    'beforeEach((context) => {\n  if (isMobile) context.skip();\n});',
     // Not Vitest: Playwright's and Jest's tests, Playwright-only calls and Jest's x/f functions.
     "import { test } from '@playwright/test';\ntest.skip('fills a limit order', async () => {});",
     "import { describe } from '@jest/globals';\ndescribe.skip('order book', () => {});",
@@ -141,6 +155,19 @@ runRule('require-ticket (Vitest)', requireTicket, {
       errors: [missing('new', 'NEW')],
     },
     {
+      code: "test('fills a limit order', { tags: 'unstable' }, () => {});",
+      settings: settings({ lifecycleTags: true }),
+      errors: [missing('unstable', 'UNSTABLE')],
+    },
+    {
+      code: "beforeEach((context) => {\n  context.skip();\n});\ntest('fills a limit order', () => {});",
+      errors: [{ ...missing('skip', 'SKIP', 'This skip call'), line: 2 }],
+    },
+    {
+      code: "import { beforeEach as setup } from 'vitest';\ndescribe('order book', () => {\n  setup(({ skip }) => {\n    skip();\n  });\n});",
+      errors: [{ ...missing('skip', 'SKIP', 'This skip call'), line: 4 }],
+    },
+    {
       code: "const orderTest = test.extend({ broker: async ({}, use) => use({}) });\norderTest.skip('fills a limit order', () => {});",
       errors: [missing('skip', 'SKIP')],
     },
@@ -157,6 +184,47 @@ runRule('marker-matches-state (Vitest)', markerMatchesState, {
           messageId: 'wrongMarker',
           data: { found: 'SKIP', expected: 'TODO', state: 'todo', subject: 'this describe block' },
           suggestions: [{ messageId: 'renameMarker', output: "// TODO: TRADE-1\ndescribe.todo('order book');" }],
+        },
+      ],
+    },
+  ]),
+});
+
+runRule('no-orphaned-marker (Vitest)', noOrphanedMarker, {
+  valid: withOptions(vitest, [
+    // An options object from another file may skip the test, so its marker may well be right.
+    "import { orderOptions } from './options';\n// SKIP: TRADE-1\ntest('fills a limit order', orderOptions, () => {});",
+    {
+      code: "// NEW: TRADE-1\ntest('fills a limit order', { tags: ['new'] }, () => {});",
+      settings: settings({ lifecycleTags: true }),
+    },
+  ]),
+  invalid: withOptions(vitest, [
+    {
+      code: "const options = { tags: ['smoke'] };\n// SKIP: TRADE-1\ntest('fills a limit order', options, () => {});",
+      errors: [
+        {
+          messageId: 'orphaned',
+          data: { marker: 'SKIP', state: 'skip', subject: 'this test' },
+          suggestions: [
+            {
+              messageId: 'removeMarker',
+              output: "const options = { tags: ['smoke'] };\ntest('fills a limit order', options, () => {});",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: "// NEW: TRADE-1\ntest('fills a limit order', { tags: ['smoke'] }, () => {});",
+      settings: settings({ lifecycleTags: true }),
+      errors: [
+        {
+          messageId: 'orphaned',
+          data: { marker: 'NEW', state: 'new', subject: 'this test' },
+          suggestions: [
+            { messageId: 'removeMarker', output: "test('fills a limit order', { tags: ['smoke'] }, () => {});" },
+          ],
         },
       ],
     },
@@ -180,6 +248,22 @@ runRule('no-conflicting-states (Vitest)', noConflictingStates, {
       code: "test('fills a limit order', { tags: ['@New'] }, () => {});",
       output: "test('fills a limit order', { tags: ['@new'] }, () => {});",
       errors: [{ messageId: 'tagCase' }],
+    },
+    // A tag name is shown and fixed without the `@` it is written without.
+    {
+      code: "test('fills a limit order', { tags: ['New', 'unstabel'] }, () => {});",
+      output: "test('fills a limit order', { tags: ['new', 'unstabel'] }, () => {});",
+      errors: [
+        { messageId: 'tagCase', data: { found: 'New', expected: 'new' } },
+        { messageId: 'tagTypo', data: { found: 'unstabel', expected: 'unstable' } },
+      ],
+    },
+    {
+      code: "const QUEUE = 'New';\ntest('fills a limit order', { tags: [QUEUE, 'N\\u0065w'] }, () => {});",
+      errors: [
+        { messageId: 'tagCase', data: { found: 'New', expected: 'new' }, column: 38 },
+        { messageId: 'tagCase', data: { found: 'New', expected: 'new' }, column: 45 },
+      ],
     },
   ]),
 });

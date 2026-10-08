@@ -23,12 +23,14 @@ A test is in a state when it is:
 | `fail`, `slow` | `test.fail(...)`, `test.slow()`, `testInfo.fail()`, `testInfo.slow()`                                                                 | `// FAIL:`, `// SLOW:` | no                         |
 | custom         | any tag you list in `customStates`                                                                                                    | your keyword           | when configured            |
 
-In Jest and Vitest, `xit`, `xdescribe`, Vitest's `{ skip: true }` and `context.skip()` skip a test
-too, and `test.failing` and `test.fails` put it in the `fail` state. The
+In Jest and Vitest, `xit`, `xdescribe`, Vitest's `{ skip: true }` and `context.skip()`, in a test or
+in `beforeEach`, skip a test too, and `test.failing` and `test.fails` put it in the `fail` state. The
 [README](../../README.md#jest-and-vitest) lists every form.
 
-Tags are read from the title (`'places a limit order @new'`) and from `{ tag: '@new' }` or `{ tag: ['@new', '@smoke'] }`.
-Tags on a `describe` apply to every test inside it.
+Tags are read from the title (`'places a limit order @new'`) and from `{ tag: '@new' }` or `{ tag: ['@new', '@smoke'] }`,
+also when they come from a `const` or an enum declared in the same file, as in `{ tag: TAGS.NEW }`.
+Vitest writes tag names without the `@`, so `{ tags: ['new'] }` is the `@new` tag. Tags on a
+`describe` apply to every test inside it.
 
 ## Marker format
 
@@ -80,12 +82,13 @@ such as `catch { test.skip(true, 'Market data feed is down') }`, and a skip afte
 If one test or describe has several markers for the same state, each must be valid: in
 `// SKIP: TRADE-1` followed by `// SKIP: nope`, the second line is reported.
 
-## Dynamic titles
+## Titles and tags that can't be read
 
-Tags can only be read from a title that is text: a string or a template literal such as
-`` `buys ${symbol} @new` ``. A title built another way, such as `'buys ' + symbol` or a variable, may
-hide a tag. With `reportDynamicTitles: true`, the rule reports those titles whenever a tag state
-(`@new`, `@unstable` or a custom state) is on, so no tagged test slips past.
+Tags can only be read from text: a string or a template literal such as `` `buys ${symbol} @new` ``,
+written in the call or kept in a `const` or an enum in the same file. A title built another way, such
+as `'buys ' + symbol`, and a tag or details object imported from another module may hide a tag. With
+`reportDynamicTitles: true`, the rule reports those whenever a tag state (`@new`, `@unstable` or a
+custom state) is on, so no tagged test slips past.
 
 <!-- example: invalid settings={"lifecycleTags":true,"reportDynamicTitles":true} -->
 
@@ -95,12 +98,29 @@ for (const symbol of ['AAPL', 'MSFT']) {
 }
 ```
 
+<!-- example: invalid settings={"lifecycleTags":true,"reportDynamicTitles":true} -->
+
+```js
+import { TAGS } from './tags';
+
+test('closes all positions with one click', { tag: TAGS.NEW }, async ({ page }) => {});
+```
+
 <!-- example: valid settings={"lifecycleTags":true,"reportDynamicTitles":true} -->
 
 ```js
 for (const symbol of ['AAPL', 'MSFT']) {
   test(`buys ${symbol}`, async ({ page }) => {});
 }
+```
+
+<!-- example: valid settings={"lifecycleTags":true,"reportDynamicTitles":true} -->
+
+```js
+const TAGS = { NEW: '@new', SMOKE: '@smoke' };
+
+// NEW: TRADE-77
+test('closes all positions with one click', { tag: [TAGS.NEW, TAGS.SMOKE] }, async ({ page }) => {});
 ```
 
 ## Examples
@@ -212,5 +232,5 @@ change what it reports:
 - `requireTicketForConditional`: conditional skips need a ticket too.
 - `allowBlankLine`: blank lines may separate a marker from its test.
 - `allowNotes`: text may follow the tickets.
-- `reportDynamicTitles`: report titles whose tags can't be read (see [Dynamic titles](#dynamic-titles)).
+- `reportDynamicTitles`: report titles and tags that can't be read (see [Titles and tags that can't be read](#titles-and-tags-that-cant-be-read)).
 - `framework` and `testFunctions`: which functions count as the framework's `test`.

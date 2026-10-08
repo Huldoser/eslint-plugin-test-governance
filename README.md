@@ -123,17 +123,19 @@ export default [
 `configs.playwright` is the Playwright config with its framework set, for a file list that needs it.
 All four configs turn on the same rules. What puts a test in a state in each framework:
 
-| State (marker)                         | Playwright                                                                                                          | Jest                                                                 | Vitest                                                                                                          |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `skip` (`// SKIP:`)                    | `test.skip(...)`, `test.describe.skip`, `test.skip()` in a body, `testInfo.skip()`, `test.step.skip`, `step.skip()` | `test.skip`, `it.skip`, `describe.skip`, `xit`, `xtest`, `xdescribe` | `test.skip`, `it.skip`, `describe.skip`, `suite.skip`, `{ skip: true }`, `context.skip()` or `skip()` in a body |
-| `todo` (`// TODO:`)                    |                                                                                                                     | `test.todo`, `it.todo`                                               | `test.todo`, `describe.todo`, `{ todo: true }`                                                                  |
-| `fixme` (`// FIXME:`)                  | `test.fixme(...)`, `test.describe.fixme`, `testInfo.fixme()`                                                        |                                                                      |                                                                                                                 |
-| `fail` (`// FAIL:`), off by default    | `test.fail(...)`, `testInfo.fail()`                                                                                 | `test.failing`                                                       | `test.fails`, `{ fails: true }`                                                                                 |
-| `slow` (`// SLOW:`), off by default    | `test.slow()`, `testInfo.slow()`                                                                                    |                                                                      |                                                                                                                 |
-| conditional skip, no ticket by default | `test.skip(condition)`, `if (...) test.skip()`                                                                      |                                                                      | `skipIf(...)`, `runIf(...)`, `{ skip: condition }`, `context.skip(condition)`, `if (...) context.skip()`        |
-| tags such as `@new` (`// NEW:`)        | the title, `{ tag }`                                                                                                | the title                                                            | the title, `{ tags }`                                                                                           |
+| State (marker)                         | Playwright                                                                                                          | Jest                                                                 | Vitest                                                                                                                             |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `skip` (`// SKIP:`)                    | `test.skip(...)`, `test.describe.skip`, `test.skip()` in a body, `testInfo.skip()`, `test.step.skip`, `step.skip()` | `test.skip`, `it.skip`, `describe.skip`, `xit`, `xtest`, `xdescribe` | `test.skip`, `it.skip`, `describe.skip`, `suite.skip`, `{ skip: true }`, `context.skip()` or `skip()` in a body or in `beforeEach` |
+| `todo` (`// TODO:`)                    |                                                                                                                     | `test.todo`, `it.todo`                                               | `test.todo`, `describe.todo`, `{ todo: true }`                                                                                     |
+| `fixme` (`// FIXME:`)                  | `test.fixme(...)`, `test.describe.fixme`, `testInfo.fixme()`                                                        |                                                                      |                                                                                                                                    |
+| `fail` (`// FAIL:`), off by default    | `test.fail(...)`, `testInfo.fail()`                                                                                 | `test.failing`                                                       | `test.fails`, `{ fails: true }`                                                                                                    |
+| `slow` (`// SLOW:`), off by default    | `test.slow()`, `testInfo.slow()`                                                                                    |                                                                      |                                                                                                                                    |
+| conditional skip, no ticket by default | `test.skip(condition)`, `if (...) test.skip()`                                                                      |                                                                      | `skipIf(...)`, `runIf(...)`, `{ skip: condition }`, `context.skip(condition)`, `if (...) context.skip()`                           |
+| tags such as `@new` (`// NEW:`)        | the title, `{ tag }`                                                                                                | the title                                                            | the title, `{ tags }`, where `'new'` and `'@new'` both mean `@new`                                                                 |
 
 Table-driven tests count too: `test.skip.each(table)(...)`, `describe.skip.each` and Vitest's `.for`.
+Vitest writes tag names without the `@`, as in `{ tags: ['flaky'] }`, so a name in `tags` counts as the
+tag with an `@` in front: `'flaky'` is `@flaky`, and a custom state with `when: '@flaky'` matches it.
 
 ## Rules
 
@@ -193,7 +195,7 @@ always agree on ticket formats, states and markers. To turn a rule off, set it t
 | `allowNotes`                  | `boolean`                                                | `false`                           | Allow free text after the tickets, e.g. `// SKIP: TRADE-123 flaky on CI`. Applies to markers and to `FIXME` / `TODO` comments.                                                                                                                                                                                                                                                                |
 | `comments`                    | `false \| { keywords?: string[] }`                       | `{ keywords: ['FIXME', 'TODO'] }` | Comment keywords that must start with a ticket anywhere in a test file, e.g. `// TODO: TRADE-123`. Your keywords replace the default ones. `false` allows free-form comments.                                                                                                                                                                                                                 |
 | `testFunctions`               | `string[]`                                               | `['test']`                        | Names treated as the framework's `test`. Jest and Vitest default to `['test', 'it']`. Your list replaces the default one, so include those names if you still need them. See below.                                                                                                                                                                                                           |
-| `reportDynamicTitles`         | `boolean`                                                | `false`                           | When a tag state is on, report titles that aren't static text, since their tags can't be read.                                                                                                                                                                                                                                                                                                |
+| `reportDynamicTitles`         | `boolean`                                                | `false`                           | When a tag state is on, report titles that aren't static text, and tags or details that can't be read in the file, such as ones imported from another module, since their tags can't be checked.                                                                                                                                                                                              |
 
 ### Ticket presets
 
@@ -269,12 +271,13 @@ The [Jest and Vitest](#jest-and-vitest) table lists what each framework's tests 
   receives. Only the step is skipped, so a marker above the step or above a skipped test around it
   covers it.
 - Tags in titles (string or template literal) and in `{ tag: '@new' }` / `{ tag: [...] }`, inherited
-  from enclosing describes.
+  from enclosing describes. Tags, titles and details can also come from a `const` or an enum declared
+  in the same file, as in `{ tag: TAGS.NEW }` after `const TAGS = { NEW: '@new' } as const`, including
+  arrays and spreads of them.
 
-Not covered in this version: tests generated in loops with dynamic titles (see
-`reportDynamicTitles`), fixtures imported from other modules under a name not in `testFunctions`,
-Playwright annotations as markers, Vitest's `context.skip()` in a global `beforeEach` (the one on
-`test.beforeEach` is covered), and other runners such as Mocha, Bun and `node:test`.
+Not covered in this version: tests generated in loops with dynamic titles, and tags or details imported
+from other modules (see `reportDynamicTitles`), fixtures imported from other modules under a name not in
+`testFunctions`, Playwright annotations as markers, and other runners such as Mocha, Bun and `node:test`.
 
 ## TypeScript
 

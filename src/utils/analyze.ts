@@ -42,12 +42,15 @@ export function isStateMarker(marker: Marker): marker is StateMarker {
 
 export interface TagOccurrence {
   tag: string;
-  node: TSESTree.Literal | TSESTree.TemplateLiteral;
+  /** Where to report the tag: the text it is written in, or the name it comes from, as `Tags.NEW`. */
+  node: Node;
   /**
-   * Where the tag is written in the source. Unset when an escape such as `\u002D` comes before the
-   * tag or inside it, since the source then no longer lines up with the title.
+   * Where the tag is written in the source. Unset when it comes from a constant, or when an escape such
+   * as `\u002D` comes before the tag or inside it, since the source then no longer lines up with the title.
    */
   range?: TSESTree.Range;
+  /** Set for a Vitest tag name such as `'flaky'` in `tags`, which is written without its `@`. */
+  plain?: true;
 }
 
 interface StateSource {
@@ -72,6 +75,13 @@ export interface Subject {
   tags: TagOccurrence[];
   /** Tags this node inherits from enclosing describes. */
   inheritedTags: Set<string>;
+  /** Tag values, or a whole details object, on this node that can't be read, as `{ tag: TAGS.NEW }` with `TAGS` imported. */
+  unreadTags: Node[];
+  /**
+   * States this node may be in without the code showing it: tag states when tags can't be read, and
+   * Vitest's option states when its options object can't. Includes those of enclosing describes.
+   */
+  unknownStates: Set<string>;
   /** True when this node is skipped or fixme'd by any means, whether or not those states are on. */
   skipped: boolean;
   ownSkip: boolean;
@@ -385,23 +395,32 @@ function parseMarkers(comment: Comment, states: StateDef[]): Marker[] {
     const match = MARKER_LINE_RE.exec(text);
     if (!match) continue;
     const [, keyword, rest] = match;
+    const restOffset = start + match[0].length - rest.length;
     const state = states.find((s) => s.marker === keyword);
     if (state) {
-      const restOffset = start + match[0].length - rest.length;
       markers.push({ comment, keyword, state, ...parseTickets(rest, restOffset, state.ticket) });
       continue;
     }
     const caseOf = states.find((s) => s.marker === keyword.toUpperCase());
-    if (caseOf) markers.push({ comment, keyword, caseOf, tickets: [] });
+    if (caseOf) markers.push({ comment, keyword, caseOf, ...parseTickets(rest, restOffset, caseOf.ticket) });
   }
   return markers;
 }
 
-function scanTags(source: string, node: TSESTree.Literal | TSESTree.TemplateLiteral, out: TagOccurrence[]): void {
+type Text = TSESTree.StringLiteral | TSESTree.TemplateLiteral;
+
+/** A piece of text a title or tag is made of. */
+interface FoundText {
+  text: Text;
+  /** The name the text was reached through, such as `Tags.NEW`. Unset when the call itself holds the text. */
+  via?: Node;
+}
+
+function scanTags(source: string, { text: node, via }: FoundText, out: TagOccurrence[]): void {
   // Each piece of text with where it starts in the source, after its opening quote, backtick or `}`.
   const parts =
     node.type === 'Literal'
-      ? [{ text: String(node.value), start: node.range[0] + 1 }]
+      ? [{ text: node.value, start: node.range[0] + 1 }]
       : node.quasis.map((quasi) => ({
           // `cooked` is only null in tagged templates, which are never titles.
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
@@ -411,49 +430,170 @@ function scanTags(source: string, node: TSESTree.Literal | TSESTree.TemplateLite
   for (const { text, start } of parts) {
     for (const match of text.matchAll(TAG_RE)) {
       const end = match.index + match[0].length;
-      const written = source.slice(start, start + end) === text.slice(0, end);
-      out.push({ tag: match[0], node, ...(written && { range: [start + match.index, start + end] }) });
+      const written = via === undefined && source.slice(start, start + end) === text.slice(0, end);
+      out.push({ tag: match[0], node: via ?? node, ...(written && { range: [start + match.index, start + end] }) });
     }
   }
 }
 
-function isStaticText(node: Node): node is TSESTree.StringLiteral | TSESTree.TemplateLiteral {
+const PLAIN_TAG_RE = /^[\w-]+$/;
+
+/** A Vitest tag name such as `'flaky'` in `tags`, which stands for the `@flaky` tag. */
+function plainTag(source: string, { text, via }: FoundText): TagOccurrence | undefined {
+  if (text.type !== 'Literal' || !PLAIN_TAG_RE.test(text.value)) return undefined;
+  const start = text.range[0] + 1;
+  const end = start + text.value.length;
+  const written = via === undefined && source.slice(start, end) === text.value;
+  return { tag: `@${text.value}`, node: via ?? text, plain: true, ...(written && { range: [start, end] }) };
+}
+
+function isStaticText(node: Node): node is Text {
   return (node.type === 'Literal' && typeof node.value === 'string') || node.type === 'TemplateLiteral';
 }
 
 /**
- * The plain-keyed properties of a test's details or options object, the second argument in
- * `test('title', { tag: '@smoke' }, fn)` or Vitest's `test('title', { skip: true }, fn)`.
+ * The value a `const` or enum declared in this file gives a name: the `'@new'` of `const NEW = '@new'`,
+ * or the enum itself. Undefined for any other name, such as an import, a parameter or a `let`.
  */
-function detailsOf(call: TSESTree.CallExpression): [string, Node][] {
+function declaredValue(sourceCode: SourceCode, id: TSESTree.Identifier): Node | undefined {
+  for (let scope: TSESLint.Scope.Scope | null = sourceCode.getScope(id); scope; scope = scope.upper) {
+    const variable = scope.set.get(id.name);
+    if (!variable) continue;
+    // A name declared more than once, as a merged enum, has no single value.
+    if (variable.defs.length !== 1) return undefined;
+    const [def] = variable.defs;
+    if (def.type === 'TSEnumName') return def.node;
+    const declarator = def.type === 'Variable' && def.parent.kind === 'const' ? def.node : undefined;
+    return declarator?.id.type === 'Identifier' ? (declarator.init ?? undefined) : undefined;
+  }
+  return undefined;
+}
+
+/** The value of the last property called `key`, or undefined when a spread written after it may replace it. */
+function propertyValue(object: TSESTree.ObjectExpression, key: string): Node | undefined {
+  for (let i = object.properties.length - 1; i >= 0; i--) {
+    const prop = object.properties[i];
+    if (prop.type === 'SpreadElement') return undefined;
+    if (propertyName(prop) === key) return prop.value;
+  }
+  return undefined;
+}
+
+/**
+ * What a name or member stands for when it is a constant declared in this file: the `'@new'` of `NEW`
+ * after `const NEW = '@new'`, or of `Tags.NEW` after `const Tags = { NEW: '@new' }` or
+ * `enum Tags { NEW = '@new' }`.
+ */
+function constantValue(sourceCode: SourceCode, node: Node): Node | undefined {
+  if (node.type === 'Identifier') return declaredValue(sourceCode, node);
+  if (node.type !== 'MemberExpression') return undefined;
+  const key = memberName(node);
+  const value = constantValue(sourceCode, unwrap(node.object));
+  const owner = value && unwrap(value);
+  if (key === undefined || owner === undefined) return undefined;
+  if (owner.type === 'ObjectExpression') return propertyValue(owner, key);
+  if (owner.type !== 'TSEnumDeclaration') return undefined;
+  const member = owner.body.members.find((m) => (m.id.type === 'Identifier' ? m.id.name : m.id.value) === key);
+  return member?.initializer;
+}
+
+/**
+ * Reads the text a title or tag value is made of: strings, template literals and arrays of them,
+ * following constants declared in this file. What can't be read, such as a name imported from another
+ * file, goes in `unread`: the name the call uses, or the value itself.
+ */
+function readTexts(
+  sourceCode: SourceCode,
+  node: Node,
+  out: { texts: FoundText[]; unread: Set<Node> },
+  via?: Node,
+  path: readonly Node[] = [],
+): void {
+  const target = unwrap(node);
+  if (isStaticText(target)) {
+    out.texts.push({ text: target, via });
+    return;
+  }
+  if (target.type === 'ArrayExpression') {
+    for (const item of target.elements) {
+      if (item) readTexts(sourceCode, item.type === 'SpreadElement' ? item.argument : item, out, via, path);
+    }
+    return;
+  }
+  const value = constantValue(sourceCode, target);
+  // `path` holds the constants already followed, so `const a = b; const b = a;` ends.
+  if (value === undefined || path.includes(value)) out.unread.add(via ?? target);
+  else readTexts(sourceCode, value, out, via ?? target, [...path, value]);
+}
+
+interface Details {
+  /** The plain-keyed properties. */
+  entries: [string, Node][];
+  /** The details argument, when it can't be read. */
+  unread?: Node;
+}
+
+/**
+ * The details or options object of a declaration, the second argument in
+ * `test('title', { tag: '@smoke' }, fn)` or Vitest's `test('title', { skip: true }, fn)`, also when it
+ * is a constant declared in this file.
+ */
+function detailsOf(sourceCode: SourceCode, call: TSESTree.CallExpression): Details {
   const details = call.arguments.at(1);
-  if (details?.type !== 'ObjectExpression') return [];
-  return details.properties.flatMap((prop): [string, Node][] => {
+  if (details === undefined || isFunction(details)) return { entries: [] };
+  const target = unwrap(details);
+  const value = target.type === 'ObjectExpression' ? target : constantValue(sourceCode, target);
+  const object = value && unwrap(value);
+  if (object?.type !== 'ObjectExpression') {
+    // A name that can't be read is the details object only when a body comes after it:
+    // `test.skip('places an order', placeOrder)` has a body defined elsewhere and no details.
+    return call.arguments.slice(2).some(isFunction) ? { entries: [], unread: details } : { entries: [] };
+  }
+  const entries = object.properties.flatMap((prop): [string, Node][] => {
     if (prop.type !== 'Property' || prop.computed) return [];
     const key = prop.key.type === 'Identifier' ? prop.key.name : String((prop.key as TSESTree.Literal).value);
     return [[key, prop.value]];
   });
+  return { entries };
 }
 
+interface TagInfo {
+  tags: TagOccurrence[];
+  /** Whether the title isn't text, so its tags can't be read. */
+  dynamic: boolean;
+  /** Tag values, or a whole details object, that can't be read. */
+  unread: Node[];
+  /** Whether the details or options object can't be read, so it may hold Vitest's `{ skip: true }`. */
+  opaqueDetails: boolean;
+}
+
+const NO_TAGS: TagInfo = { tags: [], dynamic: false, unread: [], opaqueDetails: false };
+
 function collectTags(
-  source: string,
+  sourceCode: SourceCode,
   call: TSESTree.CallExpression,
   hasTitle: boolean,
-  tagKey: string | undefined,
-): { tags: TagOccurrence[]; dynamic: boolean } {
+  framework: Framework,
+  details: Details,
+): TagInfo {
+  if (!hasTitle) return NO_TAGS;
+  const source = sourceCode.text;
   const tags: TagOccurrence[] = [];
-  if (!hasTitle) return { tags, dynamic: false };
-  const [title] = call.arguments;
-  const dynamic = !isStaticText(title);
-  if (!dynamic) scanTags(source, title, tags);
-  for (const [key, value] of detailsOf(call)) {
-    if (key !== tagKey) continue;
-    const values = value.type === 'ArrayExpression' ? value.elements : [value];
-    for (const item of values) {
-      if (item && isStaticText(item)) scanTags(source, item, tags);
-    }
+  const title = { texts: [] as FoundText[], unread: new Set<Node>() };
+  readTexts(sourceCode, call.arguments[0], title);
+  for (const found of title.texts) scanTags(source, found, tags);
+  const values = { texts: [] as FoundText[], unread: new Set<Node>() };
+  for (const [key, value] of details.entries) {
+    if (key === framework.tagKey) readTexts(sourceCode, value, values);
   }
-  return { tags, dynamic };
+  for (const found of values.texts) {
+    const plain = framework.plainTags ? plainTag(source, found) : undefined;
+    if (plain) tags.push(plain);
+    else scanTags(source, found, tags);
+  }
+  const unread = [...values.unread];
+  if (details.unread && framework.tagKey !== undefined) unread.push(details.unread);
+  return { tags, dynamic: title.unread.size > 0, unread, opaqueDetails: details.unread !== undefined };
 }
 
 /**
@@ -570,6 +710,8 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   const stack: Subject[] = [];
   const infos: InfoName[] = [];
   const keys = sourceCode.visitorKeys as Record<string, readonly string[] | undefined>;
+  /** States an options object can put a test in, such as `skip` for Vitest's `{ skip: true }`. */
+  const optionModifiers = new Set<string>(framework.optionEffects.values());
 
   /**
    * `modifiers` maps each state modifier the call has to whether it always applies; a conditional one,
@@ -579,7 +721,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     kind: Subject['kind'],
     call: TSESTree.CallExpression,
     modifiers: ReadonlyMap<string, boolean>,
-    tagInfo: { tags: TagOccurrence[]; dynamic: boolean },
+    tagInfo: TagInfo,
     parent = stack.at(-1),
   ): Subject => {
     const anchor = anchorOf(call);
@@ -601,9 +743,18 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     }
     const inherited = new Set<string>();
     const inheritedTags = new Set<string>();
+    const unknownStates = new Set<string>();
     if (parent && kind !== 'runtime') {
       for (const name of parent.inherited) inherited.add(name);
       for (const source of parent.states) inherited.add(source.state.name);
+      for (const name of parent.unknownStates) unknownStates.add(name);
+    }
+    for (const state of states) {
+      const unknown =
+        state.modifier === undefined
+          ? tagInfo.unread.length > 0
+          : tagInfo.opaqueDetails && optionModifiers.has(state.modifier);
+      if (unknown) unknownStates.add(state.name);
     }
     // Tags belong to tests: a step in a `@new` test is not itself new.
     if (parent && (kind === 'test' || kind === 'describe')) {
@@ -621,6 +772,8 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       runtimeStates: new Set(),
       tags: tagInfo.tags,
       inheritedTags,
+      unreadTags: tagInfo.unread,
+      unknownStates,
       skipped: ownSkip || (kind !== 'runtime' && parent?.skipped === true),
       ownSkip,
       markers: block.flatMap((comment) => parseMarkers(comment, states)),
@@ -631,7 +784,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   };
 
   /** The state modifiers of a declaration, from its members and, in Vitest, its options object. */
-  const modifiersOf = (members: string[], call: TSESTree.CallExpression): Map<string, boolean> => {
+  const modifiersOf = (members: string[], details: [string, Node][]): Map<string, boolean> => {
     const modifiers = new Map<string, boolean>();
     const add = (modifier: string, always: boolean): void => {
       if (!modifiers.get(modifier)) modifiers.set(modifier, always);
@@ -641,7 +794,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       if (effect) add(effect.modifier, !effect.conditional);
     }
     // `{ skip: true }` always skips, `{ skip: isMobile }` only sometimes, `{ skip: false }` never.
-    for (const [key, value] of detailsOf(call)) {
+    for (const [key, value] of details) {
       const modifier = framework.optionEffects.get(key);
       const literal = value.type === 'Literal' ? value.value : undefined;
       if (modifier && literal !== false) add(modifier, literal === true);
@@ -665,13 +818,15 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const args = call.arguments;
     const { root } = callee;
     let { path } = callee;
+    // Vitest's `beforeEach((context) => context.skip())` skips the tests it runs before.
+    if (root.kind === 'hook') return { infos: bodyInfos(args, path) };
 
     if (framework.playwright) {
       // `test.step('fills the order', async (step) => {...})` or `test.step.skip(...)`. The step's body
       // gets a `TestStepInfo` that can skip the step at runtime.
       const step = path.join('.');
       if ((step === 'step' || step === 'step.skip') && args.length >= 2) {
-        const subject = makeSubject('step', call, modifiersOf(path.slice(1), call), { tags: [], dynamic: false });
+        const subject = makeSubject('step', call, modifiersOf(path.slice(1), []), NO_TAGS);
         const body = args[1];
         const param = isFunction(body) ? body.params.at(0) : undefined;
         return { subject, infos: infoNames(param, STEP_INFO_METHODS, subject) };
@@ -687,8 +842,9 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const allowed = kind === 'test' ? framework.testMembers : framework.describeMembers;
     if (members.every((m) => allowed.has(m)) && isDeclaration(kind, args, members.includes('todo'))) {
       // A declaration always has a first argument: its title, or the body of a describe without one.
-      const tagInfo = collectTags(sourceCode.text, call, !isFunction(args[0]), framework.tagKey);
-      return { subject: makeSubject(kind, call, modifiersOf(members, call), tagInfo), infos: bodyInfo };
+      const details = detailsOf(sourceCode, call);
+      const tagInfo = collectTags(sourceCode, call, !isFunction(args[0]), framework, details);
+      return { subject: makeSubject(kind, call, modifiersOf(members, details.entries), tagInfo), infos: bodyInfo };
     }
     // test.skip(), test.fixme(), test.fail() and test.slow() in a test, a describe or a hook.
     if (framework.playwright && path.length === 1 && RUNTIME_MODIFIERS.has(path[0])) {
@@ -727,7 +883,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       'runtime',
       call,
       new Map([[modifier, isUnconditional(call)]]),
-      { tags: [], dynamic: false },
+      NO_TAGS,
       step ?? stack.findLast((s) => s.kind !== 'step'),
     );
     const parent = subject.parent;
@@ -834,11 +990,17 @@ function isWorkComment(marker: Marker, options: ResolvedOptions): boolean {
   return options.workCommentKeywords.has(marker.keyword.toUpperCase()) && marker.tickets.at(0)?.result !== 'ok';
 }
 
-/** Markers in the subject's own block for states that don't apply to it, leaving out work comments. */
+/**
+ * Markers in the subject's own block for states that don't apply to it, leaving out work comments and
+ * states its code may hide, such as a tag from a constant imported from another file. A marker in the
+ * wrong case, as `// skip: TRADE-1`, counts when it starts with a valid ticket.
+ */
 export function strayMarkers(subject: Subject, options: ResolvedOptions): StateMarker[] {
-  return subject.markers
-    .filter(isStateMarker)
-    .filter((m) => !appliesTo(subject, m.state.name) && !isWorkComment(m, options));
+  return subject.markers.flatMap((marker): StateMarker[] => {
+    const state = marker.state ?? (marker.tickets.at(0)?.result === 'ok' ? marker.caseOf : undefined);
+    if (state === undefined || appliesTo(subject, state.name) || subject.unknownStates.has(state.name)) return [];
+    return isWorkComment(marker, options) ? [] : [{ ...marker, state }];
+  });
 }
 
 /**

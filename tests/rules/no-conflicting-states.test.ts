@@ -46,6 +46,12 @@ runRule('no-conflicting-states', rule, {
     },
   ],
   invalid: [
+    // A tag from a constant is reported where the test uses it. The constant may be shared, so there is no autofix.
+    {
+      code: "const TAGS = { NEW: '@New' };\ntest('places an order', { tag: TAGS.NEW }, async () => {});",
+      settings: lifecycle,
+      errors: [{ messageId: 'tagCase', data: { found: '@New', expected: '@new' }, line: 2, column: 32, endColumn: 40 }],
+    },
     {
       code: "test('places a market order @new @unstable', async () => {});",
       settings: lifecycle,

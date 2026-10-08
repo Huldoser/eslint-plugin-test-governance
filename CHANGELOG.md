@@ -6,6 +6,25 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Tags kept in a `const` or an enum in the same file count, as in `{ tag: TAGS.NEW }` after
+  `const TAGS = { NEW: '@new' } as const`, with spreads, `as const` and `satisfies`, and so do titles
+  and details objects kept in a constant. Before, a test tagged this way needed no ticket, and a
+  correct `// NEW:` marker above it was reported as left over.
+- Tags and details imported from another module can't be read, so a marker for a tag state above such
+  a test is no longer reported as left over, and neither is a Vitest state marker such as `// SKIP:`
+  above a test whose options object is imported. With `reportDynamicTitles: true`, the unreadable
+  tags are reported, like titles that aren't static text.
+- Vitest tag names, which are written without the `@` (`{ tags: ['flaky'] }`), match the states:
+  `'new'` is `@new`, and a custom state with `when: '@flaky'` matches `'flaky'`. Before, they never
+  matched. `no-conflicting-states` shows and fixes them without the `@`.
+- `context.skip()` in Vitest's `beforeEach`, global or imported, needs a ticket, like the one in
+  `test.beforeEach`. Before, it wasn't checked.
+- A marker in the wrong case with a ticket, such as `// skip: TRADE-1`, is reported by
+  `no-orphaned-marker` once the test is no longer skipped, and by `marker-matches-state` above a test in
+  another state. Before, it was only reported while the test was still in that state.
+
 ## [0.4.0] - 2026-10-08
 
 ### Added
