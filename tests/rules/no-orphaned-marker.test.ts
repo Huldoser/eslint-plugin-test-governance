@@ -11,6 +11,8 @@ runRule('no-orphaned-marker', rule, {
     "// SKIP: TRADE-1\ntest.skip('places an order', async () => {});",
     "// Plain comment\ntest('shows prices', async () => {});",
     '// skip: lowercase is not a marker here\nconst x = 1;',
+    // A lowercase keyword away from any test is not a marker.
+    "test('places an order', async () => {});\n// skip: TRADE-1\nconst broker = connectBroker();",
     // With lifecycleTags off, NEW: isn't a known marker.
     "// NEW: TRADE-1\ntest('places a limit order', async () => {});",
     { code: "// NEW: TRADE-1\ntest('places a limit order @new', async () => {});", settings: lifecycle },
