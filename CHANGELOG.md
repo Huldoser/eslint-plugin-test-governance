@@ -14,6 +14,9 @@ All notable changes to this project are documented here. The format follows
 - Tests inside a node type that a custom parser gives no visitor keys for are now checked. ESLint
   reads such nodes' children from the node itself, and the rules now do the same. Before, everything
   inside such a node was skipped.
+- Test files that ESLint parses as CommonJS, such as `.cjs` files, are now checked. Before, their
+  top-level variables were taken for local helpers, so a `test` from `require('@playwright/test')`
+  was ignored by every rule.
 
 ## [0.3.1] - 2026-10-06
 

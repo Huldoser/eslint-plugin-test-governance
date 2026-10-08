@@ -140,6 +140,10 @@ runRule('require-ticket', rule, {
     // A local variable that happens to be called `test` is not Playwright's.
     "function validateOrder() {\n  const test = { skip(name, fn) { fn(); } };\n  test.skip('checks the order size', () => {});\n}",
     "{\n  let test = orderHelpers;\n  test.skip('checks the order size', () => {});\n}",
+    {
+      code: "function validateOrder() {\n  const test = orderHelpers;\n  test.skip('checks the order size', () => {});\n}",
+      languageOptions: { sourceType: 'commonjs' },
+    },
     "function validateOrder(test) {\n  var test = orderHelpers;\n  test.skip('checks the order size', () => {});\n}",
     // A private method called #skip is not Playwright's skip.
     "class OrderForm {\n  #skip() {}\n  submit(test) {\n    test.#skip('places an order', async () => {});\n  }\n}",
@@ -235,6 +239,12 @@ runRule('require-ticket', rule, {
     {
       code: "const { test } = require('@playwright/test');\ntest.skip('places an order', async () => {});",
       languageOptions: { sourceType: 'script' },
+      errors: [missing('skip', 'SKIP')],
+    },
+    // In CommonJS, top-level variables belong to the function that wraps the module.
+    {
+      code: "const { test } = require('@playwright/test');\ntest.skip('places an order', async () => {});",
+      languageOptions: { sourceType: 'commonjs' },
       errors: [missing('skip', 'SKIP')],
     },
     {

@@ -223,7 +223,9 @@ function isLocalVariable(sourceCode: SourceCode, id: TSESTree.Identifier): boole
   for (let scope: TSESLint.Scope.Scope | null = sourceCode.getScope(id); scope; scope = scope.upper) {
     const variable = scope.set.get(id.name);
     if (!variable) continue;
-    if (scope.type === 'module' || scope.type === 'global') return false;
+    // A top-level scope: the global scope, a module's scope, or in CommonJS the function scope that
+    // wraps the module.
+    if (scope.block.type === 'Program') return false;
     return variable.defs.some((def) => def.type === 'Variable');
   }
   return false;
