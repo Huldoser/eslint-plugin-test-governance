@@ -273,6 +273,27 @@ describe('README.md', () => {
   });
 });
 
+describe('docs/upgrading.md', () => {
+  /** The message `fn` throws. */
+  const thrown = (fn: () => unknown): string => {
+    try {
+      fn();
+    } catch (error) {
+      return (error as Error).message;
+    }
+    return assert.fail('expected an error');
+  };
+
+  it('shows the errors an old config really gives', () => {
+    const samples = [...read('docs/upgrading.md').matchAll(/```text\n([\s\S]*?)```/g)].map((m) => m[1].trimEnd());
+    assert.deepEqual(samples, [
+      thrown(() => (testGovernance.configs as Record<string, unknown>).recommended),
+      thrown(() => testGovernance.configure({ ticket: { preset: 'jira' } } as never)),
+      thrown(() => testGovernance.configure({ framework: 'playwright', reportDynamicTitles: true } as never)),
+    ]);
+  });
+});
+
 describe('option defaults', () => {
   const options = table(readme, '## Options');
   const defaultColumn = options[0].indexOf('Default');
@@ -492,6 +513,7 @@ describe('links between docs', () => {
     'SECURITY.md',
     'CODE_OF_CONDUCT.md',
     '.github/pull_request_template.md',
+    'docs/upgrading.md',
     ...ruleDocs,
   ];
   const withoutCodeBlocks = (text: string): string => text.replace(/^```[\s\S]*?^```/gm, '');
@@ -532,7 +554,13 @@ describe('links between docs', () => {
   }
 
   it('names only npm scripts that exist', () => {
-    for (const file of ['README.md', 'CONTRIBUTING.md', '.github/pull_request_template.md', ...ruleDocs]) {
+    for (const file of [
+      'README.md',
+      'CONTRIBUTING.md',
+      '.github/pull_request_template.md',
+      'docs/upgrading.md',
+      ...ruleDocs,
+    ]) {
       for (const [, script] of read(file).matchAll(/\bnpm run ([\w:-]+)/g)) {
         assert.ok(script in packageJson.scripts, `${file}: npm run ${script}`);
       }

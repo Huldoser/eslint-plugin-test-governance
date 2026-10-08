@@ -31,6 +31,16 @@ runRule('require-ticket (Vitest)', requireTicket, {
     "describe.skipIf(isMobile)('order book', () => {});",
     "test.skipIf(isMobile).each([1, 2])('buys %i shares', (shares) => {});",
     "test.skipIf(isMobile).concurrent('streams quotes', async () => {});",
+    "test.skipIf('CI')('fills a limit order', () => {});",
+    // A literal condition decides: `skipIf(true)` and `runIf(false)` always skip, so they take a marker.
+    "// SKIP: TRADE-1\ntest.skipIf(true)('fills a limit order', () => {});",
+    "// SKIP: TRADE-1\ndescribe.runIf(false)('order book', () => {});",
+    "// SKIP: TRADE-1\ntest.skipIf(true).each([1, 2])('buys %i shares', (shares) => {});",
+    // `skipIf(false)` and `runIf(true)` never skip, so they need no ticket even for conditional skips.
+    {
+      code: "test.skipIf(false)('fills a limit order', () => {});\ntest.runIf(true)('fills a stop order', () => {});",
+      settings: settings({ requireTicketForConditional: true }),
+    },
     // A todo test or describe takes a TODO marker.
     "// TODO: TRADE-1\ntest.todo('fills a partial order');",
     "// TODO: TRADE-1\ndescribe.todo('order book');",
@@ -119,6 +129,16 @@ runRule('require-ticket (Vitest)', requireTicket, {
       settings: settings({ requireTicketForConditional: true }),
       errors: [missing('skip', 'SKIP', 'This describe block')],
     },
+    { code: "test.skipIf(true)('fills a limit order', () => {});", errors: [missing('skip', 'SKIP')] },
+    { code: "test.runIf(false)('fills a limit order', () => {});", errors: [missing('skip', 'SKIP')] },
+    {
+      code: "describe.skipIf(true)('order book', () => {});",
+      errors: [missing('skip', 'SKIP', 'This describe block')],
+    },
+    {
+      code: "import * as vitest from 'vitest';\nvitest.test.skipIf(true).concurrent('streams quotes', async () => {});",
+      errors: [missing('skip', 'SKIP')],
+    },
     { code: "test.skip.each([1, 2])('buys %i shares', (shares) => {});", errors: [missing('skip', 'SKIP')] },
     { code: "test.skip.for([1, 2])('buys %i shares', (shares) => {});", errors: [missing('skip', 'SKIP')] },
     {
@@ -200,6 +220,16 @@ runRule('no-orphaned-marker (Vitest)', noOrphanedMarker, {
     },
   ]),
   invalid: withOptions(vitest, [
+    {
+      code: "// SKIP: TRADE-1\ntest.skipIf(false)('fills a limit order', () => {});",
+      errors: [
+        {
+          messageId: 'orphaned',
+          data: { marker: 'SKIP', state: 'skip', subject: 'this test' },
+          suggestions: [{ messageId: 'removeMarker', output: "test.skipIf(false)('fills a limit order', () => {});" }],
+        },
+      ],
+    },
     {
       code: "const options = { tags: ['smoke'] };\n// SKIP: TRADE-1\ntest('fills a limit order', options, () => {});",
       errors: [

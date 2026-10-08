@@ -71,7 +71,7 @@ tester.run('require-ticket (TypeScript syntax)', rule as never, {
         { messageId: 'dynamicTags', line: 5, column: 55, endLine: 5, endColumn: 62 },
       ],
       name: 'enum members without a string, merged enums and missing members',
-      settings: settings({ lifecycleTags: true, reportDynamicTitles: true }),
+      settings: settings({ lifecycleTags: true, reportUnreadableTags: true }),
     },
   ],
 });

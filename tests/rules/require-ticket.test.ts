@@ -3,7 +3,7 @@ import { runRule, settings } from '../helpers.ts';
 
 const ANY = 'a ticket key like PROJ-123, an issue like #4821 or owner/repo#4821, or a URL';
 const lifecycle = settings({ lifecycleTags: true });
-const dynamic = settings({ lifecycleTags: true, reportDynamicTitles: true });
+const dynamic = settings({ lifecycleTags: true, reportUnreadableTags: true });
 
 const missing = (state: string, marker: string, subject = 'This test', example = 'PROJ-123') => ({
   messageId: 'missingMarker' as const,
@@ -141,11 +141,11 @@ runRule('require-ticket', rule, {
       code: "const placeOrder = async () => {};\n// SKIP: TRADE-1\ntest.skip('places an order', placeOrder);",
       settings: dynamic,
     },
-    // Tags that can't be read are reported only with reportDynamicTitles, and only while a tag state is on.
+    // Tags that can't be read are reported only with reportUnreadableTags, and only while a tag state is on.
     { code: "test('places an order', { tag: TAGS.NEW }, async () => {});", settings: lifecycle },
     {
       code: "test('places an order', { tag: TAGS.NEW }, async () => {});",
-      settings: settings({ reportDynamicTitles: true }),
+      settings: settings({ reportUnreadableTags: true }),
     },
     // Only the tag detail holds tags, and details from another file can't be read.
     {
@@ -265,12 +265,12 @@ runRule('require-ticket', rule, {
       code: "test('places an order', async () => { test.skip(); });",
       settings: settings({ states: { skip: false } }),
     },
-    { code: 'test(title, async () => {});', settings: settings({ reportDynamicTitles: true }) },
+    { code: 'test(title, async () => {});', settings: settings({ reportUnreadableTags: true }) },
     // A describe without a title and a runtime call have no title to check.
     ...[
       "test.describe(() => { test('places an order', async () => {}); });",
       "test('shows prices', async ({ browserName }) => { test.skip(browserName === 'webkit'); });",
-    ].map((code) => ({ code, settings: settings({ lifecycleTags: true, reportDynamicTitles: true }) })),
+    ].map((code) => ({ code, settings: settings({ lifecycleTags: true, reportUnreadableTags: true }) })),
     // Steps: `test.step.skip` and `step.skip()` in a step's body.
     "test('places an order', async () => {\n  // SKIP: TRADE-1\n  await test.step.skip('confirms the fill', async () => {});\n});",
     "// SKIP: TRADE-1\ntest.skip('places an order', async () => {\n  await test.step.skip('confirms the fill', async () => {});\n});",
@@ -834,7 +834,7 @@ runRule('require-ticket', rule, {
     },
     {
       code: 'test(title, async () => {});\ntest.describe(symbol, () => {});',
-      settings: settings({ lifecycleTags: true, reportDynamicTitles: true }),
+      settings: settings({ lifecycleTags: true, reportUnreadableTags: true }),
       errors: [
         { messageId: 'dynamicTitle', column: 6 },
         { messageId: 'dynamicTitle', column: 15 },
@@ -842,7 +842,7 @@ runRule('require-ticket', rule, {
     },
     {
       code: 'test(title, async () => {});',
-      settings: settings({ lifecycleTags: true, reportDynamicTitles: true }),
+      settings: settings({ lifecycleTags: true, reportUnreadableTags: true }),
       errors: [
         { message: "This title isn't static text, so its tags can't be checked. Use a string or template literal." },
       ],

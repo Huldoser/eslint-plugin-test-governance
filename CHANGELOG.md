@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+This release changes how the plugin is configured, ahead of 1.0.
+[Upgrading to 0.5](https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/upgrading.md#upgrading-to-05)
+shows what to change, with a before and after for each one.
+
 ### Changed
 
 - **Breaking:** `configure()` needs a `framework`, as in
@@ -14,6 +18,13 @@ All notable changes to this project are documented here. The format follows
   files as Playwright tests. Now `configure()` fails when the config file loads, and hand-written
   settings fail on the first lint, with a message that names the three frameworks. To share options
   between frameworks, pass the same options to a `configure()` for each one.
+- **Breaking:** `reportDynamicTitles` is renamed to `reportUnreadableTags`, because it also reports
+  tags and details objects imported from another module, not only titles. It works the same way, and
+  a config that still uses the old name fails with a message that names the new one.
+- Vitest's `skipIf(true)` and `runIf(false)` always skip, so they need a ticket, like `{ skip: true }`
+  and Playwright's `test.skip(true)`. `skipIf(false)` and `runIf(true)` never skip, so a `// SKIP:`
+  marker above one is reported as left over. Any other condition is still a conditional skip. Before,
+  a literal condition was treated like any other.
 
 ### Removed
 
@@ -21,7 +32,9 @@ All notable changes to this project are documented here. The format follows
   config for your framework instead: `configs.playwright`, `configs.jest` or `configs.vitest`. For
   Playwright, replace `configs.recommended` with `configs.playwright`, and
   `extends: ['test-governance/recommended']` with `extends: ['test-governance/playwright']`. The
-  rules and their severities are the same.
+  rules and their severities are the same. A config that still reads `configs.recommended` fails when
+  it loads, with a message that points to the upgrade guide, rather than spreading nothing and turning
+  the rules off.
 
 ### Fixed
 
@@ -31,7 +44,7 @@ All notable changes to this project are documented here. The format follows
   correct `// NEW:` marker above it was reported as left over.
 - Tags and details imported from another module can't be read, so a marker for a tag state above such
   a test is no longer reported as left over, and neither is a Vitest state marker such as `// SKIP:`
-  above a test whose options object is imported. With `reportDynamicTitles: true`, the unreadable
+  above a test whose options object is imported. With `reportUnreadableTags: true`, the unreadable
   tags are reported, like titles that aren't static text.
 - Vitest tag names, which are written without the `@` (`{ tags: ['flaky'] }`), match the states:
   `'new'` is `@new`, and a custom state with `when: '@flaky'` matches `'flaky'`. Before, they never

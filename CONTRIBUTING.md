@@ -68,6 +68,7 @@ Docs change in the same pull request as the code. Most of what they say about th
 | Exported types                                      | the README TypeScript section                                                                                                        | docs tests                                                   |
 | The supported Node.js, ESLint or TypeScript version | `package.json`, the README, this file and the CI matrix                                                                              | docs tests                                                   |
 | A heading                                           | the links to it                                                                                                                      | docs tests                                                   |
+| A breaking change                                   | a section in `docs/upgrading.md` with a before and after, and the error an old config gives                                          | docs tests, for the errors                                   |
 | Anything users will notice                          | an entry under `[Unreleased]` in `CHANGELOG.md`                                                                                      | the Changelog check, for changes to `src/`                   |
 
 What the README and rule pages say about behaviour, such as which syntax each framework supports,

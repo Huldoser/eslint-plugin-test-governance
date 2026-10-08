@@ -69,8 +69,11 @@ export interface GovernanceOptions {
   comments?: false | { keywords?: string[] };
   /** Allow free text after the tickets, e.g. `// SKIP: TRADE-1 flaky on CI`. Off by default: details belong in the ticket. */
   allowNotes?: boolean;
-  /** Report titles that aren't static text when a tag state is on, because their tags can't be read. */
-  reportDynamicTitles?: boolean;
+  /**
+   * When a tag state is on, report tags that can't be read: titles that aren't static text, and tags or
+   * details objects imported from another module.
+   */
+  reportUnreadableTags?: boolean;
 }
 
 interface StateBase {
@@ -95,7 +98,7 @@ export interface ResolvedOptions {
   requireTicketForConditional: boolean;
   allowBlankLine: boolean;
   allowNotes: boolean;
-  reportDynamicTitles: boolean;
+  reportUnreadableTags: boolean;
   /** Keywords checked by `require-ticket-in-comments`; empty when `comments: false`. */
   commentKeywords: string[];
   /**
@@ -249,7 +252,7 @@ export function compileOptions(options: GovernanceOptions): ResolvedOptions {
     requireTicketForConditional: options.requireTicketForConditional ?? false,
     allowBlankLine: options.allowBlankLine ?? false,
     allowNotes: options.allowNotes ?? false,
-    reportDynamicTitles: options.reportDynamicTitles ?? false,
+    reportUnreadableTags: options.reportUnreadableTags ?? false,
     commentKeywords,
     workCommentKeywords: new Set([...DEFAULT_COMMENT_KEYWORDS, ...commentKeywords]),
     commentTicket: defaultMatcher,

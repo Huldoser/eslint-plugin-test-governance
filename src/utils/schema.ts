@@ -87,9 +87,10 @@ export const optionsSchema: Schema = {
     requireTicketForConditional: { type: 'boolean' },
     allowBlankLine: { type: 'boolean' },
     allowNotes: { type: 'boolean' },
-    reportDynamicTitles: { type: 'boolean' },
+    reportUnreadableTags: { type: 'boolean' },
   },
   // Each framework declares and skips tests its own way, so there is no default.
   required: ['framework'],
   additionalProperties: false,
+  renamed: { reportDynamicTitles: 'reportUnreadableTags' },
 };

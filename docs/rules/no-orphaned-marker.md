@@ -74,6 +74,16 @@ test('places a limit order', async ({ page }) => {
 test('cancels an open order', async ({ page }) => {});
 ```
 
+A Vitest test with `skipIf(false)`, `runIf(true)` or `{ skip: false }` always runs, so its marker is
+left over:
+
+<!-- example: invalid settings={"framework":"vitest"} -->
+
+```js
+// SKIP: TRADE-83
+test.skipIf(false)('fills a stop order when the market opens', () => {});
+```
+
 Correct:
 
 <!-- example: valid settings={"lifecycleTags":true} -->

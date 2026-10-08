@@ -19,7 +19,7 @@ describe('compileOptions', () => {
     assert.deepEqual([...resolved.testFunctions], ['test']);
     assert.equal(resolved.requireTicketForConditional, false);
     assert.equal(resolved.allowBlankLine, false);
-    assert.equal(resolved.reportDynamicTitles, false);
+    assert.equal(resolved.reportUnreadableTags, false);
   });
 
   it('turns on @new and @unstable with lifecycleTags', () => {
