@@ -9,6 +9,7 @@
     "noUncheckedIndexedAccess": false,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
+    "stripInternal": true,
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
     "erasableSyntaxOnly": true,

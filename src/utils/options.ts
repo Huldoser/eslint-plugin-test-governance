@@ -23,26 +23,38 @@ export interface CustomState {
 
 /** Options shared by every rule. Set them once in `settings['test-governance']`. */
 export interface GovernanceOptions {
-  /** Names that are treated as the Playwright `test` function. Defaults to `['test']`. */
+  /**
+   * Names that are treated as the Playwright `test` function. Defaults to `['test']`. Your list replaces
+   * the default one, so include `'test'` if you still need it.
+   */
   testFunctions?: string[];
   /** Accepted ticket formats. Defaults to `{ preset: 'any' }`. */
   ticket?: TicketSpec | TicketSpec[];
-  /** Tickets that are rejected as placeholders. `*` matches any characters. */
+  /**
+   * Tickets that are rejected as placeholders. `*` matches any characters. Your list replaces the default
+   * one (`TODO`, `TBD`, `XXX-*`, ...); tickets numbered 0 are always rejected.
+   */
   placeholders?: string[];
   /** Turns on the `@new` and `@unstable` states. */
   lifecycleTags?: boolean;
+  /**
+   * Turns built-in states on or off, renames their marker or gives them their own ticket format. `skip` and
+   * `fixme` are on by default, `fail` and `slow` off; a setting for `new` or `unstable` wins over `lifecycleTags`.
+   */
   states?: Partial<Record<BuiltinStateName, boolean | StateOverride>>;
+  /** Adds a state for a tag, e.g. `{ quarantine: { when: '@quarantine', marker: 'QUARANTINE' } }`. */
   customStates?: Record<string, CustomState>;
   /** Require a ticket for conditional skips such as `test.skip(browserName === 'webkit')`. */
   requireTicketForConditional?: boolean;
   /** Let blank lines separate a marker from the test it belongs to. */
   allowBlankLine?: boolean;
   /**
-   * Comment keywords that must start with a ticket anywhere in a test file, e.g. `// TODO: WEB-123`.
-   * Defaults to `{ keywords: ['FIXME', 'TODO'] }`; `false` allows free-form comments.
+   * Comment keywords that must start with a ticket anywhere in a test file, e.g. `// TODO: TRADE-123`.
+   * Defaults to `{ keywords: ['FIXME', 'TODO'] }`, and your keywords replace those; `false` allows free-form
+   * comments.
    */
   comments?: false | { keywords?: string[] };
-  /** Allow free text after the tickets, e.g. `// SKIP: WEB-1 flaky on CI`. Off by default: details belong in the ticket. */
+  /** Allow free text after the tickets, e.g. `// SKIP: TRADE-1 flaky on CI`. Off by default: details belong in the ticket. */
   allowNotes?: boolean;
   /** Report titles that aren't static text when a tag state is on, because their tags can't be read. */
   reportDynamicTitles?: boolean;

@@ -22,15 +22,15 @@ Incorrect:
 <!-- example: invalid -->
 
 ```js
-// SKIP: WEB-500
-test.fixme('splits shipping', async () => {});
+// SKIP: TRADE-500
+test.fixme('shows the unfilled quantity of a partly filled order', async () => {});
 ```
 
 <!-- example: invalid settings={"lifecycleTags":true} -->
 
 ```js
-// SKIP: WEB-500
-test.skip('splits shipping @unstable', async () => {});
+// SKIP: TRADE-500
+test.skip('shows the unfilled quantity of a partly filled order @unstable', async () => {});
 ```
 
 Correct:
@@ -38,18 +38,26 @@ Correct:
 <!-- example: valid -->
 
 ```js
-// FIXME: WEB-500
-test.fixme('splits shipping', async () => {});
+// FIXME: TRADE-500
+test.fixme('shows the unfilled quantity of a partly filled order', async () => {});
 ```
 
 <!-- example: valid settings={"lifecycleTags":true} -->
 
 ```js
-// SKIP: WEB-500
-// UNSTABLE: WEB-500
-test.skip('splits shipping @unstable', async () => {});
+// SKIP: TRADE-500
+// UNSTABLE: TRADE-500
+test.skip('shows the unfilled quantity of a partly filled order @unstable', async () => {});
 ```
 
 ## Options
 
-Uses the shared options described in the [README](../../README.md#options).
+This rule has no options of its own. It reads the shared options described in the
+[README](../../README.md#options). These change what it reports:
+
+- `lifecycleTags`, `states` and `customStates`: which states are on, and the marker keyword each
+  one expects.
+- `requireTicketForConditional`: conditional skips such as `test.skip(browserName === 'webkit')`
+  need a marker only when this is set, so only then is a wrong marker above one reported.
+- `allowBlankLine`: whether a marker separated from its test by a blank line still belongs to it.
+- `testFunctions`: which functions count as Playwright's `test`.

@@ -17,5 +17,5 @@ export const TICKET_PRESETS = [
   'pattern',
 ] as const;
 
-/** Comment keywords that must reference a ticket by default (`// TODO: WEB-123`). */
+/** Comment keywords that must reference a ticket by default (`// TODO: TRADE-123`). */
 export const DEFAULT_COMMENT_KEYWORDS = ['FIXME', 'TODO'];
