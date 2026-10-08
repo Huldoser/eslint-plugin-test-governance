@@ -142,6 +142,17 @@ runRule('no-orphaned-marker', rule, {
       ],
     },
     {
+      code: "test('shows the order book', async () => {});\nconst depth = 10; // SKIP: TRADE-1",
+      errors: [
+        {
+          message: '`SKIP:` is not directly above a test, describe or skip call, so it has no effect.',
+          suggestions: [
+            { messageId: 'removeMarker', output: "test('shows the order book', async () => {});\nconst depth = 10; " },
+          ],
+        },
+      ],
+    },
+    {
       code: "// SKIP: TRADE-1\n\ntest.skip('rebalances the portfolio', async () => {});",
       errors: [
         {

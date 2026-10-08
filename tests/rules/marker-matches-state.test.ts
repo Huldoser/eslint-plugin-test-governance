@@ -24,6 +24,11 @@ runRule('marker-matches-state', rule, {
     "// FIXME: flaky\ntest.skip('shows live prices', async () => {});",
     // A marker for an inherited state is redundant, not wrong.
     "// SKIP: TRADE-1\ntest.describe.skip('order entry', () => {\n  // SKIP: TRADE-1\n  test('places an order', async () => {});\n});",
+    // A marker in the wrong case is require-ticket's job, not a shared marker.
+    {
+      code: "// skip: TRADE-1\ntest.skip('places a stop order @unstable', async () => {});",
+      settings: lifecycle,
+    },
   ],
   invalid: [
     {
@@ -128,6 +133,44 @@ runRule('marker-matches-state', rule, {
       code: "// SKIP:\ntest.skip('exports the trade history @new', async () => {});",
       settings: lifecycle,
       errors: [{ messageId: 'sharedMarker', suggestions: [] }],
+    },
+    // The added marker keeps the indentation of the one above it.
+    {
+      code: "test.describe('risk limits', () => {\n  // SKIP: TRADE-1\n  test.skip('rejects an order over the position limit @unstable', async () => {});\n});",
+      settings: lifecycle,
+      errors: [
+        {
+          message:
+            "`SKIP:` covers only the 'skip' state. This test is also in the 'unstable' state, which needs its own `// UNSTABLE: <ticket>` marker.",
+          line: 2,
+          suggestions: [
+            {
+              messageId: 'addMarker',
+              output:
+                "test.describe('risk limits', () => {\n  // SKIP: TRADE-1\n  // UNSTABLE: TRADE-1\n  test.skip('rejects an order over the position limit @unstable', async () => {});\n});",
+            },
+          ],
+        },
+      ],
+    },
+    // Only the wrong marker is reported; renaming it fixes the test.
+    {
+      code: "// SKIP: TRADE-1\n// NEW: TRADE-2\ntest.skip('triggers a stop-loss when the price drops @unstable', async () => {});",
+      settings: lifecycle,
+      errors: [
+        {
+          messageId: 'wrongMarker',
+          data: { found: 'NEW', expected: 'UNSTABLE', state: 'unstable', subject: 'this test' },
+          line: 2,
+          suggestions: [
+            {
+              messageId: 'renameMarker',
+              output:
+                "// SKIP: TRADE-1\n// UNSTABLE: TRADE-2\ntest.skip('triggers a stop-loss when the price drops @unstable', async () => {});",
+            },
+          ],
+        },
+      ],
     },
   ],
 });

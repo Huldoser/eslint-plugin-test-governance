@@ -57,9 +57,18 @@ runRule('require-ticket-in-comments', rule, {
       code: `/*\r\n * Context.\r\n * TODO: refactor\r\n */\r\ntest('rebalances the portfolio', async () => {});`,
       errors: [{ ...missing('TODO'), line: 3, column: 4, endLine: 3, endColumn: 18 }],
     },
+    // A lone \r also ends a line.
+    {
+      code: `/*\r * TODO: refactor\r */\rtest('rebalances the portfolio', async () => {});`,
+      errors: [{ ...missing('TODO'), line: 2, column: 4, endLine: 2, endColumn: 18 }],
+    },
     {
       code: `// TODO: TBD${TEST}`,
       errors: [{ messageId: 'placeholderTicket', data: { ticket: 'TBD' } }],
+    },
+    {
+      code: `// FIXME: TBD${TEST}`,
+      errors: [{ message: "'TBD' is a placeholder, not a real ticket. Link the ticket that tracks this work." }],
     },
     {
       code: `// TODO: TRADE-1, nope${TEST}`,
@@ -80,6 +89,16 @@ runRule('require-ticket-in-comments', rule, {
         {
           messageId: 'invalidTicket',
           data: { ticket: 'OPS-1', expected: 'a Jira key like TRADE-123 in project TRADE, or a Jira URL' },
+        },
+      ],
+    },
+    {
+      code: `// FIXME: RISK-45${TEST}`,
+      settings: settings({ ticket: { preset: 'jira', projects: ['TRADE'] } }),
+      errors: [
+        {
+          message:
+            "'RISK-45' is not a valid ticket. Expected a Jira key like TRADE-123 in project TRADE, or a Jira URL.",
         },
       ],
     },
@@ -159,6 +178,16 @@ runRule('require-ticket-in-comments', rule, {
       ],
     },
     {
+      code: `// TODO(TRADE-1):remove after the migration${TEST}`,
+      errors: [
+        {
+          message:
+            'Only ticket IDs are allowed after `TODO:`, separated by commas. Put details in the ticket instead of `remove after the migration`.',
+          suggestions: [{ messageId: 'removeExtraText', output: `// TODO(TRADE-1)${TEST}` }],
+        },
+      ],
+    },
+    {
       code: `// FIXME(TRADE-1 see thread) later${TEST}`,
       errors: [
         {
@@ -172,6 +201,11 @@ runRule('require-ticket-in-comments', rule, {
       code: `// HACK: quick fix${TEST}`,
       settings: settings({ comments: { keywords: ['HACK', 'TODO'] } }),
       errors: [missing('HACK')],
+    },
+    {
+      code: `// BUG: fills at the wrong price${TEST}`,
+      settings: settings({ comments: { keywords: ['BUG'] } }),
+      errors: [missing('BUG')],
     },
     // A Playwright import alone makes it a test file.
     {
