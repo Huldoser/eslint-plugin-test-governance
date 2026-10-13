@@ -23,8 +23,8 @@ A test is in a state when it is:
 | `fail`, `slow` | `test.fail(...)`, `test.slow()`, `testInfo.fail()`, `testInfo.slow()`                                                                 | `// FAIL:`, `// SLOW:` | no                         |
 | custom         | any tag you list in `customStates`                                                                                                    | your keyword           | when configured            |
 
-In Jest and Vitest, `xit`, `xdescribe`, Vitest's `{ skip: true }`, `skipIf(true)` and `context.skip()`,
-in a test or in `beforeEach`, skip a test too, and `test.failing` and `test.fails` put it in the `fail` state. The
+In Jest and Vitest, `xit`, `xdescribe`, Vitest's `{ skip: true }`, `skipIf(true)`, `context.skip()` and
+`context.skip('note')`, in a test or in `beforeEach`, skip a test too, and `test.failing` and `test.fails` put it in the `fail` state. The
 [README](../../README.md#frameworks) lists every form.
 
 Tags are read from the title (`'places a limit order @new'`) and from `{ tag: '@new' }` or `{ tag: ['@new', '@smoke'] }`,

@@ -24,6 +24,11 @@ runRule('require-ticket', rule, {
     // A body defined elsewhere.
     "// SKIP: TRADE-123\ntest.skip('buys shares', placeLimitOrder);",
     "test.skip(isMobile, 'Not on mobile');",
+    // A title held in a constant, and a constant condition, which is not a title.
+    "const title = 'buys shares';\n// SKIP: TRADE-123\ntest.skip(title, placeLimitOrder);",
+    'const onMobile = true;\ntest.skip(onMobile, reason);',
+    // `describe` taken out of `test`.
+    "const { beforeEach, describe } = test;\n// SKIP: TRADE-123\ndescribe.skip('order entry', () => {});",
     "/* SKIP: TRADE-123 */\ntest.skip('places a market order', async () => {});",
     "//SKIP: TRADE-123\ntest.skip('places a market order', async () => {});",
     // Only code before a comment on the same line takes it out of the block, not another comment.
@@ -196,6 +201,7 @@ runRule('require-ticket', rule, {
     // A local variable that happens to be called `test` is not Playwright's.
     "function validateOrder() {\n  const test = { skip(name, fn) { fn(); } };\n  test.skip('checks the order size', () => {});\n}",
     "{\n  let test = orderHelpers;\n  test.skip('checks the order size', () => {});\n}",
+    "function validateOrder() {\n  function test(name, fn) { fn(); }\n  test.skip('checks the order size', () => {});\n}",
     {
       code: "function validateOrder() {\n  const test = orderHelpers;\n  test.skip('checks the order size', () => {});\n}",
       languageOptions: { sourceType: 'commonjs' },
@@ -328,6 +334,15 @@ runRule('require-ticket', rule, {
     },
     // A body defined elsewhere, or wrapped in a helper.
     { code: "test.skip('buys shares', placeLimitOrder);", errors: [missing('skip', 'SKIP')] },
+    {
+      code: "const Titles = { BUY: 'buys shares' };\ntest.skip(Titles.BUY, placeLimitOrder);",
+      errors: [{ ...missing('skip', 'SKIP'), line: 2 }],
+    },
+    // `describe` taken out of `test`, as in `const { describe } = test`.
+    {
+      code: "import { test } from '@playwright/test';\nconst { beforeEach, describe: group } = test;\ngroup('order entry', () => {\n  group.skip('a11y', () => {});\n});",
+      errors: [{ ...missing('skip', 'SKIP', 'This describe block'), line: 4 }],
+    },
     {
       code: "test.skip(`buys ${symbol}`, { tag: '@slow' }, buyShares(symbol));",
       errors: [missing('skip', 'SKIP')],

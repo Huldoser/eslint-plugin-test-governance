@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- In Jest and Vitest, a test or describe whose title is a variable and whose body is defined
+  elsewhere, as in `test.skip(title, placeOrder)`, is checked. Before, it was read as Playwright's
+  runtime `test.skip(condition, description)` and left alone, though Jest and Vitest have no such call.
+  In Playwright, a title kept in a `const` in the same file now counts as a title too.
+- Vitest's `test.skip('title')` and `describe.skip('title')` with no body need a `// SKIP:` marker, since
+  Vitest reports them as skipped. Before, only `.todo` was checked without a body.
+- Vitest's `context.skip('note')` always skips, so it needs a `// SKIP:` marker. Before, the note was
+  read as a condition and the skip as conditional.
+- In Playwright, `describe` taken out of `test`, as in `const { describe } = test`, works like
+  `test.describe`: `describe.skip(...)` needs a marker, and tags in its title apply to the tests inside.
+  Before, it wasn't recognized.
+- A function declared inside another function that happens to be called `test` is no longer taken for
+  the framework's `test`, as a local variable already wasn't.
+
 ## [0.5.0] - 2026-10-08
 
 This release changes how the plugin is configured, ahead of 1.0.

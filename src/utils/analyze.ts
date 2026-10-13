@@ -8,6 +8,7 @@ type Comment = TSESTree.Comment;
 type SourceCode = Readonly<TSESLint.SourceCode>;
 
 const TEST: Root = { kind: 'test', modifiers: [] };
+const DESCRIBE: Root = { kind: 'describe', modifiers: [] };
 /** Modifiers that keep a test from running. */
 const SKIPPING_MODIFIERS = new Set(['skip', 'fixme', 'todo']);
 /** What a step's `TestStepInfo` can do at runtime: `step.skip()`. */
@@ -272,6 +273,15 @@ function collectTestNames(program: TSESTree.Program, framework: Framework, confi
           if (source !== undefined && framework.ownsModule(source)) modules.add(name);
         }
       } else if (declarator.id.type === 'ObjectPattern') {
+        // Playwright's `const { describe } = test`, used as `describe.skip(...)`.
+        if (framework.playwright && resolve(init)) {
+          for (const prop of declarator.id.properties) {
+            if (prop.type === 'Property' && prop.value.type === 'Identifier' && propertyName(prop) === 'describe') {
+              roots.set(prop.value.name, DESCRIBE);
+            }
+          }
+          continue;
+        }
         const source = requireSource(init);
         if (source === undefined) continue;
         for (const prop of declarator.id.properties) {
@@ -307,8 +317,8 @@ function requireSource(node: Node): string | undefined {
 }
 
 /**
- * Whether `id` refers to a variable declared inside a function or block, such as a local helper that
- * happens to be called `test`. Top-level variables, imports, parameters and globals still count.
+ * Whether `id` refers to a variable or function declared inside a function or block, such as a local
+ * helper that happens to be called `test`. Top-level variables, imports, parameters and globals still count.
  */
 function isLocalVariable(sourceCode: SourceCode, id: TSESTree.Identifier): boolean {
   for (let scope: TSESLint.Scope.Scope | null = sourceCode.getScope(id); scope; scope = scope.upper) {
@@ -317,7 +327,7 @@ function isLocalVariable(sourceCode: SourceCode, id: TSESTree.Identifier): boole
     // A top-level scope: the global scope, a module's scope, or in CommonJS the function scope that
     // wraps the module.
     if (scope.block.type === 'Program') return false;
-    return variable.defs.some((def) => def.type === 'Variable');
+    return variable.defs.some((def) => def.type === 'Variable' || def.type === 'FunctionName');
   }
   return false;
 }
@@ -601,17 +611,27 @@ function collectTags(
 }
 
 /**
- * Whether a call declares a test or describe block: a title and a body, as in `test('title', fn)` or
- * `test('title', details, fn)`, a static title with a body defined elsewhere, as in
- * `test.skip('pays', payWithCard)`, a describe with only a body, or a `todo` with only a title. A string
- * title tells `test.skip('pays', payWithCard)` apart from a runtime `test.skip(isMobile, 'why')`.
+ * Whether a call declares a test or describe block: a title and a body, as in `test('title', fn)`,
+ * `test('title', details, fn)` or `test.skip(title, payWithCard)` with the body defined elsewhere, a
+ * describe with only a body, or a `todo` with only a title, and in Vitest a `skip` with only a title.
+ * Only Playwright has a runtime `test.skip(isMobile, 'why')`; there a title, written out or held in a
+ * constant, or a body written in place tells the two apart.
  */
-function isDeclaration(kind: Root['kind'], args: TSESTree.CallExpressionArgument[], todo: boolean): boolean {
+function isDeclaration(
+  sourceCode: SourceCode,
+  framework: Framework,
+  kind: Root['kind'],
+  args: TSESTree.CallExpressionArgument[],
+  members: string[],
+): boolean {
   const first = args.at(0);
   if (isFunction(first)) return kind === 'describe';
   if (first === undefined) return false;
-  if (args.length === 1) return todo;
-  return isStaticText(first) || args.slice(1).some(isFunction);
+  if (args.length === 1) return members.includes('todo') || (framework.skipWithoutBody && members.includes('skip'));
+  if (!framework.playwright) return true;
+  const title = unwrap(first);
+  const value = constantValue(sourceCode, title);
+  return isStaticText(title) || (value !== undefined && isStaticText(unwrap(value))) || args.slice(1).some(isFunction);
 }
 
 /** The value of a `true` or `false` literal; undefined for anything else. */
@@ -619,9 +639,14 @@ function booleanOf(node: Node | undefined): boolean | undefined {
   return node?.type === 'Literal' && typeof node.value === 'boolean' ? node.value : undefined;
 }
 
-function isUnconditional(call: TSESTree.CallExpression): boolean {
+/**
+ * Whether a runtime call always applies: it has no condition, or `true`, or with `notes` only a note, as
+ * Vitest's `context.skip('Broker sandbox is down')`, and nothing around it makes it conditional.
+ */
+function isUnconditional(call: TSESTree.CallExpression, notes: boolean): boolean {
   const first = call.arguments.at(0);
-  return (first === undefined || booleanOf(first) === true) && !isGuarded(call);
+  const always = first === undefined || booleanOf(first) === true || (notes && isStaticText(first));
+  return always && !isGuarded(call);
 }
 
 const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression']);
@@ -860,7 +885,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     }
     const members = [...root.modifiers, ...path];
     const allowed = kind === 'test' ? framework.testMembers : framework.describeMembers;
-    if (members.every((m) => allowed.has(m)) && isDeclaration(kind, args, members.includes('todo'))) {
+    if (members.every((m) => allowed.has(m)) && isDeclaration(sourceCode, framework, kind, args, members)) {
       // A declaration always has a first argument: its title, or the body of a describe without one.
       const details = detailsOf(sourceCode, call);
       const tagInfo = collectTags(sourceCode, call, !isFunction(args[0]), framework, details);
@@ -905,7 +930,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const subject = makeSubject(
       'runtime',
       call,
-      new Map([[modifier, isUnconditional(call)]]),
+      new Map([[modifier, isUnconditional(call, framework.skipNotes)]]),
       NO_TAGS,
       step ?? stack.findLast((s) => s.kind !== 'step'),
     );

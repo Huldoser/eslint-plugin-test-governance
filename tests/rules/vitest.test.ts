@@ -45,6 +45,14 @@ runRule('require-ticket (Vitest)', requireTicket, {
     "// TODO: TRADE-1\ntest.todo('fills a partial order');",
     "// TODO: TRADE-1\ndescribe.todo('order book');",
     "// TODO: TRADE-1\ntest('fills a partial order', { todo: true });",
+    // A skipped test or describe with no body.
+    "// SKIP: TRADE-1\ndescribe.skip('order book');",
+    "// SKIP: TRADE-1\ntest('fills a limit order', { skip: true });",
+    // Vitest runs a test with only a title as a todo, but a helper or import with the same name looks the
+    // same, as in `describe(input)`, so it isn't checked.
+    "test('fills a partial order');\ndescribe(order);",
+    // A title held in a variable and a body defined elsewhere.
+    '// SKIP: TRADE-1\ntest.skip(title, fillLimitOrder);',
     // `fails` needs a marker only when the `fail` state is on.
     "test.fails('rejects an order above the buying power', () => {});",
     {
@@ -57,8 +65,8 @@ runRule('require-ticket (Vitest)', requireTicket, {
     "test('fills a limit order', ({ skip: skipTest }) => {\n  // SKIP: TRADE-1\n  skipTest();\n});",
     "test('fills a limit order', (context) => {\n  context.skip(isMobile, 'No order ticket on mobile');\n});",
     "test('fills a limit order', ({ skip }) => {\n  if (isMobile) skip();\n});",
-    // A skip with only a note is a call the test makes once it is running, so it needs no ticket.
-    "test('fills a limit order', (context) => {\n  context.skip('Broker sandbox is down');\n});",
+    // A skip with only a note always skips.
+    "test('fills a limit order', (context) => {\n  // SKIP: TRADE-1\n  context.skip('Broker sandbox is down');\n});",
     "test.for([1, 2])('buys %i shares', (shares, context) => {\n  // SKIP: TRADE-1\n  context.skip();\n});",
     // A table row is not the test context.
     "test.each([{ skip: () => {} }])('buys shares', (row) => {\n  row.skip();\n});",
@@ -148,6 +156,12 @@ runRule('require-ticket (Vitest)', requireTicket, {
     { code: "test.todo('fills a partial order');", errors: [missing('todo', 'TODO')] },
     { code: "describe.todo('order book');", errors: [missing('todo', 'TODO', 'This describe block')] },
     { code: "test('fills a partial order', { todo: true });", errors: [missing('todo', 'TODO')] },
+    { code: "test.skip('fills a limit order');", errors: [missing('skip', 'SKIP')] },
+    { code: "describe.skip('order book');", errors: [missing('skip', 'SKIP', 'This describe block')] },
+    {
+      code: "const title = 'fills a limit order';\ntest.skip(title, fillLimitOrder);",
+      errors: [{ ...missing('skip', 'SKIP'), line: 2 }],
+    },
     {
       code: "test('rejects a short sale', { fails: true }, () => {});",
       settings: settings({ states: { fail: true } }),
@@ -155,6 +169,14 @@ runRule('require-ticket (Vitest)', requireTicket, {
     },
     {
       code: "test('fills a limit order', (context) => {\n  context.skip();\n});",
+      errors: [{ ...missing('skip', 'SKIP', 'This skip call'), line: 2 }],
+    },
+    {
+      code: "test('fills a limit order', (context) => {\n  context.skip('Broker sandbox is down');\n});",
+      errors: [{ ...missing('skip', 'SKIP', 'This skip call'), line: 2 }],
+    },
+    {
+      code: "test('fills a limit order', ({ skip }) => {\n  skip(`Broker sandbox is down in ${region}`);\n});",
       errors: [{ ...missing('skip', 'SKIP', 'This skip call'), line: 2 }],
     },
     {

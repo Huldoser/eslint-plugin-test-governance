@@ -56,6 +56,13 @@ export interface Framework {
    * `testInfo` or Vitest's test context, and the methods it has for that.
    */
   info?: { param: number; methods: ReadonlySet<string> };
+  /** Whether `skip` with only a title declares a skipped test or describe, as Vitest's `test.skip('title')`. */
+  skipWithoutBody: boolean;
+  /**
+   * Whether a runtime skip with only text always skips, the text being a note, as Vitest's
+   * `context.skip('why')`. In Playwright the first argument is always a condition.
+   */
+  skipNotes: boolean;
   /** Built-in states a test can be put in with this framework. */
   states: ReadonlySet<BuiltinStateName>;
   /** Playwright's own API on `test`: `test.describe`, `test.step`, `test.info()` and runtime `test.skip()`. */
@@ -101,6 +108,8 @@ const playwright: Framework = {
   tagKey: 'tag',
   plainTags: false,
   info: { param: 1, methods: RUNTIME_MODIFIERS },
+  skipWithoutBody: false,
+  skipNotes: false,
   states: new Set(['skip', 'fixme', 'fail', 'slow', 'new', 'unstable']),
   playwright: true,
 };
@@ -132,6 +141,8 @@ const jest: Framework = {
   ]),
   optionEffects: new Map(),
   plainTags: false,
+  skipWithoutBody: false,
+  skipNotes: false,
   states: new Set(['skip', 'todo', 'fail', 'new', 'unstable']),
   playwright: false,
 };
@@ -172,6 +183,8 @@ const vitest: Framework = {
   tagKey: 'tags',
   plainTags: true,
   info: { param: 0, methods: new Set(['skip']) },
+  skipWithoutBody: true,
+  skipNotes: true,
   states: new Set(['skip', 'todo', 'fail', 'new', 'unstable']),
   playwright: false,
 };
