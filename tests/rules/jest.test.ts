@@ -23,6 +23,8 @@ runRule('require-ticket (Jest)', requireTicket, {
     "// SKIP: TRADE-1\ntest.concurrent.skip('streams quotes', async () => {});",
     // A timeout after the body, with a title that isn't static text.
     '// SKIP: TRADE-1\ntest.skip(title, async () => {}, 10_000);',
+    // A title held in a variable and a body defined elsewhere.
+    '// SKIP: TRADE-1\ntest.skip(title, fillLimitOrder);',
     // Jest tests have no details object, so a second argument never hides a tag.
     {
       code: "test('fills a limit order', orderCase, () => {});",
@@ -85,6 +87,15 @@ runRule('require-ticket (Jest)', requireTicket, {
     },
     { code: "test.concurrent.skip('streams quotes', async () => {});", errors: [missing('skip', 'SKIP')] },
     { code: 'test.skip(title, async () => {}, 10_000);', errors: [missing('skip', 'SKIP')] },
+    // Jest has no runtime `test.skip(condition)`, so these declare skipped tests.
+    {
+      code: "const title = 'fills a limit order';\ntest.skip(title, fillLimitOrder);",
+      errors: [{ ...missing('skip', 'SKIP'), line: 2 }],
+    },
+    {
+      code: 'describe.skip(suiteName, defineOrderBookTests);',
+      errors: [missing('skip', 'SKIP', 'This describe block')],
+    },
     {
       code: "test.skip.each([[1], [2]])('buys %i shares', (shares) => {});",
       errors: [{ ...missing('skip', 'SKIP'), line: 1, column: 1, endColumn: 44 }],
