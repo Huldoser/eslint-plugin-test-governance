@@ -145,7 +145,7 @@ jobs:
           registry-url: https://registry.npmjs.org
           package-manager-cache: false # never restore a cache in a release build
       # Trusted publishing needs a newer npm than Node ships with.
-      - run: npm install -g npm@11.21.0
+      - run: npm install -g npm@11.21.0 # zizmor: ignore[adhoc-packages] a pinned npm, not a dependency
       - name: Publish
         run: |
           # A re-run after a later step failed must not try to publish the same version again.

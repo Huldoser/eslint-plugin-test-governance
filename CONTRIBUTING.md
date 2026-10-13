@@ -15,17 +15,22 @@ npm install
 
 ## Checks
 
-Every pull request runs these in CI (tests on Node 22 and 24 with ESLint 9 and 10, plus the oldest supported
-versions, Node 22.12 with ESLint 9.0.0):
+Every pull request runs these in CI (tests on Node 22, 24 and 26 with ESLint 9 and 10, plus the oldest supported
+versions, Node 22.12 with ESLint 9.0.0, and the tests and packing on Windows):
 
 ```sh
 npm run lint           # ESLint, including type-aware rules and eslint-plugin-eslint-plugin
 npm run format:check   # Prettier (run `npm run format` to fix)
 npm run typecheck      # TypeScript, including the tests
 npm run test:coverage  # all tests, including the docs checks; fails below 100% coverage of src
-npm run test:pack      # packs the plugin and lints tests/fixtures/sample-project with the tarball
+npm run test:pack      # packs the plugin, lints tests/fixtures/sample-project with the tarball, and type-checks
+                       # a config with the oldest supported and the latest TypeScript
 npm run docs:check     # the README rules list and rule doc headers are up to date
 ```
+
+CI also checks the packed type declarations with [are the types wrong](https://github.com/arethetypeswrong/arethetypeswrong.github.io),
+and the workflows with [actionlint](https://github.com/rhysd/actionlint) and [zizmor](https://github.com/zizmorcore/zizmor).
+It runs again every Monday, so a new ESLint, TypeScript or Node release that breaks the plugin shows up on its own.
 
 A pull request that changes `src/` also needs a `CHANGELOG.md` entry (see below).
 
