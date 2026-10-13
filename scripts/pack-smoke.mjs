@@ -1,7 +1,7 @@
 // Packs the plugin, installs the tarball into a copy of the sample project, lints it with the
 // project's eslint.config.js and again with eslint.config.commonjs.cjs, and compares both outputs with
 // the snapshot the unit tests use. It then type-checks a config that imports the plugin with
-// TypeScript 5.0, the oldest version the type declarations support.
+// TypeScript 5.0, the oldest version the type declarations support, and with the latest TypeScript.
 // Usage: node scripts/pack-smoke.mjs [--eslint 9]
 import { execFileSync } from 'node:child_process';
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -15,15 +15,21 @@ const eslintArg = process.argv.indexOf('--eslint');
 const eslintVersion = eslintArg === -1 ? '10' : process.argv[eslintArg + 1];
 const OLDEST_TYPESCRIPT = '5.0';
 const work = mkdtempSync(path.join(tmpdir(), 'test-governance-pack-'));
-const run = (cmd, args, cwd) =>
-  execFileSync(cmd, args, { cwd, stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8' });
+// `npm run` sets npm_execpath to npm's own script, and starting that with Node works on every platform.
+// Windows can't start npm.cmd without a shell.
+const npmCommand = process.env.npm_execpath ? [process.execPath, process.env.npm_execpath] : ['npm'];
+const npm = (args, cwd) =>
+  execFileSync(npmCommand[0], [...npmCommand.slice(1), ...args], {
+    cwd,
+    stdio: ['ignore', 'pipe', 'inherit'],
+    encoding: 'utf8',
+  });
 
 try {
-  const [{ filename }] = JSON.parse(run('npm', ['pack', '--json', '--pack-destination', work], root));
+  const [{ filename }] = JSON.parse(npm(['pack', '--json', '--pack-destination', work], root));
   const project = path.join(work, 'sample-project');
   cpSync(path.join(root, 'tests/fixtures/sample-project'), project, { recursive: true });
-  run(
-    'npm',
+  npm(
     [
       'install',
       '--no-audit',
@@ -69,12 +75,18 @@ try {
   );
   const tsc = path.join(project, 'node_modules/typescript/bin/tsc');
   const tscArgs = ['--noEmit', '--strict', '--module', 'nodenext', '--skipLibCheck', 'eslint.config.check.ts'];
-  try {
-    execFileSync(process.execPath, [tsc, ...tscArgs], { cwd: project, encoding: 'utf8' });
-    console.log(`TypeScript ${OLDEST_TYPESCRIPT}: a config importing the plugin type-checks.`);
-  } catch (error) {
-    console.error(`TypeScript ${OLDEST_TYPESCRIPT} rejects the type declarations:\n${error.stdout}`);
-    process.exitCode = 1;
+  // The oldest supported version is installed above; the newest replaces it for the second check.
+  for (const typescript of [OLDEST_TYPESCRIPT, 'latest']) {
+    if (typescript === 'latest')
+      npm(['install', '--no-audit', '--no-fund', '--legacy-peer-deps', 'typescript@latest'], project);
+    const { version } = JSON.parse(readFileSync(path.join(project, 'node_modules/typescript/package.json'), 'utf8'));
+    try {
+      execFileSync(process.execPath, [tsc, ...tscArgs], { cwd: project, encoding: 'utf8' });
+      console.log(`TypeScript ${version}: a config importing the plugin type-checks.`);
+    } catch (error) {
+      console.error(`TypeScript ${version} rejects the type declarations:\n${error.stdout}`);
+      process.exitCode = 1;
+    }
   }
 } finally {
   rmSync(work, { recursive: true, force: true });

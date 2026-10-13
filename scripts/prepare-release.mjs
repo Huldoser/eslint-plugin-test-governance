@@ -58,5 +58,11 @@ if (linkIndex === -1) updated.push(unreleasedLink, versionLink);
 else updated.splice(linkIndex, 1, unreleasedLink, versionLink);
 writeFileSync(changelogPath, updated.join('\n'));
 
-execFileSync('npm', ['version', next, '--no-git-tag-version'], { cwd: root, stdio: ['ignore', 'ignore', 'inherit'] });
+// `npm run` sets npm_execpath to npm's own script, and starting that with Node works on every platform.
+// Windows can't start npm.cmd without a shell.
+const npm = process.env.npm_execpath ? [process.execPath, process.env.npm_execpath] : ['npm'];
+execFileSync(npm[0], [...npm.slice(1), 'version', next, '--no-git-tag-version'], {
+  cwd: root,
+  stdio: ['ignore', 'ignore', 'inherit'],
+});
 console.log(next);
