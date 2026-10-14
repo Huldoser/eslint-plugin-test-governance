@@ -14,7 +14,7 @@ export default createRule({
     fixable: 'code',
     schema: [],
     messages: {
-      newAndUnstable: '`{{new}}` and `{{unstable}}` are separate stages; a test should be in only one of them.',
+      newAndQuarantined: '`{{new}}` and `{{quarantined}}` are separate stages; a test should be in only one of them.',
       newSkipped:
         "`{{new}}` on a skipped test: a new test that doesn't run can't be promoted. Fix the test or drop the tag.",
       tagCase: '`{{found}}` should be written `{{expected}}`.',
@@ -24,7 +24,7 @@ export default createRule({
   create(context, analysis, options) {
     const tagStates = options.states.filter(isTagState);
     const newTag = options.states.find((s) => s.name === 'new')?.tag;
-    const unstableTag = options.states.find((s) => s.name === 'unstable')?.tag;
+    const quarantinedTag = options.states.find((s) => s.name === 'quarantined')?.tag;
 
     for (const subject of analysis.subjects) {
       for (const occurrence of subject.tags) checkSpelling(occurrence);
@@ -34,13 +34,13 @@ export default createRule({
       const has = (tag: string): boolean => own(tag) !== undefined || subject.inheritedTags.has(tag);
       const ownNew = own(newTag);
 
-      if (unstableTag !== undefined && has(newTag) && has(unstableTag)) {
-        const occurrence = ownNew ?? own(unstableTag);
+      if (quarantinedTag !== undefined && has(newTag) && has(quarantinedTag)) {
+        const occurrence = ownNew ?? own(quarantinedTag);
         if (occurrence) {
           context.report({
             node: occurrence.node,
-            messageId: 'newAndUnstable',
-            data: { new: newTag, unstable: unstableTag },
+            messageId: 'newAndQuarantined',
+            data: { new: newTag, quarantined: quarantinedTag },
           });
         }
       }
@@ -70,7 +70,7 @@ export default createRule({
         return;
       }
       // A typo changes, adds, drops or swaps a letter or two. A tag that is two or more letters
-      // shorter or longer, like `@stable` or `@untestable` next to `@unstable`, is a different word.
+      // shorter or longer, like `@unquarantined` next to `@quarantined`, is a different word.
       const near = tagStates.find((s) => {
         const expected = s.tag.toLowerCase();
         return (

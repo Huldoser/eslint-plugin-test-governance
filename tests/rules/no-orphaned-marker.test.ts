@@ -49,7 +49,7 @@ runRule('no-orphaned-marker', rule, {
       settings: lifecycle,
     },
     {
-      code: "import { orderDetails } from './details';\ntest.describe('order entry', orderDetails, () => {\n  // UNSTABLE: TRADE-1\n  test('places an order', async () => {});\n});",
+      code: "import { orderDetails } from './details';\ntest.describe('order entry', orderDetails, () => {\n  // QUARANTINED: TRADE-1\n  test('places an order', async () => {});\n});",
       settings: lifecycle,
     },
     // A marker in the wrong case reads as a sentence unless a valid ticket follows it.

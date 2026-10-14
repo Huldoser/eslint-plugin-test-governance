@@ -8,13 +8,13 @@
 
 <!-- end auto-generated rule header -->
 
-Tags are matched exactly, so `@New` or `@unstabel` silently puts a test in no state at all. This
+Tags are matched exactly, so `@New` or `@quarantiend` silently puts a test in no state at all. This
 rule reports:
 
-- `@new` together with `@unstable` on the same test, including tags inherited from a `describe`;
+- `@new` together with `@quarantined` on the same test, including tags inherited from a `describe`;
 - `@new` on a test that is skipped or fixme'd, since a test that doesn't run can't be promoted;
 - a state tag written in the wrong case, such as `@New` (autofixed to `@new`);
-- a near-miss spelling of a state tag, such as `@unstabel`.
+- a near-miss spelling of a state tag, such as `@quarantiend`.
 
 The `@new` checks run when the `new` state is on (`lifecycleTags: true`). Case and typo checks cover
 every tag state that is on, including custom states. A tag kept in a `const` in the same file is
@@ -28,7 +28,7 @@ Incorrect:
 <!-- example: invalid settings={"lifecycleTags":true} -->
 
 ```js
-test('places a limit order @new @unstable', async () => {});
+test('places a limit order @new @quarantined', async () => {});
 ```
 
 <!-- example: invalid settings={"lifecycleTags":true} -->
@@ -48,7 +48,7 @@ test('exports the trade history as CSV @New', async () => {});
 <!-- example: invalid settings={"lifecycleTags":true} -->
 
 ```js
-test('shows dividend payments in the account history @unstabel', async () => {});
+test('shows dividend payments in the account history @quarantiend', async () => {});
 ```
 
 Correct:
@@ -56,7 +56,7 @@ Correct:
 <!-- example: valid settings={"lifecycleTags":true} -->
 
 ```js
-test('places a limit order @unstable', async () => {});
+test('places a limit order @quarantined', async () => {});
 ```
 
 ## Options
@@ -64,7 +64,8 @@ test('places a limit order @unstable', async () => {});
 This rule has no options of its own. It reads the shared options described in the
 [README](../../README.md#options). These change what it reports:
 
-- `lifecycleTags`, or `states` for `new` and `unstable`: the `@new` checks run when the `new` state
-  is on, and `@new` together with `@unstable` is reported when both are on.
+- `lifecycleTags`, or `states` for `new` and `quarantined`: the `@new` checks run when the `new` state
+  is on, and `@new` together with `@quarantined` is reported when both are on. A tag renamed in
+  `states`, such as `@flaky`, is checked in place of the default one.
 - `customStates`: the tags of custom states get the same case and typo checks.
 - `framework` and `testFunctions`: which functions count as the framework's `test`.

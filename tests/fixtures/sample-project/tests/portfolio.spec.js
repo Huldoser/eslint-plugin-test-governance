@@ -19,4 +19,4 @@ test('opens a position', async ({ page }, testInfo) => {
   await page.goto('/portfolio');
 });
 
-test('rebalances the portfolio @new @unstable', async () => {});
+test('rebalances the portfolio @new @quarantined', async () => {});

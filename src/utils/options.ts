@@ -3,6 +3,7 @@ import {
   DEFAULT_COMMENT_KEYWORDS,
   type BuiltinStateName,
   type FrameworkName,
+  type TagStateName,
 } from './constants.ts';
 import { ConfigError } from './errors.ts';
 import { FRAMEWORKS, type Framework, type Modifier } from './frameworks.ts';
@@ -15,6 +16,8 @@ export const SETTINGS_KEY = 'test-governance';
 /** A state override in `states`. `false` turns a state off, `true` turns it on. */
 export interface StateOverride {
   enabled?: boolean;
+  /** The tag that puts a test in the state, e.g. `@flaky`. Only `new` and `quarantined` have a tag. */
+  tag?: string;
   marker?: string;
   ticket?: TicketSpec | TicketSpec[];
 }
@@ -47,15 +50,17 @@ export interface GovernanceOptions {
    * one (`TODO`, `TBD`, `XXX-*`, ...); tickets numbered 0 are always rejected.
    */
   placeholders?: string[];
-  /** Turns on the `@new` and `@unstable` states. */
+  /** Turns on the `@new` and `@quarantined` states. */
   lifecycleTags?: boolean;
   /**
-   * Turns built-in states on or off, renames their marker or gives them their own ticket format. `skip`,
-   * `fixme` and `todo` are on by default, `fail` and `slow` off; a setting for `new` or `unstable` wins over
-   * `lifecycleTags`. `fixme` and `slow` exist only in Playwright and `todo` only in Jest and Vitest.
+   * Turns built-in states on or off, renames their tag or marker, or gives them their own ticket format.
+   * `skip`, `fixme` and `todo` are on by default, `fail` and `slow` off; a setting for `new` or `quarantined`
+   * wins over `lifecycleTags`. Only `new` and `quarantined` have a tag, e.g.
+   * `{ quarantined: { tag: '@flaky', marker: 'FLAKY' } }`. `fixme` and `slow` exist only in Playwright and
+   * `todo` only in Jest and Vitest.
    */
   states?: Partial<Record<BuiltinStateName, boolean | StateOverride>>;
-  /** Adds a state for a tag, e.g. `{ quarantine: { when: '@quarantine', marker: 'QUARANTINE' } }`. */
+  /** Adds a state for a tag, e.g. `{ 'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' } }`. */
   customStates?: Record<string, CustomState>;
   /** Require a ticket for conditional skips such as `test.skip(browserName === 'webkit')`. */
   requireTicketForConditional?: boolean;
@@ -114,14 +119,18 @@ type BuiltinDef = { marker: string; lifecycle?: boolean; enabled: boolean } & (
   { modifier: Modifier; tag?: undefined } | { tag: string; modifier?: undefined }
 );
 
-const BUILTIN_STATES: Record<BuiltinStateName, BuiltinDef> = {
+// A state in `TAG_STATE_NAMES` must have a tag and every other one a modifier, so the schema offers `tag`
+// to the right states.
+const BUILTIN_STATES: {
+  [Name in BuiltinStateName]: Extract<BuiltinDef, Name extends TagStateName ? { tag: string } : { modifier: Modifier }>;
+} = {
   skip: { marker: 'SKIP', modifier: 'skip', enabled: true },
   fixme: { marker: 'FIXME', modifier: 'fixme', enabled: true },
   fail: { marker: 'FAIL', modifier: 'fail', enabled: false },
   slow: { marker: 'SLOW', modifier: 'slow', enabled: false },
   todo: { marker: 'TODO', modifier: 'todo', enabled: true },
   new: { marker: 'NEW', tag: '@new', lifecycle: true, enabled: false },
-  unstable: { marker: 'UNSTABLE', tag: '@unstable', lifecycle: true, enabled: false },
+  quarantined: { marker: 'QUARANTINED', tag: '@quarantined', lifecycle: true, enabled: false },
 };
 
 export { ConfigError } from './errors.ts';
@@ -220,7 +229,9 @@ export function compileOptions(options: GovernanceOptions): ResolvedOptions {
       marker: override.marker ?? def.marker,
       ticket: override.ticket === undefined ? defaultMatcher : compile(override.ticket),
     };
-    states.push(def.modifier === undefined ? { ...base, tag: def.tag } : { ...base, modifier: def.modifier });
+    states.push(
+      def.modifier === undefined ? { ...base, tag: override.tag ?? def.tag } : { ...base, modifier: def.modifier },
+    );
   }
 
   for (const [name, custom] of Object.entries(options.customStates ?? {})) {

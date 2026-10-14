@@ -1,5 +1,55 @@
 # Upgrading
 
+## Upgrading to 0.6
+
+0.6.0 renames the `unstable` state to `quarantined`. Only projects that turn it on, with
+`lifecycleTags: true` or `states.unstable`, need to change anything.
+
+| What changed                                                | Who it affects                                           | What to do                                              |
+| ----------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------- |
+| [`@unstable` is now `@quarantined`](#the-quarantined-state) | Projects with `lifecycleTags: true` or `states.unstable` | Rename the tags and markers, or keep them with `states` |
+
+### The quarantined state
+
+The state's tag is now `@quarantined` and its marker `// QUARANTINED:`.
+
+Before:
+
+```ts
+// UNSTABLE: TRADE-311
+test('streams level 2 quotes @unstable', async ({ page }) => {});
+```
+
+After:
+
+```ts
+// QUARANTINED: TRADE-311
+test('streams level 2 quotes @quarantined', async ({ page }) => {});
+```
+
+In Vitest, `{ tags: ['unstable'] }` becomes `{ tags: ['quarantined'] }` too. To keep the tags and
+markers you have instead, name them in `states`:
+
+```js
+testGovernance.configure({
+  framework: 'playwright',
+  lifecycleTags: true,
+  states: { quarantined: { tag: '@unstable', marker: 'UNSTABLE' } },
+});
+```
+
+A config that sets `states.unstable` fails when it loads, so rename it to `states.quarantined`:
+
+```text
+eslint-plugin-test-governance: invalid options:
+  - states.unstable was renamed to "quarantined"
+```
+
+A config that only sets `lifecycleTags: true` still loads, and nothing reports the old tag: an
+`@unstable` test no longer needs a ticket, and its `// UNSTABLE:` marker is an ordinary comment. Before
+you upgrade, list them with `grep -rni unstable tests/` (or wherever your tests are), then rename them
+or keep them as above.
+
 ## Upgrading to 0.5
 
 0.5.0 changes how the plugin is configured, ahead of 1.0. Most projects change one or two lines. A

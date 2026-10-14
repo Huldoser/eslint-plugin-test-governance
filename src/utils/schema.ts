@@ -1,4 +1,11 @@
-import { BUILTIN_STATE_NAMES, FRAMEWORK_NAMES, MARKER_RE, TAG_RE, TICKET_PRESETS } from './constants.ts';
+import {
+  BUILTIN_STATE_NAMES,
+  FRAMEWORK_NAMES,
+  MARKER_RE,
+  TAG_RE,
+  TAG_STATE_NAMES,
+  TICKET_PRESETS,
+} from './constants.ts';
 import type { Schema } from './validate.ts';
 
 const MARKER_HINT = 'an uppercase keyword such as NEEDS-DATA (letters, digits, "-" and "_")';
@@ -30,20 +37,22 @@ const ticketSchema: Schema = {
   anyOf: [ticketSpecSchema, { type: 'array', items: ticketSpecSchema, minItems: 1 }],
 };
 
-const stateOverrideSchema: Schema = {
+/** A setting in `states`. Only a state that a tag puts a test in, such as `new`, can rename its tag. */
+const stateOverrideSchema = (hasTag: boolean): Schema => ({
   anyOf: [
     { type: 'boolean' },
     {
       type: 'object',
       properties: {
         enabled: { type: 'boolean' },
+        ...(hasTag && { tag: { type: 'string', pattern: TAG_RE.source, patternHint: TAG_HINT } }),
         marker: { type: 'string', pattern: MARKER_RE.source, patternHint: MARKER_HINT },
         ticket: ticketSchema,
       },
       additionalProperties: false,
     },
   ],
-};
+});
 
 /** The shape of `settings['test-governance']`, the options of `configure()`. */
 export const optionsSchema: Schema = {
@@ -56,8 +65,14 @@ export const optionsSchema: Schema = {
     lifecycleTags: { type: 'boolean' },
     states: {
       type: 'object',
-      properties: Object.fromEntries(BUILTIN_STATE_NAMES.map((name) => [name, stateOverrideSchema])),
+      properties: Object.fromEntries(
+        BUILTIN_STATE_NAMES.map((name) => [
+          name,
+          stateOverrideSchema((TAG_STATE_NAMES as readonly string[]).includes(name)),
+        ]),
+      ),
       additionalProperties: false,
+      renamed: { unstable: 'quarantined' },
     },
     customStates: {
       type: 'object',

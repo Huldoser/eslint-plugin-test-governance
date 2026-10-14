@@ -19,7 +19,7 @@ A test is in a state when it is:
 | `fixme`        | `test.fixme(...)`, `test.describe.fixme`, `testInfo.fixme()`                                                                          | `// FIXME:`            | yes                        |
 | `todo`         | Jest's and Vitest's `test.todo`                                                                                                       | `// TODO:`             | yes, in Jest and Vitest    |
 | `new`          | the `@new` tag                                                                                                                        | `// NEW:`              | with `lifecycleTags: true` |
-| `unstable`     | the `@unstable` tag                                                                                                                   | `// UNSTABLE:`         | with `lifecycleTags: true` |
+| `quarantined`  | the `@quarantined` tag                                                                                                                | `// QUARANTINED:`      | with `lifecycleTags: true` |
 | `fail`, `slow` | `test.fail(...)`, `test.slow()`, `testInfo.fail()`, `testInfo.slow()`                                                                 | `// FAIL:`, `// SLOW:` | no                         |
 | custom         | any tag you list in `customStates`                                                                                                    | your keyword           | when configured            |
 
@@ -30,7 +30,8 @@ In Jest and Vitest, `xit`, `xdescribe`, Vitest's `{ skip: true }`, `skipIf(true)
 Tags are read from the title (`'places a limit order @new'`) and from `{ tag: '@new' }` or `{ tag: ['@new', '@smoke'] }`,
 also when they come from a `const` or an enum declared in the same file, as in `{ tag: TAGS.NEW }`.
 Vitest writes tag names without the `@`, so `{ tags: ['new'] }` is the `@new` tag. Tags on a
-`describe` apply to every test inside it.
+`describe` apply to every test inside it. `states` can rename the tag and marker of `new` and
+`quarantined`, as in `states: { quarantined: { tag: '@flaky', marker: 'FLAKY' } }`.
 
 ## Marker format
 
@@ -87,7 +88,7 @@ If one test or describe has several markers for the same state, each must be val
 Tags can only be read from text: a string or a template literal such as `` `buys ${symbol} @new` ``,
 written in the call or kept in a `const` or an enum in the same file. A title built another way, such
 as `'buys ' + symbol`, and a tag or details object imported from another module may hide a tag. With
-`reportUnreadableTags: true`, the rule reports those whenever a tag state (`@new`, `@unstable` or a
+`reportUnreadableTags: true`, the rule reports those whenever a tag state (`@new`, `@quarantined` or a
 custom state) is on, so no tagged test slips past.
 
 <!-- example: invalid settings={"lifecycleTags":true,"reportUnreadableTags":true} -->
@@ -233,8 +234,8 @@ This rule has no options of its own. It reads the shared options described in th
 change what it reports:
 
 - `ticket` and `placeholders`: which tickets are accepted.
-- `lifecycleTags`, `states` and `customStates`: which states need a marker, what the marker is
-  called, and, for a state with its own `ticket`, which tickets it accepts.
+- `lifecycleTags`, `states` and `customStates`: which states need a marker, which tag puts a test in
+  each, what the marker is called, and, for a state with its own `ticket`, which tickets it accepts.
 - `requireTicketForConditional`: conditional skips need a ticket too.
 - `allowBlankLine`: blank lines may separate a marker from its test.
 - `allowNotes`: text may follow the tickets.

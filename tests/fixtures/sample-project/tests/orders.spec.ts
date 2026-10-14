@@ -28,17 +28,17 @@ test.describe('Order entry', () => {
     await page.goto('/positions');
   });
 
-  test('moves a trailing stop up with the price', { tag: ['@unstable', '@smoke'] }, async () => {});
+  test('moves a trailing stop up with the price', { tag: ['@quarantined', '@smoke'] }, async () => {});
 
-  // UNSTABLE: OPS-9
-  test('triggers a stop-loss when the price drops @unstable', async () => {});
+  // QUARANTINED: OPS-9
+  test('triggers a stop-loss when the price drops @quarantined', async () => {});
 
   // NEW: RISK-80 promoted, marker left behind
   test('saves a watchlist', async () => {});
 
   test('exports the trade history as CSV @New', async () => {});
 
-  test('shows dividend payments in the account history @unstabel', async () => {});
+  test('shows dividend payments in the account history @quarantiend', async () => {});
 
   test('draws the price chart', async ({ browserName }) => {
     test.skip(browserName === 'webkit', 'Chart layout differs on WebKit by design');

@@ -110,7 +110,7 @@ const playwright: Framework = {
   info: { param: 1, methods: RUNTIME_MODIFIERS },
   skipWithoutBody: false,
   skipNotes: false,
-  states: new Set(['skip', 'fixme', 'fail', 'slow', 'new', 'unstable']),
+  states: new Set(['skip', 'fixme', 'fail', 'slow', 'new', 'quarantined']),
   playwright: true,
 };
 
@@ -143,7 +143,7 @@ const jest: Framework = {
   plainTags: false,
   skipWithoutBody: false,
   skipNotes: false,
-  states: new Set(['skip', 'todo', 'fail', 'new', 'unstable']),
+  states: new Set(['skip', 'todo', 'fail', 'new', 'quarantined']),
   playwright: false,
 };
 
@@ -185,7 +185,7 @@ const vitest: Framework = {
   info: { param: 0, methods: new Set(['skip']) },
   skipWithoutBody: true,
   skipNotes: true,
-  states: new Set(['skip', 'todo', 'fail', 'new', 'unstable']),
+  states: new Set(['skip', 'todo', 'fail', 'new', 'quarantined']),
   playwright: false,
 };
 

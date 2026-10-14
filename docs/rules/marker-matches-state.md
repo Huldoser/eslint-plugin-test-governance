@@ -30,7 +30,7 @@ test.fixme('shows the unfilled quantity of a partly filled order', async () => {
 
 ```js
 // SKIP: TRADE-500
-test.skip('shows the unfilled quantity of a partly filled order @unstable', async () => {});
+test.skip('shows the unfilled quantity of a partly filled order @quarantined', async () => {});
 ```
 
 Correct:
@@ -46,8 +46,8 @@ test.fixme('shows the unfilled quantity of a partly filled order', async () => {
 
 ```js
 // SKIP: TRADE-500
-// UNSTABLE: TRADE-500
-test.skip('shows the unfilled quantity of a partly filled order @unstable', async () => {});
+// QUARANTINED: TRADE-500
+test.skip('shows the unfilled quantity of a partly filled order @quarantined', async () => {});
 ```
 
 ## Options

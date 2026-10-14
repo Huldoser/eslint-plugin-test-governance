@@ -42,7 +42,7 @@ describe('options validation', () => {
     [{ ticket: { preset: 'numeric', minLength: 0 } }, 'ticket.minLength must be at least 1 (got 0)'],
     [
       { states: { blocked: true } },
-      'states.blocked is not a known option (expected one of: skip, fixme, fail, slow, todo, new, unstable)',
+      'states.blocked is not a known option (expected one of: skip, fixme, fail, slow, todo, new, quarantined)',
     ],
     [{ states: { skip: null } }, 'states.skip must be a boolean or an object (got null)'],
     [{ comments: true }, 'comments must be false (got true)'],
@@ -85,6 +85,7 @@ describe('options validation', () => {
       { customStates: { blocked: { when: '@blocked', marker: '@BLOCKED' } } },
       'customStates.blocked.marker must be an uppercase keyword such as NEEDS-DATA (letters, digits, "-" and "_") (got "@BLOCKED")',
     ],
+    [{ states: { new: { tag: 'candidate' } } }, 'states.new.tag must be a tag such as @needs-data (got "candidate")'],
     [{ comments: 'off' }, 'comments must be false or an object (got "off")'],
     [{ comments: { keyword: ['HACK'] } }, 'comments.keyword is not a known option; did you mean "keywords"?'],
     [{ placeholders: [0] }, 'placeholders[0] must be a string (got 0)'],
@@ -94,6 +95,7 @@ describe('options validation', () => {
     [{ reportUnreadableTags: 'on' }, 'reportUnreadableTags must be a boolean (got "on")'],
     // An option renamed before 1.0 names its new name.
     [{ reportDynamicTitles: true }, 'reportDynamicTitles was renamed to "reportUnreadableTags"'],
+    [{ states: { unstable: { enabled: true } } }, 'states.unstable was renamed to "quarantined"'],
   ]) {
     it(JSON.stringify(options), () => {
       assert.deepEqual(problems(options), [message]);

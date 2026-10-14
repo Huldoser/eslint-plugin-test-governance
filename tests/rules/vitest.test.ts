@@ -197,9 +197,14 @@ runRule('require-ticket (Vitest)', requireTicket, {
       errors: [missing('new', 'NEW')],
     },
     {
-      code: "test('fills a limit order', { tags: 'unstable' }, () => {});",
+      code: "test('fills a limit order', { tags: 'quarantined' }, () => {});",
       settings: settings({ lifecycleTags: true }),
-      errors: [missing('unstable', 'UNSTABLE')],
+      errors: [missing('quarantined', 'QUARANTINED')],
+    },
+    {
+      code: "test('fills a limit order', { tags: ['flaky'] }, () => {});",
+      settings: settings({ lifecycleTags: true, states: { quarantined: { tag: '@flaky' } } }),
+      errors: [missing('quarantined', 'QUARANTINED')],
     },
     {
       code: "beforeEach((context) => {\n  context.skip();\n});\ntest('fills a limit order', () => {});",
@@ -303,11 +308,11 @@ runRule('no-conflicting-states (Vitest)', noConflictingStates, {
     },
     // A tag name is shown and fixed without the `@` it is written without.
     {
-      code: "test('fills a limit order', { tags: ['New', 'unstabel'] }, () => {});",
-      output: "test('fills a limit order', { tags: ['new', 'unstabel'] }, () => {});",
+      code: "test('fills a limit order', { tags: ['New', 'quarantiend'] }, () => {});",
+      output: "test('fills a limit order', { tags: ['new', 'quarantiend'] }, () => {});",
       errors: [
         { messageId: 'tagCase', data: { found: 'New', expected: 'new' } },
-        { messageId: 'tagTypo', data: { found: 'unstabel', expected: 'unstable' } },
+        { messageId: 'tagTypo', data: { found: 'quarantiend', expected: 'quarantined' } },
       ],
     },
     {

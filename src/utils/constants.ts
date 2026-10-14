@@ -3,8 +3,11 @@ export const MARKER_RE = /^[A-Z][A-Z0-9_-]*$/;
 /** A tag as written in options: `@` followed by letters, digits, `-` and `_`. */
 export const TAG_RE = /^@[\w-]+$/;
 
-export const BUILTIN_STATE_NAMES = ['skip', 'fixme', 'fail', 'slow', 'todo', 'new', 'unstable'] as const;
+export const BUILTIN_STATE_NAMES = ['skip', 'fixme', 'fail', 'slow', 'todo', 'new', 'quarantined'] as const;
 export type BuiltinStateName = (typeof BUILTIN_STATE_NAMES)[number];
+/** The built-in states a tag puts a test in, so the only ones whose tag can be renamed. */
+export const TAG_STATE_NAMES = ['new', 'quarantined'] as const satisfies readonly BuiltinStateName[];
+export type TagStateName = (typeof TAG_STATE_NAMES)[number];
 
 /** The test frameworks the rules understand. */
 export const FRAMEWORK_NAMES = ['playwright', 'jest', 'vitest'] as const;
