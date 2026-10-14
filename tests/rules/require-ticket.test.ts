@@ -224,6 +224,11 @@ runRule('require-ticket', rule, {
     // fail and slow are off by default.
     "test.fail('rejects an order over the position limit', async () => {});",
     "test('backtests a moving-average strategy', async () => { test.slow(); });",
+    // Playwright has no `test.slow(title, body)`: a string first is the condition of a runtime call.
+    {
+      code: "test.slow('backtests a moving-average strategy', async () => {});",
+      settings: settings({ states: { slow: true } }),
+    },
     // Only Playwright's test function counts.
     "broker.skip('places an order', async () => {});",
     "describe.skip('order entry', () => {});",

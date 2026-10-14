@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- In Playwright, `test.slow('title', body)` is no longer read as a slow test declared with a title.
+  Playwright has no such form: `slow` only marks a running test, and a string before the description
+  is its condition, so the call is checked like `test.slow(condition, description)`. Before, with the
+  `slow` state on, it needed a `// SLOW:` marker even without `requireTicketForConditional`.
+
 ## [0.6.0] - 2026-10-14
 
 This release renames the `unstable` state to `quarantined`.
