@@ -21,6 +21,7 @@ runRule('no-orphaned-marker', rule, {
     "// SKIP: TRADE-1\ntest('shows the order book', async ({ browserName }) => { test.skip(browserName === 'webkit'); });",
     // A test inside a skipped describe may repeat the marker.
     "// SKIP: TRADE-1\ntest.describe.skip('order entry', () => {\n  // SKIP: TRADE-1\n  test('places an order', async () => {});\n});",
+    "// SKIP: TRADE-1\ntest.describe.skip('order entry', () => {\n  test.describe('limit orders', () => {\n    // SKIP: TRADE-1\n    test('places an order', async () => {});\n  });\n});",
     // A mismatch next to a missing marker is marker-matches-state's job.
     "// SKIP: TRADE-1\ntest.fixme('cancels an order', async () => {});",
     // An ordinary comment that happens to start with a marker keyword is not a leftover ticket.
@@ -64,6 +65,17 @@ runRule('no-orphaned-marker', rule, {
         {
           messageId: 'orphaned',
           data: { marker: 'skip', state: 'skip', subject: 'this test' },
+          suggestions: [{ messageId: 'removeMarker', output: "test('places an order', async () => {});" }],
+        },
+      ],
+    },
+    // FIXME is also a work-comment keyword, but with a ticket right above a test it's a forgotten marker.
+    {
+      code: "// FIXME: TRADE-1\ntest('places an order', async () => {});",
+      errors: [
+        {
+          messageId: 'orphaned',
+          data: { marker: 'FIXME', state: 'fixme', subject: 'this test' },
           suggestions: [{ messageId: 'removeMarker', output: "test('places an order', async () => {});" }],
         },
       ],

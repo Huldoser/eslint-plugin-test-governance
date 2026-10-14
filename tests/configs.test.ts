@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import { Linter } from 'eslint';
 import testGovernance, { configs, configure, rules } from '../src/index.ts';
@@ -30,6 +31,11 @@ describe('configs', () => {
       removed,
     );
     assert.ok(!Object.keys(configs).includes('recommended'));
+  });
+
+  it('names the package, its version and the rule prefix in the plugin meta', () => {
+    const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as Record<string, string>;
+    assert.deepEqual(testGovernance.meta, { name: pkg.name, version: pkg.version, namespace: 'test-governance' });
   });
 
   it('names a configure() config after its framework', () => {

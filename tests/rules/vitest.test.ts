@@ -23,6 +23,10 @@ runRule('require-ticket (Vitest)', requireTicket, {
     "// SKIP: TRADE-1\ntest('fills a limit order', { skip: true }, () => {});",
     "// SKIP: TRADE-1\ndescribe('order book', { 'skip': true }, () => {});",
     "test('fills a limit order', { skip: false, timeout: 5_000 }, () => {});",
+    {
+      code: "test('fills a limit order', { skip: false }, () => {});",
+      settings: settings({ requireTicketForConditional: true }),
+    },
     "test('fills a limit order', { skip: process.env.CI === 'true' }, () => {});",
     "test('fills a limit order', { [option]: true, ...defaults }, () => {});",
     // skipIf and runIf skip only sometimes, so they need no ticket by default.
@@ -107,8 +111,12 @@ runRule('require-ticket (Vitest)', requireTicket, {
     { code: "suite.skip('order book', () => {});", errors: [missing('skip', 'SKIP', 'This describe block')] },
     { code: "test.skip.concurrent('streams quotes', async () => {});", errors: [missing('skip', 'SKIP')] },
     {
-      code: "import { it as check, suite as group } from 'vitest';\ncheck.skip('fills', () => {});\ngroup.skip('order book', () => {});",
-      errors: [missing('skip', 'SKIP'), missing('skip', 'SKIP', 'This describe block')],
+      code: "import { it as check, suite as group, describe as block } from 'vitest';\ncheck.skip('fills', () => {});\ngroup.skip('order book', () => {});\nblock.skip('quotes', () => {});",
+      errors: [
+        missing('skip', 'SKIP'),
+        missing('skip', 'SKIP', 'This describe block'),
+        missing('skip', 'SKIP', 'This describe block'),
+      ],
     },
     {
       code: "import * as vi from 'vitest';\nvi.test.skip('fills', () => {});",
@@ -205,6 +213,24 @@ runRule('require-ticket (Vitest)', requireTicket, {
       code: "test('fills a limit order', { tags: ['flaky'] }, () => {});",
       settings: settings({ lifecycleTags: true, states: { quarantined: { tag: '@flaky' } } }),
       errors: [missing('quarantined', 'QUARANTINED')],
+    },
+    // Members that change no state keep the tags in the title.
+    {
+      code: "test.only('fills a limit order @new', () => {});\ntest.sequential('fills a market order @new', () => {});\ndescribe.only('order book @new', () => {});\ndescribe.concurrent('quotes @new', () => {});\ndescribe.sequential('fills @new', () => {});\ndescribe.shuffle('cancels @new', () => {});",
+      settings: settings({ lifecycleTags: true }),
+      errors: [
+        missing('new', 'NEW'),
+        missing('new', 'NEW'),
+        missing('new', 'NEW', 'This describe block'),
+        missing('new', 'NEW', 'This describe block'),
+        missing('new', 'NEW', 'This describe block'),
+        missing('new', 'NEW', 'This describe block'),
+      ],
+    },
+    {
+      code: "test.fails('rejects an order above the buying power', () => {});",
+      settings: settings({ states: { fail: true } }),
+      errors: [missing('fail', 'FAIL')],
     },
     {
       code: "beforeEach((context) => {\n  context.skip();\n});\ntest('fills a limit order', () => {});",

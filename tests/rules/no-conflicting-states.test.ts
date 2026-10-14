@@ -74,6 +74,11 @@ runRule('no-conflicting-states', rule, {
       settings: lifecycle,
       errors: [{ messageId: 'newAndQuarantined' }],
     },
+    {
+      code: "test.describe('market data @new', () => {\n  test.describe('level 2', () => { test('streams the order book @quarantined', async () => {}); });\n});",
+      settings: lifecycle,
+      errors: [{ messageId: 'newAndQuarantined', line: 2 }],
+    },
     // A renamed tag gets the same checks.
     {
       code: "test('places a market order @new @flaky', async () => {});",
