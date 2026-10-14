@@ -93,6 +93,13 @@ runRule('require-ticket', rule, {
     "test('places an order', async () => { try { await connectBroker(); } catch { test.skip(); } finally { disconnectBroker(); } });",
     "test('places an order', async ({ page }, testInfo) => { try { await connectBroker(); } catch { if (retry) {} testInfo.fixme(); } });",
     "test('places a market order', async () => { if (marketOpen) return; test.skip(); });",
+    // A test or describe whose function a condition picks is skipped only sometimes.
+    "(isMobile ? test.skip : test)('places an order', async () => {});",
+    "(isMobile ? test.describe : test.describe.skip)('order entry', () => {\n  test('places an order', async () => {});\n});",
+    {
+      code: "// SKIP: TRADE-1\n(isMobile ? test.skip : test)('places an order', async () => {});",
+      settings: settings({ requireTicketForConditional: true }),
+    },
     "test('places a market order', async () => { if (!marketOpen) { log('market closed'); return; }\n  await step();\n  test.skip(); });",
     "test('cancels an order', async () => { if (supported) {} else throw new Error('x'); { test.skip(); } });",
     "test('cancels an order', async () => { if (!tradingEnabled) { throw new Error('off'); } for (;;) { test.skip(); break; } });",
@@ -622,6 +629,16 @@ runRule('require-ticket', rule, {
       code: "test('places an order', async () => { try { await connectBroker(); } catch { test.skip(); } });",
       settings: settings({ requireTicketForConditional: true }),
       errors: [missing('skip', 'SKIP', 'This skip call')],
+    },
+    {
+      code: "(isMobile ? test.describe.skip : test.describe)('order entry', () => {\n  test('places an order', async () => {});\n});",
+      settings: settings({ requireTicketForConditional: true }),
+      errors: [missing('skip', 'SKIP', 'This describe block')],
+    },
+    {
+      code: "(isMobile ? test.skip : test)('places an order', { tag: '@new' }, async () => {});",
+      settings: lifecycle,
+      errors: [missing('new', 'NEW')],
     },
     // A guard outside the enclosing function doesn't make the call conditional.
     {

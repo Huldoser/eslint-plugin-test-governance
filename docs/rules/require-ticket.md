@@ -80,6 +80,24 @@ A runtime skip under an `if`, a `switch` case, a ternary or `&&` counts as condi
 such as `catch { test.skip(true, 'Market data feed is down') }`, and a skip after an early exit such as
 `if (ready) return;` or `if (!ok) throw error;` earlier in the same function.
 
+A test or describe whose function a condition picks is a conditional skip too, in every framework. Its
+title and tags count as usual, and a marker goes above it, or in code without semicolons above the
+`;` that starts the line.
+
+<!-- example: valid -->
+
+```js
+(isMobile ? test.skip : test)('places an order', async ({ page }) => {});
+```
+
+<!-- example: invalid settings={"framework":"jest","requireTicketForConditional":true} -->
+
+```js
+(process.env.CI ? describe.skip : describe)('order book', () => {
+  it('shows the best bid', () => {});
+});
+```
+
 If one test or describe has several markers for the same state, each must be valid: in
 `// SKIP: TRADE-1` followed by `// SKIP: nope`, the second line is reported.
 

@@ -68,6 +68,23 @@ runRule('require-ticket (Jest)', requireTicket, {
     "test('fills a limit order', (done) => { done.skip(); });",
     // A test's title only.
     "test.skip('fills a limit order');",
+    // A test or describe whose function a condition picks is skipped only sometimes.
+    "(process.env.CI ? describe.skip : describe)('order book', () => {\n  it('shows the best bid', () => {});\n});",
+    {
+      code: "const symbol = 'AAPL'\n// SKIP: TRADE-1\n;(process.env.CI ? it.skip : it)('fills a limit order', () => {})",
+      settings: settings({ requireTicketForConditional: true }),
+    },
+    {
+      code: "// SKIP: TRADE-1\n;(process.env.CI ? it.skip : it)('fills a limit order', () => {})",
+      settings: settings({ requireTicketForConditional: true }),
+    },
+    // A condition that picks a function other than a test, or a test or a describe, declares nothing.
+    "(process.env.CI ? it : renderOrderBook)('order book', () => {});",
+    "(process.env.CI ? renderOrderBook : it)('order book', () => {});",
+    "(process.env.CI ? describe : it)('order book', () => {});",
+    // Jest's `skip` needs a body, which a `todo` doesn't have.
+    "(process.env.CI ? it.skip : it.todo)('fills a partial order');",
+    "(process.env.CI ? it.todo : it.skip)('fills a partial order');",
   ]),
   invalid: withOptions(jest, [
     {
@@ -160,6 +177,31 @@ runRule('require-ticket (Jest)', requireTicket, {
       code: "const check = it;\ncheck.skip('fills a limit order', () => {});",
       errors: [missing('skip', 'SKIP')],
     },
+    {
+      code: "(process.env.CI ? describe.skip : describe)('order book', () => {\n  it('shows the best bid', () => {});\n});",
+      settings: settings({ requireTicketForConditional: true }),
+      errors: [missing('skip', 'SKIP', 'This describe block')],
+    },
+    {
+      code: "const symbol = 'AAPL'\n;(process.env.CI ? it.skip : it)('fills a limit order', () => {})",
+      settings: settings({ requireTicketForConditional: true }),
+      errors: [missing('skip', 'SKIP')],
+    },
+    // Both functions skip, so the test always does.
+    {
+      code: "(process.env.CI ? it.skip : xit)('fills a limit order', () => {});",
+      errors: [missing('skip', 'SKIP')],
+    },
+    {
+      code: "(process.env.CI ? describe.skip : describe)('order book @new', () => {\n  it('shows the best bid', () => {});\n});",
+      settings: settings({ lifecycleTags: true }),
+      errors: [missing('new', 'NEW', 'This describe block')],
+    },
+    // A marker above a line that starts with another statement isn't the test's.
+    {
+      code: "// SKIP: TRADE-1\nconst title = 'fills a limit order'; it.skip(title, () => {});",
+      errors: [missing('skip', 'SKIP')],
+    },
   ]),
 });
 
@@ -195,6 +237,9 @@ runRule('no-orphaned-marker (Jest)', noOrphanedMarker, {
     "// TODO: TRADE-1\ndescribe('order book', () => {\n  it('shows the best bid', () => {});\n});",
     "// TODO: #7348 keep the fills in time order\ntest('fills a partial order', () => {});",
     "// Todo: TRADE-1\ntest('fills a partial order', () => {});",
+    // A marker above a test or describe whose function a condition picks belongs to it.
+    "// SKIP: TRADE-1\n(process.env.CI ? describe.skip : describe)('order book', () => {\n  it('shows the best bid', () => {});\n});",
+    "const symbol = 'AAPL'\n// SKIP: TRADE-1\n;(process.env.CI ? describe : describe.skip)('order book', () => {})",
   ]),
   invalid: withOptions(jest, [
     // A todo marker under its own keyword is still checked.

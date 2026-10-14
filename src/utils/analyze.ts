@@ -345,7 +345,13 @@ function anchorOf(call: TSESTree.CallExpression): Node {
 
 /** The contiguous comment block directly above `anchor`. */
 function commentBlock(sourceCode: SourceCode, anchor: Node, allowBlankLine: boolean): Comment[] {
-  const comments = sourceCode.getCommentsBefore(anchor);
+  // Code without semicolons starts a line that opens with `(` with one: `;(isCI ? describe.skip : describe)(...)`.
+  const semicolon = sourceCode.getTokenBefore(anchor);
+  const leading =
+    semicolon?.value === ';' &&
+    semicolon.loc.start.line === anchor.loc.start.line &&
+    sourceCode.getTokenBefore(semicolon)?.loc.end.line !== semicolon.loc.start.line;
+  const comments = sourceCode.getCommentsBefore(leading ? semicolon : anchor);
   const block: Comment[] = [];
   let nextLine = anchor.loc.start.line;
   for (let i = comments.length - 1; i >= 0; i--) {
@@ -856,15 +862,60 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     return infoNames(param, framework.info.methods);
   };
 
+  /**
+   * What a callee declares and with which members: `describe` and `['skip']` for `test.describe.skip`.
+   * Undefined for a hook.
+   */
+  const declarationOf = ({ root, path, args }: NonNullable<ReturnType<typeof target>>) => {
+    if (root.kind === 'hook') return undefined;
+    const playwrightDescribe = framework.playwright && path[0] === 'describe';
+    const kind = playwrightDescribe ? 'describe' : root.kind;
+    return { kind, members: [...root.modifiers, ...(playwrightDescribe ? path.slice(1) : path)], args };
+  };
+  type Declaration = NonNullable<ReturnType<typeof declarationOf>>;
+
+  /** Whether a call with these members and arguments declares a test or describe of this kind. */
+  const declares = ({ kind, members }: Declaration, args: TSESTree.CallExpressionArgument[]): boolean => {
+    const allowed = kind === 'test' ? framework.testMembers : framework.describeMembers;
+    return members.every((m) => allowed.has(m)) && isDeclaration(sourceCode, framework, kind, args, members);
+  };
+
+  /**
+   * `(isCI ? describe.skip : describe)('order entry', ...)`: a test or describe whose function is picked by
+   * a condition. A state that only one side has depends on the condition, like `test.skip(isCI)`.
+   */
+  const pickedDeclaration = (call: TSESTree.CallExpression): { subject: Subject; infos: InfoName[] } | undefined => {
+    const callee = unwrap(call.callee);
+    if (callee.type !== 'ConditionalExpression') return undefined;
+    const [yes, no] = [callee.consequent, callee.alternate].map((side) => {
+      const picked = target(chainOf(unwrap(side), framework.factories));
+      return picked && declarationOf(picked);
+    });
+    const args = call.arguments;
+    if (yes === undefined || no === undefined) return undefined;
+    if (yes.kind !== no.kind || !declares(yes, args) || !declares(no, args)) return undefined;
+    usesTest = true;
+    const details = detailsOf(sourceCode, call);
+    const tagInfo = collectTags(sourceCode, call, !isFunction(args[0]), framework, details);
+    const [ifYes, ifNo] = [yes, no].map(({ members, args: conditions }) =>
+      modifiersOf(members, details.entries, conditions),
+    );
+    const modifiers = new Map<string, boolean>();
+    for (const modifier of new Set([...ifYes.keys(), ...ifNo.keys()])) {
+      modifiers.set(modifier, ifYes.get(modifier) === true && ifNo.get(modifier) === true);
+    }
+    return { subject: makeSubject(yes.kind, call, modifiers, tagInfo), infos: bodyInfos(args, yes.members) };
+  };
+
   const visitCall = (call: TSESTree.CallExpression): { subject?: Subject; infos?: InfoName[] } => {
     const callee = target(chainOf(call.callee, framework.factories));
-    if (callee === undefined) return { subject: runtimeCall(call) };
+    if (callee === undefined) return pickedDeclaration(call) ?? { subject: runtimeCall(call) };
     usesTest = true;
     const args = call.arguments;
-    const { root } = callee;
-    let { path } = callee;
+    const { path } = callee;
+    const declaration = declarationOf(callee);
     // Vitest's `beforeEach((context) => context.skip())` skips the tests it runs before.
-    if (root.kind === 'hook') return { infos: bodyInfos(args, path) };
+    if (declaration === undefined) return { infos: bodyInfos(args, path) };
 
     if (framework.playwright) {
       // `test.step('fills the order', async (step) => {...})` or `test.step.skip(...)`. The step's body
@@ -878,14 +929,8 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       }
     }
     const bodyInfo = bodyInfos(args, path);
-    let { kind } = root;
-    if (framework.playwright && path[0] === 'describe') {
-      kind = 'describe';
-      path = path.slice(1);
-    }
-    const members = [...root.modifiers, ...path];
-    const allowed = kind === 'test' ? framework.testMembers : framework.describeMembers;
-    if (members.every((m) => allowed.has(m)) && isDeclaration(sourceCode, framework, kind, args, members)) {
+    const { kind, members } = declaration;
+    if (declares(declaration, args)) {
       // A declaration always has a first argument: its title, or the body of a describe without one.
       const details = detailsOf(sourceCode, call);
       const tagInfo = collectTags(sourceCode, call, !isFunction(args[0]), framework, details);
@@ -895,8 +940,8 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       };
     }
     // test.skip(), test.fixme(), test.fail() and test.slow() in a test, a describe or a hook.
-    if (framework.playwright && path.length === 1 && RUNTIME_MODIFIERS.has(path[0])) {
-      return { subject: runtimeSubject(call, path[0]), infos: bodyInfo };
+    if (framework.playwright && members.length === 1 && RUNTIME_MODIFIERS.has(members[0])) {
+      return { subject: runtimeSubject(call, members[0]), infos: bodyInfo };
     }
     return { infos: bodyInfo };
   };

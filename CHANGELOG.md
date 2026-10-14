@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A test or describe whose function a condition picks, as in
+  `(process.env.CI ? describe.skip : describe)('order book', fn)`, is now read as a conditional skip in
+  Playwright, Jest and Vitest. Before, it wasn't seen at all: a `// SKIP:` marker above it was reported
+  as orphaned, tags in its title didn't reach its tests, and `requireTicketForConditional` didn't
+  require a ticket for it. In code without semicolons, a marker above the `;` that starts the line
+  belongs to it.
+
 ## [0.6.1] - 2026-10-14
 
 ### Fixed
