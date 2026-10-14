@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/npm/l/eslint-plugin-test-governance)](LICENSE)
 
 ESLint rules that keep a Playwright, Jest or Vitest suite honest. Every skipped, fixme, todo, `@new`
-or `@unstable` test must point at the ticket that tracks it:
+or `@quarantined` test must point at the ticket that tracks it:
 
 <!-- example: valid -->
 
@@ -20,8 +20,8 @@ Without the comment, `test-governance/require-ticket` fails the lint. When the t
 skip removed, `no-orphaned-marker` flags the leftover comment. The markers are plain
 comments, so `grep -rn "SKIP:" tests/` lists every disabled test and its ticket.
 
-> **Status:** early release (0.x). Options may still change before 1.0. Coming from 0.4?
-> [Upgrading to 0.5](docs/upgrading.md#upgrading-to-05) shows what to change.
+> **Status:** early release (0.x). Options may still change before 1.0. Coming from 0.5?
+> [Upgrading to 0.6](docs/upgrading.md#upgrading-to-06) shows what to change.
 
 ## Install
 
@@ -90,7 +90,7 @@ export default [
       framework: 'playwright',
       // Only accept Jira keys from these projects (or Jira URLs).
       ticket: { preset: 'jira', projects: ['TRADE', 'RISK'] },
-      // Turn on the @new and @unstable states.
+      // Turn on the @new and @quarantined states.
       lifecycleTags: true,
       // Any tag your team uses, with the same rules as the built-ins.
       customStates: {
@@ -175,7 +175,7 @@ The defaults follow how most teams already work, so each framework config is use
 | Setting                                                                                                   | Default                                                                      | Why                                                                                                                      |
 | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | States that need a ticket                                                                                 | `skip`, `fixme`; in Jest and Vitest `skip`, `todo`                           | Every team skips tests. Chromium DevTools, GitLab and Slack all require a bug link on disabled tests.                    |
-| `@new`, `@unstable`                                                                                       | off; `lifecycleTags: true` turns both on                                     | A promotion workflow is not universal. Teams that call it `@flaky` or `@quarantine` use `customStates`.                  |
+| `@new`, `@quarantined`                                                                                    | off; `lifecycleTags: true` turns both on                                     | A promotion workflow is not universal. Teams that say `@flaky` instead [rename the tag](#tag-names).                     |
 | Conditional skips (`test.skip(browserName === 'webkit', ...)`, `if (...) test.skip()`, a skip in `catch`) | no ticket needed                                                             | These are usually permanent platform limits, not bugs. `requireTicketForConditional: true` changes this.                 |
 | `test.fail`, `test.slow`, Jest's `test.failing`, Vitest's `test.fails`                                    | off                                                                          | They don't remove coverage. Turn them on with `states: { fail: true, slow: true }`.                                      |
 | Marker format                                                                                             | `// SKIP: TRADE-123` or `// SKIP: TRADE-123, TRADE-124`                      | Uppercase keyword and colon, like `TODO:`. Easy to grep.                                                                 |
@@ -194,20 +194,47 @@ yourself. `framework` is required, and every other option has a default. The rul
 of their own: they all read these shared settings, so they always agree on ticket formats, states
 and markers. To turn a rule off, set it to `'off'` as usual.
 
-| Option                        | Type                                                     | Default                           | Description                                                                                                                                                                                                                                                                                                                                                                                   |
-| ----------------------------- | -------------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `framework`                   | `'playwright' \| 'jest' \| 'vitest'`                     | required                          | The test framework of the files the config applies to. `configs.playwright`, `configs.jest` and `configs.vitest` set it, and `configure()` needs it. See [Frameworks](#frameworks).                                                                                                                                                                                                           |
-| `ticket`                      | `TicketSpec \| TicketSpec[]`                             | `{ preset: 'any' }`               | Accepted ticket formats. An array accepts a ticket that matches any entry. See [Ticket presets](#ticket-presets).                                                                                                                                                                                                                                                                             |
-| `placeholders`                | `string[]`                                               | see above                         | Tickets rejected as placeholders. `*` matches any characters. Case-insensitive; a leading `#` is ignored. Your list replaces the default one, so repeat the defaults you want to keep. Tickets numbered 0 are always rejected.                                                                                                                                                                |
-| `lifecycleTags`               | `boolean`                                                | `false`                           | Turns on the `new` (`@new`) and `unstable` (`@unstable`) states.                                                                                                                                                                                                                                                                                                                              |
-| `states`                      | `{ [state]: boolean \| { enabled?, marker?, ticket? } }` | `skip`, `fixme` and `todo` on     | Turns built-in states (`skip`, `fixme`, `fail`, `slow`, `todo`, `new`, `unstable`) on or off, renames their marker, or gives them their own ticket format. `fail` and `slow` are off by default; a setting for `new` or `unstable` here wins over `lifecycleTags`. `fixme` and `slow` exist only in Playwright and `todo` only in Jest and Vitest, so turning one on elsewhere has no effect. |
-| `customStates`                | `{ [name]: { when, marker, ticket? } }`                  | `{}`                              | Adds a state for a tag, e.g. `{ quarantine: { when: '@quarantine', marker: 'QUARANTINE' } }`. `when` is a tag and `marker` an uppercase keyword; neither can be shared with another state.                                                                                                                                                                                                    |
-| `requireTicketForConditional` | `boolean`                                                | `false`                           | Require a ticket for conditional skips too: `test.skip(condition, ...)`, `if (...) test.skip()`, a skip in a `catch` block or after an early `return` or `throw`.                                                                                                                                                                                                                             |
-| `allowBlankLine`              | `boolean`                                                | `false`                           | Let blank lines separate a marker from its test.                                                                                                                                                                                                                                                                                                                                              |
-| `allowNotes`                  | `boolean`                                                | `false`                           | Allow free text after the tickets, e.g. `// SKIP: TRADE-123 flaky on CI`. Applies to markers and to `FIXME` / `TODO` comments.                                                                                                                                                                                                                                                                |
-| `comments`                    | `false \| { keywords?: string[] }`                       | `{ keywords: ['FIXME', 'TODO'] }` | Comment keywords that must start with a ticket anywhere in a test file, e.g. `// TODO: TRADE-123`. Your keywords replace the default ones. `false` allows free-form comments.                                                                                                                                                                                                                 |
-| `testFunctions`               | `string[]`                                               | `['test']`                        | Names treated as the framework's `test`. Jest and Vitest default to `['test', 'it']`. Your list replaces the default one, so include those names if you still need them. See below.                                                                                                                                                                                                           |
-| `reportUnreadableTags`        | `boolean`                                                | `false`                           | When a tag state is on, report titles that aren't static text, and tags or details that can't be read in the file, such as ones imported from another module, since their tags can't be checked.                                                                                                                                                                                              |
+| Option                        | Type                                                           | Default                           | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ----------------------------- | -------------------------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `framework`                   | `'playwright' \| 'jest' \| 'vitest'`                           | required                          | The test framework of the files the config applies to. `configs.playwright`, `configs.jest` and `configs.vitest` set it, and `configure()` needs it. See [Frameworks](#frameworks).                                                                                                                                                                                                                                                                                                        |
+| `ticket`                      | `TicketSpec \| TicketSpec[]`                                   | `{ preset: 'any' }`               | Accepted ticket formats. An array accepts a ticket that matches any entry. See [Ticket presets](#ticket-presets).                                                                                                                                                                                                                                                                                                                                                                          |
+| `placeholders`                | `string[]`                                                     | see above                         | Tickets rejected as placeholders. `*` matches any characters. Case-insensitive; a leading `#` is ignored. Your list replaces the default one, so repeat the defaults you want to keep. Tickets numbered 0 are always rejected.                                                                                                                                                                                                                                                             |
+| `lifecycleTags`               | `boolean`                                                      | `false`                           | Turns on the `new` (`@new`) and `quarantined` (`@quarantined`) states.                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `states`                      | `{ [state]: boolean \| { enabled?, tag?, marker?, ticket? } }` | `skip`, `fixme` and `todo` on     | Turns built-in states (`skip`, `fixme`, `fail`, `slow`, `todo`, `new`, `quarantined`) on or off, renames their tag or marker, or gives them their own ticket format. `fail` and `slow` are off by default; a setting for `new` or `quarantined` here wins over `lifecycleTags`. Only `new` and `quarantined` have a tag to rename; see [Tag names](#tag-names). `fixme` and `slow` exist only in Playwright and `todo` only in Jest and Vitest, so turning one on elsewhere has no effect. |
+| `customStates`                | `{ [name]: { when, marker, ticket? } }`                        | `{}`                              | Adds a state for a tag, e.g. `{ 'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' } }`. `when` is a tag and `marker` an uppercase keyword; neither can be shared with another state.                                                                                                                                                                                                                                                                                               |
+| `requireTicketForConditional` | `boolean`                                                      | `false`                           | Require a ticket for conditional skips too: `test.skip(condition, ...)`, `if (...) test.skip()`, a skip in a `catch` block or after an early `return` or `throw`.                                                                                                                                                                                                                                                                                                                          |
+| `allowBlankLine`              | `boolean`                                                      | `false`                           | Let blank lines separate a marker from its test.                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `allowNotes`                  | `boolean`                                                      | `false`                           | Allow free text after the tickets, e.g. `// SKIP: TRADE-123 flaky on CI`. Applies to markers and to `FIXME` / `TODO` comments.                                                                                                                                                                                                                                                                                                                                                             |
+| `comments`                    | `false \| { keywords?: string[] }`                             | `{ keywords: ['FIXME', 'TODO'] }` | Comment keywords that must start with a ticket anywhere in a test file, e.g. `// TODO: TRADE-123`. Your keywords replace the default ones. `false` allows free-form comments.                                                                                                                                                                                                                                                                                                              |
+| `testFunctions`               | `string[]`                                                     | `['test']`                        | Names treated as the framework's `test`. Jest and Vitest default to `['test', 'it']`. Your list replaces the default one, so include those names if you still need them. See below.                                                                                                                                                                                                                                                                                                        |
+| `reportUnreadableTags`        | `boolean`                                                      | `false`                           | When a tag state is on, report titles that aren't static text, and tags or details that can't be read in the file, such as ones imported from another module, since their tags can't be checked.                                                                                                                                                                                                                                                                                           |
+
+### Tag names
+
+Teams name the stages of a test differently, so `states` can rename the tag of `new` and
+`quarantined`. The marker keeps its name unless you rename it too:
+
+```js
+testGovernance.configure({
+  framework: 'playwright',
+  lifecycleTags: true,
+  states: { quarantined: { tag: '@flaky', marker: 'FLAKY' } },
+});
+```
+
+<!-- example: valid settings={"lifecycleTags":true,"states":{"quarantined":{"tag":"@flaky","marker":"FLAKY"}}} -->
+
+```ts
+// FLAKY: TRADE-311
+test('streams level 2 quotes @flaky', async ({ page }) => {
+  // ...
+});
+```
+
+The new tag replaces the default one, so `@quarantined` no longer puts a test in the state, and the
+rules check `@flaky` as they checked `@quarantined`: `@new` together with `@flaky` is reported, and so
+is a near-miss such as `@flakey`. For a tag that isn't one of these stages, such as `@needs-data`, add
+a `customStates` entry.
 
 ### Ticket presets
 
@@ -235,7 +262,7 @@ testGovernance.configure({
   framework: 'playwright',
   ticket: { preset: 'jira', projects: ['TRADE'] },
   lifecycleTags: true,
-  states: { unstable: { ticket: { preset: 'github' } } },
+  states: { quarantined: { ticket: { preset: 'github' } } },
 });
 ```
 

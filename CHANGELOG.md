@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+This release renames the `unstable` state to `quarantined`.
+[Upgrading to 0.6](https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/upgrading.md#upgrading-to-06)
+shows what to change.
+
+### Added
+
+- `states` can rename the tag of the `new` and `quarantined` states, for teams that call them
+  something else: `states: { quarantined: { tag: '@flaky', marker: 'FLAKY' } }` makes `@flaky` tests
+  need a `// FLAKY:` marker. The rules check the new tag as they did the default one, and
+  `@quarantined` no longer counts.
+
+### Changed
+
+- **Breaking:** the `unstable` state is renamed to `quarantined`. `lifecycleTags: true` now turns on
+  `@quarantined`, with the `// QUARANTINED:` marker, instead of `@unstable` and `// UNSTABLE:`, so rename
+  those in your tests, or keep them with
+  `states: { quarantined: { tag: '@unstable', marker: 'UNSTABLE' } }`. A config that sets
+  `states.unstable` fails with a message that names `states.quarantined`. A config that only sets
+  `lifecycleTags: true` still loads, but no longer checks `@unstable` tests.
+
 ## [0.5.1] - 2026-10-13
 
 ### Fixed

@@ -7,15 +7,15 @@ tests/orders.spec.ts:18:3 error test-governance/require-ticket This test is in t
 tests/orders.spec.ts:20:3 error test-governance/require-ticket 'TODO' is a placeholder, not a real ticket. Link the ticket that tracks this test.
 tests/orders.spec.ts:23:3 error test-governance/marker-matches-state `SKIP:` doesn't match this code: this test is in the 'fixme' state, so the marker should be `FIXME:`.
 tests/orders.spec.ts:24:3 error test-governance/require-ticket This test is in the 'fixme' state but has no `// FIXME: <ticket>` comment directly above it, e.g. `// FIXME: TRADE-123`.
-tests/orders.spec.ts:31:3 error test-governance/require-ticket This test is in the 'unstable' state but has no `// UNSTABLE: <ticket>` comment directly above it, e.g. `// UNSTABLE: TRADE-123`.
-tests/orders.spec.ts:33:3 error test-governance/require-ticket 'OPS-9' is not a valid ticket for the 'unstable' state. Expected a Jira key like TRADE-123 in project TRADE, RISK, or a Jira URL.
+tests/orders.spec.ts:31:3 error test-governance/require-ticket This test is in the 'quarantined' state but has no `// QUARANTINED: <ticket>` comment directly above it, e.g. `// QUARANTINED: TRADE-123`.
+tests/orders.spec.ts:33:3 error test-governance/require-ticket 'OPS-9' is not a valid ticket for the 'quarantined' state. Expected a Jira key like TRADE-123 in project TRADE, RISK, or a Jira URL.
 tests/orders.spec.ts:36:3 error test-governance/no-orphaned-marker `NEW:` is left over: this test is not in the 'new' state.
 tests/orders.spec.ts:39:8 warn  test-governance/no-conflicting-states `@New` should be written `@new`.
-tests/orders.spec.ts:41:8 warn  test-governance/no-conflicting-states `@unstabel` looks like a typo of `@unstable`.
+tests/orders.spec.ts:41:8 warn  test-governance/no-conflicting-states `@quarantiend` looks like a typo of `@quarantined`.
 tests/portfolio.spec.js:9:1 error test-governance/require-ticket This describe block is in the 'needs-data' state but has no `// NEEDS-DATA: <ticket>` comment directly above it, e.g. `// NEEDS-DATA: TRADE-123`.
 tests/portfolio.spec.js:17:3 error test-governance/require-ticket Write the marker keyword in uppercase: `SKIP:` instead of `skip:`.
 tests/portfolio.spec.js:22:1 error test-governance/require-ticket This test is in the 'new' state but has no `// NEW: <ticket>` comment directly above it, e.g. `// NEW: TRADE-123`.
-tests/portfolio.spec.js:22:1 error test-governance/require-ticket This test is in the 'unstable' state but has no `// UNSTABLE: <ticket>` comment directly above it, e.g. `// UNSTABLE: TRADE-123`.
-tests/portfolio.spec.js:22:6 warn  test-governance/no-conflicting-states `@new` and `@unstable` are separate stages; a test should be in only one of them.
+tests/portfolio.spec.js:22:1 error test-governance/require-ticket This test is in the 'quarantined' state but has no `// QUARANTINED: <ticket>` comment directly above it, e.g. `// QUARANTINED: TRADE-123`.
+tests/portfolio.spec.js:22:6 warn  test-governance/no-conflicting-states `@new` and `@quarantined` are separate stages; a test should be in only one of them.
 tests/unit/pricing.spec.ts:10:3 error test-governance/require-ticket This test is in the 'skip' state but has no `// SKIP: <ticket>` comment directly above it, e.g. `// SKIP: TRADE-123`.
 tests/unit/pricing.spec.ts:16:3 error test-governance/require-ticket This test is in the 'todo' state but has no `// TODO: <ticket>` comment directly above it, e.g. `// TODO: TRADE-123`.

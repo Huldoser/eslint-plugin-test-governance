@@ -4,6 +4,7 @@ import { runRule, settings } from '../helpers.ts';
 const ANY = 'a ticket key like PROJ-123, an issue like #4821 or owner/repo#4821, or a URL';
 const lifecycle = settings({ lifecycleTags: true });
 const dynamic = settings({ lifecycleTags: true, reportUnreadableTags: true });
+const flaky = settings({ lifecycleTags: true, states: { quarantined: { tag: '@flaky', marker: 'FLAKY' } } });
 
 const missing = (state: string, marker: string, subject = 'This test', example = 'PROJ-123') => ({
   messageId: 'missingMarker' as const,
@@ -108,7 +109,7 @@ runRule('require-ticket', rule, {
     "test('shows prices', async () => { broker.info().skip(); });",
     // Tags are off unless lifecycleTags is set.
     "test('places an order @new', async () => {});",
-    "test('places an order', { tag: '@unstable' }, async () => {});",
+    "test('places an order', { tag: '@quarantined' }, async () => {});",
     { code: "// NEW: TRADE-1\ntest('places an order @new', async () => {});", settings: lifecycle },
     {
       code: "// NEW: TRADE-1\ntest('places an order', { tag: ['@new', '@smoke'] }, async () => {});",
@@ -118,6 +119,9 @@ runRule('require-ticket', rule, {
     { code: "// NEW: TRADE-1\ntest(`buys ${'AAPL'} @new`, async () => {});", settings: lifecycle },
     { code: "test('emails the fill report to desk@new.com', async () => {});", settings: lifecycle },
     { code: "test('places an order @newer', async () => {});", settings: lifecycle },
+    // A renamed tag takes the place of the default one.
+    { code: "// FLAKY: TRADE-1\ntest('places an order @flaky', async () => {});", settings: flaky },
+    { code: "test('places an order @quarantined', async () => {});", settings: flaky },
     { code: "test('places an order', { tag: [someTag, ...more] }, async () => {});", settings: lifecycle },
     { code: "test('places an order', { [key]: '@new', ...rest }, async () => {});", settings: lifecycle },
     // Tags kept in constants declared in this file count like tags written in the call.
@@ -165,7 +169,7 @@ runRule('require-ticket', rule, {
     "const quotes = [, 1];\ntest('shows prices', async () => { const [, ask] = quotes; });",
     { code: 'test(title, async () => {});', settings: lifecycle },
     {
-      code: "// UNSTABLE: TRADE-1\ntest.describe('market data @unstable', () => {\n  test('streams price updates @unstable', async () => {});\n  test('shows live prices', async () => {});\n});",
+      code: "// QUARANTINED: TRADE-1\ntest.describe('market data @quarantined', () => {\n  test('streams price updates @quarantined', async () => {});\n  test('shows live prices', async () => {});\n});",
       settings: lifecycle,
     },
     // Other test runners: `test` from these modules is not Playwright's.
@@ -677,9 +681,9 @@ runRule('require-ticket', rule, {
     // Tags, once lifecycleTags is on.
     { code: "test('places an order @new', async () => {});", settings: lifecycle, errors: [missing('new', 'NEW')] },
     {
-      code: "test('places an order', { tag: '@unstable' }, async () => {});",
+      code: "test('places an order', { tag: '@quarantined' }, async () => {});",
       settings: lifecycle,
-      errors: [missing('unstable', 'UNSTABLE')],
+      errors: [missing('quarantined', 'QUARANTINED')],
     },
     {
       code: "test('places an order', { tag: ['@smoke', '@new'] }, async () => {});",
@@ -687,22 +691,27 @@ runRule('require-ticket', rule, {
       errors: [missing('new', 'NEW')],
     },
     {
+      code: "// QUARANTINED: TRADE-1\ntest('places an order', { tag: '@flaky' }, async () => {});",
+      settings: flaky,
+      errors: [missing('quarantined', 'FLAKY')],
+    },
+    {
       code: 'test(`buys ${symbol} @new`, async () => {});',
       settings: lifecycle,
       errors: [missing('new', 'NEW')],
     },
     {
-      code: "test.describe('market data @unstable', () => { test('shows live prices', async () => {}); });",
+      code: "test.describe('market data @quarantined', () => { test('shows live prices', async () => {}); });",
       settings: lifecycle,
-      errors: [missing('unstable', 'UNSTABLE', 'This describe block')],
+      errors: [missing('quarantined', 'QUARANTINED', 'This describe block')],
     },
     {
-      code: "test.only('places an order @new', async () => {});\ntest.describe.only('market data @unstable', () => {});\ntest.describe.parallel('order entry @unstable', () => {});",
+      code: "test.only('places an order @new', async () => {});\ntest.describe.only('market data @quarantined', () => {});\ntest.describe.parallel('order entry @quarantined', () => {});",
       settings: lifecycle,
       errors: [
         missing('new', 'NEW'),
-        missing('unstable', 'UNSTABLE', 'This describe block'),
-        missing('unstable', 'UNSTABLE', 'This describe block'),
+        missing('quarantined', 'QUARANTINED', 'This describe block'),
+        missing('quarantined', 'QUARANTINED', 'This describe block'),
       ],
     },
     {
@@ -718,7 +727,7 @@ runRule('require-ticket', rule, {
     },
     // A broken marker on a describe is reported once, not once per test.
     {
-      code: "// UNSTABLE: TODO\ntest.describe('market data @unstable', () => {\n  test('shows live prices @unstable', async () => {});\n  test('streams price updates @unstable', async () => {});\n});",
+      code: "// QUARANTINED: TODO\ntest.describe('market data @quarantined', () => {\n  test('shows live prices @quarantined', async () => {});\n  test('streams price updates @quarantined', async () => {});\n});",
       settings: lifecycle,
       errors: [{ messageId: 'placeholderTicket', data: { ticket: 'TODO' } }],
     },
@@ -869,9 +878,9 @@ runRule('require-ticket', rule, {
       errors: [{ ...missing('new', 'NEW'), line: 2 }],
     },
     {
-      code: "const UNSTABLE = ['@unstable'];\nconst details = { tag: [...UNSTABLE] };\ntest.describe('market data', details, () => {});",
+      code: "const QUARANTINED = ['@quarantined'];\nconst details = { tag: [...QUARANTINED] };\ntest.describe('market data', details, () => {});",
       settings: lifecycle,
-      errors: [{ ...missing('unstable', 'UNSTABLE', 'This describe block'), line: 3 }],
+      errors: [{ ...missing('quarantined', 'QUARANTINED', 'This describe block'), line: 3 }],
     },
     {
       code: "import { orderDetails } from './details';\ntest('places an order', orderDetails, async () => {});",
@@ -900,7 +909,7 @@ runRule('require-ticket', rule, {
         "const SYMBOL = 'AAPL';",
         'const BOOK = { ...TAGS, depth: 10 };',
         'const DEPTH = { levels: 10 };',
-        'const MIXED = [TAGS.NEW, TAGS.UNSTABLE];',
+        'const MIXED = [TAGS.NEW, TAGS.QUARANTINED];',
         'const a = b;',
         'const b = a;',
         "for (const tag of ['@new']) {",

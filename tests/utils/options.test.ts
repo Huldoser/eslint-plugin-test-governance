@@ -22,15 +22,29 @@ describe('compileOptions', () => {
     assert.equal(resolved.reportUnreadableTags, false);
   });
 
-  it('turns on @new and @unstable with lifecycleTags', () => {
-    assert.deepEqual(stateNames({ lifecycleTags: true }), ['skip', 'fixme', 'new', 'unstable']);
+  it('turns on @new and @quarantined with lifecycleTags', () => {
+    assert.deepEqual(stateNames({ lifecycleTags: true }), ['skip', 'fixme', 'new', 'quarantined']);
     assert.deepEqual(stateNames({ lifecycleTags: false }), ['skip', 'fixme']);
   });
 
   it('lets states override lifecycleTags and defaults', () => {
     assert.deepEqual(
-      stateNames({ lifecycleTags: true, states: { unstable: false, fail: true, skip: { enabled: false } } }),
+      stateNames({ lifecycleTags: true, states: { quarantined: false, fail: true, skip: { enabled: false } } }),
       ['fixme', 'fail', 'new'],
+    );
+  });
+
+  it('renames the tag and marker of a tag state, and only those it is given', () => {
+    const resolved = compile({
+      lifecycleTags: true,
+      states: { new: { tag: '@candidate' }, quarantined: { tag: '@flaky', marker: 'FLAKY' } },
+    });
+    assert.deepEqual(
+      resolved.states.slice(-2).map(({ name, tag, marker }) => ({ name, tag, marker })),
+      [
+        { name: 'new', tag: '@candidate', marker: 'NEW' },
+        { name: 'quarantined', tag: '@flaky', marker: 'FLAKY' },
+      ],
     );
   });
 
@@ -99,6 +113,17 @@ describe('compileOptions', () => {
     [{ customStates: { x: { when: '@x', marker: 'SKIP' } } }, /two states use the marker "SKIP"/],
     [{ lifecycleTags: true, customStates: { x: { when: '@new', marker: 'X' } } }, /two states use the tag "@new"/],
     [
+      { lifecycleTags: true, states: { quarantined: { tag: '@new', marker: 'FLAKY' } } },
+      /two states use the tag "@new"/,
+    ],
+    [{ states: { quarantined: { tag: 'flaky' } } }, /states\.quarantined\.tag must be a tag such as @needs-data/],
+    // Only a state that a tag puts a test in has a tag to rename.
+    [
+      { states: { skip: { tag: '@skipped' } } },
+      /states\.skip\.tag is not a known option \(expected one of: enabled, marker, ticket\)/,
+    ],
+    [{ states: { unstable: true } }, /states\.unstable was renamed to "quarantined"/],
+    [
       { ticket: { preset: 'jira', projects: ['trade'] } },
       /ticket\.projects\[0\] must be an uppercase key as it appears in tickets, such as WEB for WEB-123 \(got "trade"\)/,
     ],
@@ -137,7 +162,7 @@ describe('framework', () => {
       assert.deepEqual(stateNames({ framework }), ['skip', 'todo']);
       assert.deepEqual(
         stateNames({ framework, lifecycleTags: true, states: { fixme: true, slow: true, fail: true } }),
-        ['skip', 'fail', 'todo', 'new', 'unstable'],
+        ['skip', 'fail', 'todo', 'new', 'quarantined'],
       );
       assert.deepEqual([...compile({ framework }).testFunctions], ['test', 'it']);
       assert.equal(compile({ framework }).framework.name, framework);

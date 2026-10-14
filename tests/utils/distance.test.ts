@@ -5,10 +5,10 @@ import { editDistance, typoThreshold } from '../../src/utils/distance.ts';
 describe('editDistance', () => {
   const cases: [string, string, number][] = [
     ['', '', 0],
-    ['unstable', 'unstable', 0],
-    ['unstabel', 'unstable', 1],
-    ['unstble', 'unstable', 1],
-    ['unstablee', 'unstable', 1],
+    ['quarantined', 'quarantined', 0],
+    ['quarantiend', 'quarantined', 1],
+    ['quarantned', 'quarantined', 1],
+    ['quarantinedd', 'quarantined', 1],
     ['quarantin', 'quarantine', 1],
     ['bid', '', 3],
     ['', 'bid', 3],

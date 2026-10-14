@@ -26,7 +26,7 @@ runRule('marker-matches-state', rule, {
     "// SKIP: TRADE-1\ntest.describe.skip('order entry', () => {\n  // SKIP: TRADE-1\n  test('places an order', async () => {});\n});",
     // A marker in the wrong case is require-ticket's job, not a shared marker.
     {
-      code: "// skip: TRADE-1\ntest.skip('places a stop order @unstable', async () => {});",
+      code: "// skip: TRADE-1\ntest.skip('places a stop order @quarantined', async () => {});",
       settings: lifecycle,
     },
   ],
@@ -94,12 +94,12 @@ runRule('marker-matches-state', rule, {
       ],
     },
     {
-      code: "// UNSTABLE: TRADE-1\ntest.describe.skip('risk limits @new', () => {});",
+      code: "// QUARANTINED: TRADE-1\ntest.describe.skip('risk limits @new', () => {});",
       settings: lifecycle,
       errors: [
         {
           messageId: 'wrongMarker',
-          data: { found: 'UNSTABLE', expected: 'SKIP', state: 'skip', subject: 'this describe block' },
+          data: { found: 'QUARANTINED', expected: 'SKIP', state: 'skip', subject: 'this describe block' },
           suggestions: [
             {
               messageId: 'renameMarker',
@@ -117,18 +117,24 @@ runRule('marker-matches-state', rule, {
     },
     // One marker for a test in two states.
     {
-      code: "// SKIP: TRADE-1, TRADE-2\ntest.skip('triggers a stop-loss @unstable', async () => {});",
+      code: "// SKIP: TRADE-1, TRADE-2\ntest.skip('triggers a stop-loss @quarantined', async () => {});",
       settings: lifecycle,
       errors: [
         {
           messageId: 'sharedMarker',
-          data: { found: 'SKIP', foundState: 'skip', expected: 'UNSTABLE', state: 'unstable', subject: 'This test' },
+          data: {
+            found: 'SKIP',
+            foundState: 'skip',
+            expected: 'QUARANTINED',
+            state: 'quarantined',
+            subject: 'This test',
+          },
           suggestions: [
             {
               messageId: 'addMarker',
-              data: { expected: 'UNSTABLE', tickets: 'TRADE-1, TRADE-2' },
+              data: { expected: 'QUARANTINED', tickets: 'TRADE-1, TRADE-2' },
               output:
-                "// SKIP: TRADE-1, TRADE-2\n// UNSTABLE: TRADE-1, TRADE-2\ntest.skip('triggers a stop-loss @unstable', async () => {});",
+                "// SKIP: TRADE-1, TRADE-2\n// QUARANTINED: TRADE-1, TRADE-2\ntest.skip('triggers a stop-loss @quarantined', async () => {});",
             },
           ],
         },
@@ -152,18 +158,18 @@ runRule('marker-matches-state', rule, {
     },
     // The added marker keeps the indentation of the one above it.
     {
-      code: "test.describe('risk limits', () => {\n  // SKIP: TRADE-1\n  test.skip('rejects an order over the position limit @unstable', async () => {});\n});",
+      code: "test.describe('risk limits', () => {\n  // SKIP: TRADE-1\n  test.skip('rejects an order over the position limit @quarantined', async () => {});\n});",
       settings: lifecycle,
       errors: [
         {
           message:
-            "`SKIP:` covers only the 'skip' state. This test is also in the 'unstable' state, which needs its own `// UNSTABLE: <ticket>` marker.",
+            "`SKIP:` covers only the 'skip' state. This test is also in the 'quarantined' state, which needs its own `// QUARANTINED: <ticket>` marker.",
           line: 2,
           suggestions: [
             {
               messageId: 'addMarker',
               output:
-                "test.describe('risk limits', () => {\n  // SKIP: TRADE-1\n  // UNSTABLE: TRADE-1\n  test.skip('rejects an order over the position limit @unstable', async () => {});\n});",
+                "test.describe('risk limits', () => {\n  // SKIP: TRADE-1\n  // QUARANTINED: TRADE-1\n  test.skip('rejects an order over the position limit @quarantined', async () => {});\n});",
             },
           ],
         },
@@ -171,18 +177,18 @@ runRule('marker-matches-state', rule, {
     },
     // Only the wrong marker is reported; renaming it fixes the test.
     {
-      code: "// SKIP: TRADE-1\n// NEW: TRADE-2\ntest.skip('triggers a stop-loss when the price drops @unstable', async () => {});",
+      code: "// SKIP: TRADE-1\n// NEW: TRADE-2\ntest.skip('triggers a stop-loss when the price drops @quarantined', async () => {});",
       settings: lifecycle,
       errors: [
         {
           messageId: 'wrongMarker',
-          data: { found: 'NEW', expected: 'UNSTABLE', state: 'unstable', subject: 'this test' },
+          data: { found: 'NEW', expected: 'QUARANTINED', state: 'quarantined', subject: 'this test' },
           line: 2,
           suggestions: [
             {
               messageId: 'renameMarker',
               output:
-                "// SKIP: TRADE-1\n// UNSTABLE: TRADE-2\ntest.skip('triggers a stop-loss when the price drops @unstable', async () => {});",
+                "// SKIP: TRADE-1\n// QUARANTINED: TRADE-2\ntest.skip('triggers a stop-loss when the price drops @quarantined', async () => {});",
             },
           ],
         },

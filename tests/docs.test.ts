@@ -287,6 +287,7 @@ describe('docs/upgrading.md', () => {
   it('shows the errors an old config really gives', () => {
     const samples = [...read('docs/upgrading.md').matchAll(/```text\n([\s\S]*?)```/g)].map((m) => m[1].trimEnd());
     assert.deepEqual(samples, [
+      thrown(() => testGovernance.configure({ framework: 'playwright', states: { unstable: true } } as never)),
       thrown(() => (testGovernance.configs as Record<string, unknown>).recommended),
       thrown(() => testGovernance.configure({ ticket: { preset: 'jira' } } as never)),
       thrown(() => testGovernance.configure({ framework: 'playwright', reportDynamicTitles: true } as never)),

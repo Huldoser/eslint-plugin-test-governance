@@ -3,13 +3,14 @@ import { runRule, settings } from '../helpers.ts';
 
 const lifecycle = settings({ lifecycleTags: true });
 const custom = settings({ customStates: { quarantine: { when: '@quarantine', marker: 'QUARANTINE' } } });
+const flaky = settings({ lifecycleTags: true, states: { quarantined: { tag: '@flaky', marker: 'FLAKY' } } });
 
 runRule('no-conflicting-states', rule, {
   valid: [
-    "test('places an order @New @unstabel', async () => {});",
+    "test('places an order @New @quarantiend', async () => {});",
     { code: "test('places a limit order @new', async () => {});", settings: lifecycle },
-    { code: "test('shows live prices @unstable @smoke @news @neww', async () => {});", settings: lifecycle },
-    { code: "test.skip('cancels an open order @unstable', async () => {});", settings: lifecycle },
+    { code: "test('shows live prices @quarantined @smoke @news @neww', async () => {});", settings: lifecycle },
+    { code: "test.skip('cancels an open order @quarantined', async () => {});", settings: lifecycle },
     {
       code: "test('shows the order book', async ({ browserName }) => { test.skip(browserName === 'webkit'); });",
       settings: lifecycle,
@@ -25,14 +26,14 @@ runRule('no-conflicting-states', rule, {
     },
     { code: "test('streams price updates @quarantine', async () => {});", settings: custom },
     // Real words two or more letters away in length are not typos.
-    { code: "test('fills a partial order @stable @untestable', async () => {});", settings: lifecycle },
-    // Only @unstable is on: no @new checks.
+    { code: "test('fills a partial order @unquarantined @requarantined', async () => {});", settings: lifecycle },
+    // Only @quarantined is on: no @new checks.
     {
-      code: "test.skip('amends the order price @new @unstable', async () => {});",
-      settings: settings({ states: { unstable: true } }),
+      code: "test.skip('amends the order price @new @quarantined', async () => {});",
+      settings: settings({ states: { quarantined: true } }),
     },
     {
-      code: "test('rebalances the portfolio @new @unstable', async () => {});",
+      code: "test('rebalances the portfolio @new @quarantined', async () => {});",
       settings: settings({ states: { new: true } }),
     },
     // A skipped step doesn't skip its test, so a new test with one still runs.
@@ -53,25 +54,36 @@ runRule('no-conflicting-states', rule, {
       errors: [{ messageId: 'tagCase', data: { found: '@New', expected: '@new' }, line: 2, column: 32, endColumn: 40 }],
     },
     {
-      code: "test('places a market order @new @unstable', async () => {});",
+      code: "test('places a market order @new @quarantined', async () => {});",
       settings: lifecycle,
-      errors: [{ messageId: 'newAndUnstable', data: { new: '@new', unstable: '@unstable' } }],
+      errors: [{ messageId: 'newAndQuarantined', data: { new: '@new', quarantined: '@quarantined' } }],
     },
     {
-      code: "test.describe('risk limits @unstable', () => {\n  test('stops trading at the daily loss limit', { tag: '@new' }, async () => {});\n  test('caps position size at 2% of equity', async () => {});\n});",
+      code: "test.describe('risk limits @quarantined', () => {\n  test('stops trading at the daily loss limit', { tag: '@new' }, async () => {});\n  test('caps position size at 2% of equity', async () => {});\n});",
       settings: lifecycle,
-      errors: [{ messageId: 'newAndUnstable', line: 2 }],
+      errors: [{ messageId: 'newAndQuarantined', line: 2 }],
     },
     // Both tags inherited: reported once, on the describe where they first meet.
     {
-      code: "test.describe('order entry @new', () => {\n  test.describe('limit orders @unstable', () => {\n    test.describe('amendments', () => { test('amends an order', async () => {}); });\n  });\n});",
+      code: "test.describe('order entry @new', () => {\n  test.describe('limit orders @quarantined', () => {\n    test.describe('amendments', () => { test('amends an order', async () => {}); });\n  });\n});",
       settings: lifecycle,
-      errors: [{ messageId: 'newAndUnstable', line: 2 }],
+      errors: [{ messageId: 'newAndQuarantined', line: 2 }],
     },
     {
-      code: "test.describe('market data @new', () => { test('streams price updates @unstable', async () => {}); });",
+      code: "test.describe('market data @new', () => { test('streams price updates @quarantined', async () => {}); });",
       settings: lifecycle,
-      errors: [{ messageId: 'newAndUnstable' }],
+      errors: [{ messageId: 'newAndQuarantined' }],
+    },
+    // A renamed tag gets the same checks.
+    {
+      code: "test('places a market order @new @flaky', async () => {});",
+      settings: flaky,
+      errors: [{ messageId: 'newAndQuarantined', data: { new: '@new', quarantined: '@flaky' } }],
+    },
+    {
+      code: "test('places a market order @flakey', async () => {});",
+      settings: flaky,
+      errors: [{ messageId: 'tagTypo', data: { found: '@flakey', expected: '@flaky' } }],
     },
     {
       code: "test.skip('exports the trade history @new', async () => {});",
@@ -120,10 +132,10 @@ runRule('no-conflicting-states', rule, {
       errors: [{ messageId: 'tagCase', data: { found: '@New', expected: '@new' } }],
     },
     {
-      code: "test('shows live prices', { tag: ['@smoke', '@UNSTABLE'] }, async () => {});",
+      code: "test('shows live prices', { tag: ['@smoke', '@QUARANTINED'] }, async () => {});",
       settings: lifecycle,
-      output: "test('shows live prices', { tag: ['@smoke', '@unstable'] }, async () => {});",
-      errors: [{ messageId: 'tagCase', data: { found: '@UNSTABLE', expected: '@unstable' } }],
+      output: "test('shows live prices', { tag: ['@smoke', '@quarantined'] }, async () => {});",
+      errors: [{ messageId: 'tagCase', data: { found: '@QUARANTINED', expected: '@quarantined' } }],
     },
     {
       code: "test('shows quotes @Quarantine and fills @Quarantine', async () => {});",
@@ -167,9 +179,15 @@ runRule('no-conflicting-states', rule, {
       errors: [{ messageId: 'tagCase' }],
     },
     {
-      code: "test('amends the order price @unstabel', async () => {});",
+      code: "test('amends the order price @quarantiend', async () => {});",
       settings: lifecycle,
-      errors: [{ messageId: 'tagTypo', data: { found: '@unstabel', expected: '@unstable' } }],
+      errors: [{ messageId: 'tagTypo', data: { found: '@quarantiend', expected: '@quarantined' } }],
+    },
+    // A team that says `@quarantine` hears about it, and can rename the tag to keep it.
+    {
+      code: "test('amends the order price @quarantine', async () => {});",
+      settings: lifecycle,
+      errors: [{ messageId: 'tagTypo', data: { found: '@quarantine', expected: '@quarantined' } }],
     },
     {
       code: 'test(`buys ${symbol} @quarantin`, async () => {});',
@@ -177,9 +195,9 @@ runRule('no-conflicting-states', rule, {
       errors: [{ messageId: 'tagTypo', data: { found: '@quarantin', expected: '@quarantine' } }],
     },
     {
-      code: "test('stops trading at the daily loss limit', { tag: ['@unstble', '@stable'] }, async () => {});",
+      code: "test('stops trading at the daily loss limit', { tag: ['@quarantned', '@unquarantined'] }, async () => {});",
       settings: lifecycle,
-      errors: [{ messageId: 'tagTypo', data: { found: '@unstble', expected: '@unstable' } }],
+      errors: [{ messageId: 'tagTypo', data: { found: '@quarantned', expected: '@quarantined' } }],
     },
     {
       code: "test('caps position size at 2% of equity @qurantiine', async () => {});",
