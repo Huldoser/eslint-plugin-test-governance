@@ -138,6 +138,16 @@ for (const file of ruleDocs) {
       assert.ok(found.some((example) => example.kind === 'invalid'));
     });
 
+    it("is the page the rule links to, titled with the rule's description", () => {
+      const { meta } = testGovernance.rules[rule as keyof typeof testGovernance.rules];
+      assert.equal(
+        meta?.docs?.url,
+        `https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/rules/${rule}.md`,
+      );
+      assert.ok(read(file).startsWith(`# ${meta.docs.description} (\`test-governance/${rule}\`)\n`));
+      assert.ok(meta.type === 'problem' || meta.type === 'suggestion');
+    });
+
     found.forEach((example, i) => {
       it(`example ${i + 1} is ${example.kind}`, () => {
         checkExample(example, { [`test-governance/${rule}`]: 'error' });

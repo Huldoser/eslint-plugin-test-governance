@@ -124,6 +124,8 @@ runRule('require-ticket', rule, {
     { code: "test('places an order @quarantined', async () => {});", settings: flaky },
     { code: "test('places an order', { tag: [someTag, ...more] }, async () => {});", settings: lifecycle },
     { code: "test('places an order', { [key]: '@new', ...rest }, async () => {});", settings: lifecycle },
+    // Playwright tags start with `@`, so a bare name isn't one.
+    { code: "test('places an order', { tag: ['new', 'quarantined'] }, async () => {});", settings: lifecycle },
     // Tags kept in constants declared in this file count like tags written in the call.
     {
       code: "const tag = '@new';\n// NEW: TRADE-1\ntest('places an order', { tag }, async () => {});",
@@ -721,6 +723,11 @@ runRule('require-ticket', rule, {
     },
     {
       code: "test('places an order', { 'tag': '@new' }, async () => {});",
+      settings: lifecycle,
+      errors: [missing('new', 'NEW')],
+    },
+    {
+      code: "const TAGS = { NEW: '@new', SMOKE: '@smoke' };\ntest('places an order', { tag: TAGS.NEW }, async () => {});",
       settings: lifecycle,
       errors: [missing('new', 'NEW')],
     },

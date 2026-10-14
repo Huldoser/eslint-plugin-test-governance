@@ -120,9 +120,33 @@ runRule('require-ticket (Jest)', requireTicket, {
       settings: settings({ lifecycleTags: true }),
       errors: [missing('new', 'NEW')],
     },
+    // `only`, `fit` and `fdescribe` change no state, but the tags in their titles do.
+    {
+      code: "test.only('fills a limit order @new', () => {});\nfit('fills a market order @new', () => {});\nfdescribe('order book @quarantined', () => {});\ndescribe.only('order entry @quarantined', () => {});",
+      settings: settings({ lifecycleTags: true }),
+      errors: [
+        missing('new', 'NEW'),
+        missing('new', 'NEW'),
+        missing('quarantined', 'QUARANTINED', 'This describe block'),
+        missing('quarantined', 'QUARANTINED', 'This describe block'),
+      ],
+    },
     {
       code: "import { xit } from '@jest/globals';\nxit('fills a limit order', () => {});",
       errors: [missing('skip', 'SKIP')],
+    },
+    {
+      code: "import { test as check, it as spec, describe as group } from '@jest/globals';\ncheck.skip('fills a limit order', () => {});\nspec.skip('fills a market order', () => {});\ngroup.skip('order book', () => {});",
+      errors: [missing('skip', 'SKIP'), missing('skip', 'SKIP'), missing('skip', 'SKIP', 'This describe block')],
+    },
+    // `testFunctions` replaces `test` and `it`; Jest's other globals stay.
+    {
+      code: "it.skip('fills a limit order', () => {});\ntest.skip('fills a stop order', () => {});\ncheck.skip('fills a market order', () => {});\nxit('cancels an order', () => {});",
+      settings: settings({ testFunctions: ['check'] }),
+      errors: [
+        { ...missing('skip', 'SKIP'), line: 3 },
+        { ...missing('skip', 'SKIP'), line: 4 },
+      ],
     },
     {
       code: "import * as j from '@jest/globals';\nj.describe.skip('order book', () => {});",
