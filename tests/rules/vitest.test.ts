@@ -36,6 +36,8 @@ runRule('require-ticket (Vitest)', requireTicket, {
     "test.skipIf(isMobile).each([1, 2])('buys %i shares', (shares) => {});",
     "test.skipIf(isMobile).concurrent('streams quotes', async () => {});",
     "test.skipIf('CI')('fills a limit order', () => {});",
+    // A function a condition picks skips only sometimes, even when one side skips by a condition of its own.
+    "(process.env.CI ? it.skipIf(isMobile) : it.skip)('fills a limit order', () => {});",
     // A literal condition decides: `skipIf(true)` and `runIf(false)` always skip, so they take a marker.
     "// SKIP: TRADE-1\ntest.skipIf(true)('fills a limit order', () => {});",
     "// SKIP: TRADE-1\ndescribe.runIf(false)('order book', () => {});",
@@ -106,6 +108,11 @@ runRule('require-ticket (Vitest)', requireTicket, {
     "import vitestDefault from 'vitest';\nvitestDefault.skip('fills a limit order', () => {});",
   ]),
   invalid: withOptions(vitest, [
+    // The options object skips the test whichever function the condition picks.
+    {
+      code: "(process.env.CI ? it : it.concurrent)('fills a limit order', { skip: true }, () => {});",
+      errors: [missing('skip', 'SKIP')],
+    },
     { code: "test.skip('fills a limit order', () => {});", errors: [missing('skip', 'SKIP')] },
     { code: "it.skip('fills a limit order', () => {});", errors: [missing('skip', 'SKIP')] },
     { code: "suite.skip('order book', () => {});", errors: [missing('skip', 'SKIP', 'This describe block')] },
