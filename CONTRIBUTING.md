@@ -32,6 +32,9 @@ CI also checks the packed type declarations with [are the types wrong](https://g
 and the workflows with [actionlint](https://github.com/rhysd/actionlint) and [zizmor](https://github.com/zizmorcore/zizmor).
 It runs again every Monday, so a new ESLint, TypeScript or Node release that breaks the plugin shows up on its own.
 
+The tests include a speed check, `tests/speed.test.ts`. It lints a generated 20,000-line spec and fails
+when the rules take too long or their time grows faster than the spec does.
+
 A pull request that changes `src/` also needs a `CHANGELOG.md` entry (see below).
 
 Code is formatted with Prettier and linted with typescript-eslint's strict type-checked rules. Editors that
