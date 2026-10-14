@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-14
+
 ### Fixed
 
 - In Playwright, `test.slow('title', body)` is no longer read as a slow test declared with a title.
@@ -292,7 +294,8 @@ First release.
 - Support for ESLint 9 and 10 flat config, JavaScript and TypeScript test files, `.extend()`
   fixtures, describe blocks, runtime skips and tags in titles or the `tag` option.
 
-[Unreleased]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.4.0...v0.5.0
