@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-14
+
 This release renames the `unstable` state to `quarantined`.
 [Upgrading to 0.6](https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/upgrading.md#upgrading-to-06)
 shows what to change.
@@ -283,7 +285,8 @@ First release.
 - Support for ESLint 9 and 10 flat config, JavaScript and TypeScript test files, `.extend()`
   fixtures, describe blocks, runtime skips and tags in titles or the `tag` option.
 
-[Unreleased]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.3.1...v0.4.0
