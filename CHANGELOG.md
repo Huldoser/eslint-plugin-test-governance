@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-20
+
 ### Added
 
 - Mocha, Cypress and WebdriverIO support. `configs.mocha`, `configs.cypress` and `configs.webdriverio`,
@@ -327,7 +329,8 @@ First release.
 - Support for ESLint 9 and 10 flat config, JavaScript and TypeScript test files, `.extend()`
   fixtures, describe blocks, runtime skips and tags in titles or the `tag` option.
 
-[Unreleased]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.5.1...v0.6.0
