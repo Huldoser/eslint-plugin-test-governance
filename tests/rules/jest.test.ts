@@ -279,6 +279,8 @@ runRule('require-ticket-in-comments (Jest)', requireTicketInComments, {
   valid: withOptions(jest, [
     // A TODO marker above a todo test belongs to require-ticket.
     "// TODO: TRADE-1\ntest.todo('fills a partial order');",
+    // So does one in the wrong case, which require-ticket reports as `markerCase`.
+    "// todo: fills need a quote feed\ntest.todo('fills a partial order');",
     // Files without Jest tests are not checked.
     'export function fillOrder() {\n  // TODO: later\n}',
   ]),

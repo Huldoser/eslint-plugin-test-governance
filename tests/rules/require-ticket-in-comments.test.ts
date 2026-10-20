@@ -29,6 +29,8 @@ runRule('require-ticket-in-comments', rule, {
     `// TODO-list: anything${TEST}`,
     // A marker directly above a test in that state belongs to require-ticket.
     "// FIXME: flaky\ntest.fixme('cancels an order', async () => {});",
+    // So does one in the wrong case, which require-ticket reports as `markerCase`.
+    "// fixme: flaky\ntest.fixme('cancels an order', async () => {});",
     // Files that don't use Playwright are not checked.
     '// TODO: refactor this\nconst x = 1;',
     // Opting out.

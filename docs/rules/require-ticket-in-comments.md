@@ -32,7 +32,8 @@ How comments are read:
   rejected, and no text after the tickets unless `allowNotes` is set.
 - A `// FIXME:` marker directly above a `test.fixme(...)`, or a `// TODO:` marker above a todo test,
   such as Jest's `test.todo(...)` or Mocha's `it('title')`, is checked by [`require-ticket`](require-ticket.md) instead, so it is
-  reported once.
+  reported once. That includes one in the wrong case, `// fixme:` or `// Todo:`, which `require-ticket` asks to write in
+  uppercase.
 - Only test files (a test framework import or a call to a test function) are checked.
   Application code is left alone, even if your config applies the plugin to it.
 
