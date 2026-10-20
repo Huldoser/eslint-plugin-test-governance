@@ -616,10 +616,18 @@ function collectTags(
   return { tags, dynamic: title.unread.size > 0, unread, opaqueDetails: details.unread !== undefined };
 }
 
+/** Whether a title is text, written out or held in a constant declared in this file. */
+function isTextTitle(sourceCode: SourceCode, node: Node): boolean {
+  const title = unwrap(node);
+  const value = constantValue(sourceCode, title);
+  return isStaticText(title) || (value !== undefined && isStaticText(unwrap(value)));
+}
+
 /**
  * Whether a call declares a test or describe block: a title and a body, as in `test('title', fn)`,
  * `test('title', details, fn)` or `test.skip(title, payWithCard)` with the body defined elsewhere, a
- * describe with only a body, or a `todo` with only a title, and in Vitest a `skip` with only a title.
+ * describe with only a body, or a `todo` with only a title, in Vitest and Mocha a `skip` with only a
+ * title, and in Mocha a test with only a title written out, which it runs as pending.
  * Only Playwright has a runtime `test.skip(isMobile, 'why')`; there a title, written out or held in a
  * constant, or a body written in place tells the two apart.
  */
@@ -633,11 +641,21 @@ function isDeclaration(
   const first = args.at(0);
   if (isFunction(first)) return kind === 'describe';
   if (first === undefined) return false;
-  if (args.length === 1) return members.includes('todo') || (framework.skipWithoutBody && members.includes('skip'));
+  if (args.length === 1) {
+    if (members.includes('todo') || (framework.skipWithoutBody && members.includes('skip'))) return true;
+    return framework.todoWithoutBody && kind === 'test' && isTextTitle(sourceCode, first);
+  }
   if (!framework.playwright) return true;
-  const title = unwrap(first);
-  const value = constantValue(sourceCode, title);
-  return isStaticText(title) || (value !== undefined && isStaticText(unwrap(value))) || args.slice(1).some(isFunction);
+  return isTextTitle(sourceCode, first) || args.slice(1).some(isFunction);
+}
+
+/** The function whose `this` a call sees: the nearest one around it that isn't an arrow function. */
+function thisFunction(node: Node): Node | undefined {
+  let current = node.parent;
+  while (current && (current.type === 'ArrowFunctionExpression' || !FUNCTIONS.has(current.type))) {
+    current = current.parent;
+  }
+  return current;
 }
 
 /** The value of a `true` or `false` literal; undefined for anything else. */
@@ -752,6 +770,8 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   const keys = sourceCode.visitorKeys as Record<string, readonly string[] | undefined>;
   /** States an options object can put a test in, such as `skip` for Vitest's `{ skip: true }`. */
   const optionModifiers = new Set<string>(framework.optionEffects.values());
+  /** Bodies of Mocha tests and hooks written as a `function`, where `this.skip()` skips at runtime. */
+  const thisBodies = new Set<Node>();
 
   /**
    * `modifiers` maps each state modifier the call has to whether it always applies; a conditional one,
@@ -853,6 +873,27 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     return modifiers;
   };
 
+  /**
+   * The modifiers of a declaration, with `todo` for a Mocha test that has only a title, which Mocha runs as
+   * pending: someone has yet to write it. A skipped one, as `it.skip('title')`, stays a skip.
+   */
+  const declarationModifiers = (
+    kind: Root['kind'],
+    args: TSESTree.CallExpressionArgument[],
+    modifiers: Map<string, boolean>,
+  ): Map<string, boolean> => {
+    if (framework.todoWithoutBody && kind === 'test' && args.length === 1 && !modifiers.has('skip')) {
+      modifiers.set('todo', true);
+    }
+    return modifiers;
+  };
+
+  /** Keeps the body of a Mocha test or hook written as a `function`, whose `this` can skip it. */
+  const addThisBody = (args: TSESTree.CallExpressionArgument[]): void => {
+    const body = args.findLast(isFunction);
+    if (framework.thisSkip && body?.type === 'FunctionExpression') thisBodies.add(body);
+  };
+
   /** What a body can change the test's state with: Playwright's `testInfo` or Vitest's test context. */
   const bodyInfos = (args: TSESTree.CallExpressionArgument[], path: string[]): InfoName[] => {
     const body = args.findLast(isFunction);
@@ -898,8 +939,9 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const details = detailsOf(sourceCode, call);
     const tagInfo = collectTags(sourceCode, call, !isFunction(args[0]), framework, details);
     const [ifYes, ifNo] = [yes, no].map(({ members, args: conditions }) =>
-      modifiersOf(members, details.entries, conditions),
+      declarationModifiers(yes.kind, args, modifiersOf(members, details.entries, conditions)),
     );
+    if (yes.kind === 'test') addThisBody(args);
     const modifiers = new Map<string, boolean>();
     for (const modifier of new Set([...ifYes.keys(), ...ifNo.keys()])) {
       modifiers.set(modifier, ifYes.get(modifier) === true && ifNo.get(modifier) === true);
@@ -914,8 +956,12 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const args = call.arguments;
     const { path } = callee;
     const declaration = declarationOf(callee);
-    // Vitest's `beforeEach((context) => context.skip())` skips the tests it runs before.
-    if (declaration === undefined) return { infos: bodyInfos(args, path) };
+    // Vitest's `beforeEach((context) => context.skip())` and Mocha's `before(function () { this.skip(); })`
+    // skip the tests they run for.
+    if (declaration === undefined) {
+      addThisBody(args);
+      return { infos: bodyInfos(args, path) };
+    }
 
     if (framework.playwright) {
       // `test.step('fills the order', async (step) => {...})` or `test.step.skip(...)`. The step's body
@@ -934,10 +980,9 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       // A declaration always has a first argument: its title, or the body of a describe without one.
       const details = detailsOf(sourceCode, call);
       const tagInfo = collectTags(sourceCode, call, !isFunction(args[0]), framework, details);
-      return {
-        subject: makeSubject(kind, call, modifiersOf(members, details.entries, callee.args), tagInfo),
-        infos: bodyInfo,
-      };
+      const modifiers = declarationModifiers(kind, args, modifiersOf(members, details.entries, callee.args));
+      if (kind === 'test') addThisBody(args);
+      return { subject: makeSubject(kind, call, modifiers, tagInfo), infos: bodyInfo };
     }
     // test.skip(), test.fixme(), test.fail() and test.slow() in a test, a describe or a hook.
     if (framework.playwright && members.length === 1 && RUNTIME_MODIFIERS.has(members[0])) {
@@ -946,7 +991,10 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     return { infos: bodyInfo };
   };
 
-  /** `testInfo.skip()`, `step.skip()`, `test.info().skip()`, and Vitest's `context.skip()` or `skip()`. */
+  /**
+   * `testInfo.skip()`, `step.skip()`, `test.info().skip()`, Vitest's `context.skip()` or `skip()`, and
+   * Mocha's `this.skip()`.
+   */
   const runtimeCall = (call: TSESTree.CallExpression): Subject | undefined => {
     const { callee } = call;
     // The innermost parameter with a name is the one the call uses.
@@ -959,6 +1007,11 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const name = memberName(callee);
     if (name === undefined || !RUNTIME_MODIFIERS.has(name)) return undefined;
     const { object } = callee;
+    // Mocha's `this.skip()`, in a test or hook whose `function` gives it the test's `this`.
+    if (object.type === 'ThisExpression') {
+      const owner = name === 'skip' ? thisFunction(call) : undefined;
+      return owner !== undefined && thisBodies.has(owner) ? runtimeSubject(call, name) : undefined;
+    }
     if (object.type === 'Identifier') {
       const info = innermost(object.name);
       return info?.methods?.has(name) ? runtimeSubject(call, name, info.step) : undefined;

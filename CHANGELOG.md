@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Mocha, Cypress and WebdriverIO support. `configs.mocha`, `configs.cypress` and `configs.webdriverio`,
+  or `configure({ framework })`, check those frameworks' tests with the same rules and markers:
+  `it.skip`, `describe.skip`, `context.skip`, `xit`, `xdescribe` and the other `x` forms, the TDD
+  interface's `suite.skip` and `test.skip`, with globals or imports from `mocha`, and `this.skip()` in a
+  test or hook written as a `function`. Under a condition, as in `if (!broker) this.skip()`, it is a
+  conditional skip, so it needs no ticket by default. Cypress and WebdriverIO run their tests on Mocha,
+  so their configs read the same calls; `webdriverio` is for WebdriverIO's Mocha framework.
+- A Mocha test with only a title, `it('settles at T+1')`, which Mocha runs as pending, is in the `todo`
+  state and needs a `// TODO:` marker, like Jest's `test.todo`. `it.skip('title')` with no body is a
+  skip.
+- In Cypress files, tags from @cypress/grep's `{ tags: '@smoke' }` count like tags in the title, and
+  `{ browser: '!webkit' }`, which runs the test only in some browsers, is a conditional skip.
+
 ## [0.6.2] - 2026-10-14
 
 ### Fixed

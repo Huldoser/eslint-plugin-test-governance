@@ -2,7 +2,7 @@
 
 📝 Disallow marker comments that no longer match a test state.
 
-💼 This rule is enabled in the following [configs](https://github.com/Huldoser/eslint-plugin-test-governance#usage): 🃏 `jest`, 🎭 `playwright`, ⚡ `vitest`.
+💼 This rule is enabled in the following [configs](https://github.com/Huldoser/eslint-plugin-test-governance#usage): 🌲 `cypress`, 🃏 `jest`, ☕ `mocha`, 🎭 `playwright`, ⚡ `vitest`, 🤖 `webdriverio`.
 
 💡 This rule is manually fixable by [editor suggestions](https://eslint.org/docs/latest/use/core-concepts#rule-suggestions).
 
@@ -26,9 +26,9 @@ A `FIXME:` or `TODO:` comment that starts with a valid ticket is treated by wher
   leftover marker and is reported, since `// FIXME: TRADE-12` above a test usually means the test was
   fixed and the marker forgotten. Move a work comment into the test body, or onto the line of code it
   is about.
-- Above a Jest or Vitest test that is not a todo, a `TODO:` comment is a tracked work comment about
+- Above a test that is not a todo, in every framework but Playwright, a `TODO:` comment is a tracked work comment about
   the test and is allowed. `TODO` is the everyday keyword for such comments, so there it is far more
-  often a note than the forgotten marker of a `test.todo`.
+  often a note than the forgotten marker of a todo test.
 
 Other markers that read as a sentence, such as `// SKIP: this one is flaky`, are left alone too: the rule
 counts a comment as prose when its first word is not a valid ticket and more text follows.

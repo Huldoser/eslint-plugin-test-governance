@@ -10,7 +10,7 @@ export const TAG_STATE_NAMES = ['new', 'quarantined'] as const satisfies readonl
 export type TagStateName = (typeof TAG_STATE_NAMES)[number];
 
 /** The test frameworks the rules understand. */
-export const FRAMEWORK_NAMES = ['playwright', 'jest', 'vitest'] as const;
+export const FRAMEWORK_NAMES = ['playwright', 'jest', 'vitest', 'mocha', 'cypress', 'webdriverio'] as const;
 export type FrameworkName = (typeof FRAMEWORK_NAMES)[number];
 
 export const TICKET_PRESETS = [

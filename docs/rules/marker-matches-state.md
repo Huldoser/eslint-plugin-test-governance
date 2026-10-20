@@ -2,7 +2,7 @@
 
 📝 Require the marker keyword to match the test's state.
 
-💼 This rule is enabled in the following [configs](https://github.com/Huldoser/eslint-plugin-test-governance#usage): 🃏 `jest`, 🎭 `playwright`, ⚡ `vitest`.
+💼 This rule is enabled in the following [configs](https://github.com/Huldoser/eslint-plugin-test-governance#usage): 🌲 `cypress`, 🃏 `jest`, ☕ `mocha`, 🎭 `playwright`, ⚡ `vitest`, 🤖 `webdriverio`.
 
 💡 This rule is manually fixable by [editor suggestions](https://eslint.org/docs/latest/use/core-concepts#rule-suggestions).
 

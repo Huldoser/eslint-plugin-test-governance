@@ -432,12 +432,13 @@ describe('option defaults', () => {
     const listed = codeSpans(optionRows.get('states')?.[defaultColumn] ?? '').sort();
     assert.deepEqual(listed, [...new Set(FRAMEWORK_NAMES.flatMap(statesOn))].sort());
 
-    const [playwright, jestAndVitest] = (defaultsRows.get('States that need a ticket') ?? '').split(
-      '; in Jest and Vitest',
+    const [playwright, others] = (defaultsRows.get('States that need a ticket') ?? '').split(
+      '; in the other frameworks',
     );
     assert.deepEqual(codeSpans(playwright).sort(), statesOn('playwright'));
-    assert.deepEqual(codeSpans(jestAndVitest).sort(), statesOn('jest'));
-    assert.deepEqual(codeSpans(jestAndVitest).sort(), statesOn('vitest'));
+    for (const framework of FRAMEWORK_NAMES.filter((name) => name !== 'playwright')) {
+      assert.deepEqual(codeSpans(others).sort(), statesOn(framework), framework);
+    }
   });
 
   it('lists the rules that only warn', () => {

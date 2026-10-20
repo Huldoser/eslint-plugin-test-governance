@@ -51,8 +51,8 @@ export interface FlatConfig {
 }
 
 /**
- * One config per framework. `playwright`, `jest` and `vitest` turn on the same rules for that framework's
- * tests; point each one at its test files with `files`.
+ * One config per framework. Each turns on the same rules for that framework's tests; point each one at its
+ * test files with `files`.
  */
 export type ConfigName = FrameworkName;
 
@@ -95,7 +95,7 @@ for (const framework of FRAMEWORK_NAMES) {
 Object.defineProperty(plugin.configs, 'recommended', {
   get(): never {
     throw new ConfigError(
-      'configs.recommended was removed in 0.5.0. Use the config for your framework: configs.playwright, configs.jest or configs.vitest. See https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/upgrading.md',
+      'configs.recommended was removed in 0.5.0. Use the config for your framework: configs.playwright, configs.jest, configs.vitest, configs.mocha, configs.cypress or configs.webdriverio. See https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/upgrading.md',
     );
   },
 });
