@@ -193,6 +193,20 @@ it.todo('caps position size at 2% of equity');
 test.skipIf(true)('fills a stop order when the market opens', () => {});
 ```
 
+<!-- example: invalid settings={"framework":"mocha"} -->
+
+```js
+it('settles a trade at T+1', function () {
+  this.skip();
+});
+```
+
+<!-- example: invalid settings={"framework":"cypress","lifecycleTags":true} -->
+
+```js
+it('places a stop order', { tags: '@quarantined' }, () => {});
+```
+
 Correct:
 
 <!-- example: valid -->
@@ -244,6 +258,19 @@ describe('risk limits', () => {
   test.todo('caps position size at 2% of equity');
 
   test.skipIf(process.env.CI)('streams live quotes', () => {});
+});
+```
+
+<!-- example: valid settings={"framework":"mocha"} -->
+
+```js
+describe('settlement', function () {
+  // TODO: TRADE-91
+  it('settles a trade on a market holiday');
+
+  it('settles in the clearing house currency', function () {
+    if (!process.env.CLEARING_URL) this.skip();
+  });
 });
 ```
 
