@@ -157,6 +157,18 @@ describe('compileOptions', () => {
 });
 
 describe('framework', () => {
+  for (const framework of ['mocha', 'cypress', 'webdriverio'] as const) {
+    it(`turns on skip and todo for ${framework}, and has no fixme, fail or slow`, () => {
+      assert.deepEqual(stateNames({ framework }), ['skip', 'todo']);
+      assert.deepEqual(
+        stateNames({ framework, lifecycleTags: true, states: { fixme: true, slow: true, fail: true } }),
+        ['skip', 'todo', 'new', 'quarantined'],
+      );
+      assert.deepEqual([...compile({ framework }).testFunctions], ['it', 'specify', 'test']);
+      assert.equal(compile({ framework }).framework.name, framework);
+    });
+  }
+
   for (const framework of ['jest', 'vitest'] as const) {
     it(`turns on skip and todo for ${framework}, and has no fixme or slow`, () => {
       assert.deepEqual(stateNames({ framework }), ['skip', 'todo']);

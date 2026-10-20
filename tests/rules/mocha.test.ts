@@ -57,6 +57,15 @@ runRule('require-ticket (Mocha)', requireTicket, {
     // A title that isn't text could be a helper with the same name, so it isn't a test.
     'it(order);\ndescribe(order);\nit();',
     "describe('order book');",
+    // A describe with only a title isn't one, so its tags put nothing in a state.
+    { code: "describe('order book @new');", settings: settings({ lifecycleTags: true }) },
+    // `this` in a describe body is the suite's, also when a condition picks the describe.
+    "(isCI ? describe : describe.skip)('order book', function () {\n  this.skip();\n});",
+    // `testFunctions` replaces `it`, `specify` and `test`; the other globals stay.
+    {
+      code: "it.skip('fills', () => {});\ntest.skip('cancels', () => {});",
+      settings: settings({ testFunctions: ['check'] }),
+    },
     // `.only` changes no state.
     "it.only('fills a limit order', () => {});\ndescribe.only('order book', () => {});\nsuite.only('quotes', () => {});",
     "(isCI ? it.skip : it)('fills a limit order', () => {});",
@@ -139,6 +148,25 @@ runRule('require-ticket (Mocha)', requireTicket, {
     { code: "it('settles at T+1');", errors: [missing('todo', 'TODO')] },
     { code: 'specify(`settles at T+1`);', errors: [missing('todo', 'TODO')] },
     { code: "test('settles at T+1');", errors: [missing('todo', 'TODO')] },
+    { code: "describe.skip('order book');", errors: [missing('skip', 'SKIP', 'This describe block')] },
+    // A title held in a variable and a body defined elsewhere.
+    { code: 'it.skip(title, fillLimitOrder);', errors: [missing('skip', 'SKIP')] },
+    {
+      code: "import { it as check, test as tdd } from 'mocha';\ncheck.skip('fills', () => {});\ntdd.skip('cancels', () => {});",
+      errors: [
+        { ...missing('skip', 'SKIP'), line: 2 },
+        { ...missing('skip', 'SKIP'), line: 3 },
+      ],
+    },
+    {
+      code: "check.skip('fills', () => {});\nxit('cancels', () => {});",
+      settings: settings({ testFunctions: ['check'] }),
+      errors: [missing('skip', 'SKIP'), missing('skip', 'SKIP')],
+    },
+    {
+      code: "describe('order book', function () {\n  after(function () {\n    this.skip();\n  });\n  afterEach(function () {\n    this.skip();\n  });\n});\nsuite('quotes', function () {\n  setup(function () {\n    this.skip();\n  });\n  suiteTeardown(function () {\n    this.skip();\n  });\n});",
+      errors: [3, 6, 11, 14].map((line) => ({ ...missing('skip', 'SKIP', 'This skip call'), line })),
+    },
     { code: "it.only('settles at T+1');", errors: [missing('todo', 'TODO')] },
     {
       code: "const title = 'settles at T+1';\nit(title);",
@@ -148,6 +176,11 @@ runRule('require-ticket (Mocha)', requireTicket, {
       code: "it('fills a limit order @new', () => {});\ndescribe('order book @quarantined', () => {});",
       settings: settings({ lifecycleTags: true }),
       errors: [missing('new', 'NEW'), missing('quarantined', 'QUARANTINED', 'This describe block')],
+    },
+    {
+      code: "it.only('fills a limit order @new', () => {});\ndescribe.only('order book @new', () => {});",
+      settings: settings({ lifecycleTags: true }),
+      errors: [missing('new', 'NEW'), missing('new', 'NEW', 'This describe block')],
     },
   ]),
 });
@@ -263,5 +296,23 @@ runRule('no-conflicting-states (Mocha)', noConflictingStates, {
       errors: [{ messageId: 'newSkipped' }],
     },
     { code: "it('settles at T+1 @new');", errors: [{ messageId: 'newSkipped' }] },
+    // A skipped test in a `@new` describe is a new test too.
+    {
+      code: "describe('order book @new', () => {\n  xit('fills a limit order', () => {});\n  xspecify('cancels an order');\n});",
+      errors: [
+        { messageId: 'newSkipped', line: 2 },
+        { messageId: 'newSkipped', line: 3 },
+      ],
+    },
   ]),
 });
+
+// Only Mocha gives a test's `function` a `this` that can skip it.
+for (const framework of ['playwright', 'jest', 'vitest'] as const) {
+  runRule(`require-ticket (this.skip() in ${framework})`, requireTicket, {
+    valid: withOptions({ framework }, [
+      "test('fills a limit order', function () {\n  this.skip();\n});\nbeforeEach(function () {\n  this.skip();\n});",
+    ]),
+    invalid: [],
+  });
+}
