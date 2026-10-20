@@ -33,14 +33,14 @@ export interface CustomState {
 /** Options shared by every rule. Set them once in `settings['test-governance']`. */
 export interface GovernanceOptions {
   /**
-   * The test framework of the files the config applies to: `'playwright'`, `'jest'` or `'vitest'`. Required;
-   * `configs.playwright`, `configs.jest` and `configs.vitest` set it.
+   * The test framework of the files the config applies to: `'playwright'`, `'jest'`, `'vitest'`, `'mocha'`,
+   * `'cypress'` or `'webdriverio'`. Required; each framework's config, such as `configs.mocha`, sets it.
    */
   framework: FrameworkName;
   /**
-   * Names that are treated as the framework's `test` function. Defaults to `['test']` for Playwright and
-   * `['test', 'it']` for Jest and Vitest. Your list replaces the default one, so include those names if
-   * you still need them.
+   * Names that are treated as the framework's `test` function. Defaults to `['test']` for Playwright,
+   * `['test', 'it']` for Jest and Vitest, and `['it', 'specify', 'test']` for Mocha, Cypress and
+   * WebdriverIO. Your list replaces the default one, so include those names if you still need them.
    */
   testFunctions?: string[];
   /** Accepted ticket formats. Defaults to `{ preset: 'any' }`. */

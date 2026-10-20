@@ -1,7 +1,7 @@
 {
   "name": "eslint-plugin-test-governance",
   "version": "0.6.2",
-  "description": "ESLint rules that require a ticket comment above skipped, fixme, todo and tagged Playwright, Jest and Vitest tests.",
+  "description": "ESLint rules that require a ticket comment above skipped, fixme, todo and tagged Playwright, Jest, Vitest, Mocha, Cypress and WebdriverIO tests.",
   "keywords": [
     "eslint",
     "eslintplugin",
@@ -9,6 +9,9 @@
     "playwright",
     "jest",
     "vitest",
+    "mocha",
+    "cypress",
+    "webdriverio",
     "testing"
   ],
   "homepage": "https://github.com/Huldoser/eslint-plugin-test-governance#readme",

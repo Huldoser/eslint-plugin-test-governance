@@ -2,7 +2,7 @@
 
 📝 Require a ticket marker comment above skipped, fixme and tagged tests.
 
-💼 This rule is enabled in the following [configs](https://github.com/Huldoser/eslint-plugin-test-governance#usage): 🃏 `jest`, 🎭 `playwright`, ⚡ `vitest`.
+💼 This rule is enabled in the following [configs](https://github.com/Huldoser/eslint-plugin-test-governance#usage): 🌲 `cypress`, 🃏 `jest`, ☕ `mocha`, 🎭 `playwright`, ⚡ `vitest`, 🤖 `webdriverio`.
 
 💡 This rule is manually fixable by [editor suggestions](https://eslint.org/docs/latest/use/core-concepts#rule-suggestions).
 
@@ -17,19 +17,21 @@ A test is in a state when it is:
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | -------------------------- |
 | `skip`         | `test.skip('title', fn)`, `test.describe.skip`, `test.skip()` in a body, `testInfo.skip()`, `test.step.skip`, `step.skip()` in a step | `// SKIP:`             | yes                        |
 | `fixme`        | `test.fixme(...)`, `test.describe.fixme`, `testInfo.fixme()`                                                                          | `// FIXME:`            | yes                        |
-| `todo`         | Jest's and Vitest's `test.todo`                                                                                                       | `// TODO:`             | yes, in Jest and Vitest    |
+| `todo`         | Jest's and Vitest's `test.todo`, and a Mocha test with only a title, `it('title')`                                                    | `// TODO:`             | yes, except in Playwright  |
 | `new`          | the `@new` tag                                                                                                                        | `// NEW:`              | with `lifecycleTags: true` |
 | `quarantined`  | the `@quarantined` tag                                                                                                                | `// QUARANTINED:`      | with `lifecycleTags: true` |
 | `fail`, `slow` | `test.fail(...)`, `test.slow()`, `testInfo.fail()`, `testInfo.slow()`                                                                 | `// FAIL:`, `// SLOW:` | no                         |
 | custom         | any tag you list in `customStates`                                                                                                    | your keyword           | when configured            |
 
 In Jest and Vitest, `xit`, `xdescribe`, Vitest's `{ skip: true }`, `skipIf(true)`, `context.skip()` and
-`context.skip('note')`, in a test or in `beforeEach`, skip a test too, and `test.failing` and `test.fails` put it in the `fail` state. The
-[README](../../README.md#frameworks) lists every form.
+`context.skip('note')`, in a test or in `beforeEach`, skip a test too, and `test.failing` and `test.fails` put it in the `fail` state. In Mocha, Cypress and WebdriverIO, `xit`, `xdescribe` and
+`this.skip()` in a test or hook skip a test too, and Cypress's `{ browser: '!webkit' }` skips it in other
+browsers, which counts as a conditional skip. The [README](../../README.md#frameworks) lists every form.
 
 Tags are read from the title (`'places a limit order @new'`) and from `{ tag: '@new' }` or `{ tag: ['@new', '@smoke'] }`,
 also when they come from a `const` or an enum declared in the same file, as in `{ tag: TAGS.NEW }`.
-Vitest writes tag names without the `@`, so `{ tags: ['new'] }` is the `@new` tag. Tags on a
+Vitest writes tag names without the `@`, so `{ tags: ['new'] }` is the `@new` tag. Cypress tags from
+@cypress/grep keep it: `{ tags: '@new' }`. Tags on a
 `describe` apply to every test inside it. `states` can rename the tag and marker of `new` and
 `quarantined`, as in `states: { quarantined: { tag: '@flaky', marker: 'FLAKY' } }`.
 

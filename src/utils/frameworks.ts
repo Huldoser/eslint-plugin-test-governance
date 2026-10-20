@@ -63,6 +63,10 @@ export interface Framework {
    * `context.skip('why')`. In Playwright the first argument is always a condition.
    */
   skipNotes: boolean;
+  /** Whether a test or hook written as a `function` can skip at runtime with `this.skip()`, as in Mocha. */
+  thisSkip: boolean;
+  /** Whether a test with only a title written out is a todo, as Mocha's pending `it('title')`. */
+  todoWithoutBody: boolean;
   /** Built-in states a test can be put in with this framework. */
   states: ReadonlySet<BuiltinStateName>;
   /** Playwright's own API on `test`: `test.describe`, `test.step`, `test.info()` and runtime `test.skip()`. */
@@ -109,6 +113,8 @@ const playwright: Framework = {
   info: { param: 1, methods: RUNTIME_MODIFIERS },
   skipWithoutBody: false,
   skipNotes: false,
+  thisSkip: false,
+  todoWithoutBody: false,
   states: new Set(['skip', 'fixme', 'fail', 'slow', 'new', 'quarantined']),
   playwright: true,
 };
@@ -142,6 +148,8 @@ const jest: Framework = {
   plainTags: false,
   skipWithoutBody: false,
   skipNotes: false,
+  thisSkip: false,
+  todoWithoutBody: false,
   states: new Set(['skip', 'todo', 'fail', 'new', 'quarantined']),
   playwright: false,
 };
@@ -184,11 +192,64 @@ const vitest: Framework = {
   info: { param: 0, methods: new Set(['skip']) },
   skipWithoutBody: true,
   skipNotes: true,
+  thisSkip: false,
+  todoWithoutBody: false,
   states: new Set(['skip', 'todo', 'fail', 'new', 'quarantined']),
   playwright: false,
 };
 
-export const FRAMEWORKS: Record<FrameworkName, Framework> = { playwright, jest, vitest };
+const SKIPPED_TEST: Root = { kind: 'test', modifiers: ['skip'] };
+const SKIPPED_DESCRIBE: Root = { kind: 'describe', modifiers: ['skip'] };
+
+/** What the `mocha` module exports, the BDD and TDD names alike. `context` and `specify` are only globals. */
+const MOCHA_EXPORTS = new Map<string, Root>([
+  ['it', TEST],
+  ['test', TEST],
+  ['xit', SKIPPED_TEST],
+  ['describe', DESCRIBE],
+  ['suite', DESCRIBE],
+  ['xdescribe', SKIPPED_DESCRIBE],
+  ...['before', 'beforeEach', 'after', 'afterEach', 'suiteSetup', 'setup', 'suiteTeardown', 'teardown'].map(
+    (name): [string, Root] => [name, HOOK],
+  ),
+]);
+
+/** Mocha, and Cypress and WebdriverIO, which run their tests on Mocha. */
+const mocha: Omit<Framework, 'name'> = {
+  ownsModule: (source) => source === 'mocha',
+  exports: MOCHA_EXPORTS,
+  globals: new Map([
+    ...[...MOCHA_EXPORTS].filter(([name]) => name !== 'it' && name !== 'test'),
+    ['context', DESCRIBE],
+    ['xcontext', SKIPPED_DESCRIBE],
+    ['xspecify', SKIPPED_TEST],
+  ]),
+  testFunctions: ['it', 'specify', 'test'],
+  testMembers: new Set(['only', 'skip']),
+  describeMembers: new Set(['only', 'skip']),
+  factories: new Set(),
+  effects: effects([['skip', 'skip']]),
+  // Cypress's `{ browser: '!webkit' }` runs the test only in some browsers.
+  optionEffects: new Map([['browser', 'skip']]),
+  // @cypress/grep's `{ tags: '@smoke' }`, written with the `@`.
+  tagKey: 'tags',
+  plainTags: false,
+  skipWithoutBody: true,
+  skipNotes: false,
+  thisSkip: true,
+  todoWithoutBody: true,
+  states: new Set(['skip', 'todo', 'new', 'quarantined']),
+  playwright: false,
+};
+
+export const FRAMEWORKS: Record<FrameworkName, Framework> = {
+  playwright,
+  jest,
+  vitest,
+  mocha: { name: 'mocha', ...mocha },
+  cypress: { name: 'cypress', ...mocha },
+  webdriverio: { name: 'webdriverio', ...mocha },
+};
 
 /** Whether `source` belongs to a test runner other than `framework`, so its names are never tests here. */
 export function isOtherRunner(framework: Framework, source: string): boolean {

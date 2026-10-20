@@ -10,6 +10,9 @@ export default {
     ['jest', '🃏'],
     ['playwright', '🎭'],
     ['vitest', '⚡'],
+    ['mocha', '☕'],
+    ['cypress', '🌲'],
+    ['webdriverio', '🤖'],
   ],
   // Options are shared by all rules and documented once in the README.
   ruleDocSectionOptions: false,

@@ -104,7 +104,7 @@ describe('options validation', () => {
 
   it('names the frameworks when the framework is missing', () => {
     assert.deepEqual(problems({ framework: undefined }), [
-      'framework is required: set it to "playwright", "jest" or "vitest", or use configs.playwright, configs.jest or configs.vitest',
+      'framework is required: set it to "playwright", "jest", "vitest", "mocha", "cypress" or "webdriverio", or use configs.playwright, configs.jest, configs.vitest, configs.mocha, configs.cypress or configs.webdriverio',
     ]);
   });
 

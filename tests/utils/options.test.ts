@@ -172,7 +172,7 @@ describe('framework', () => {
   it('is required, since there is no default framework', () => {
     assert.throws(
       () => compileOptions({} as never),
-      /framework is required: set it to "playwright", "jest" or "vitest", or use configs\.playwright, configs\.jest or configs\.vitest$/,
+      /framework is required: set it to "playwright", "jest", "vitest", "mocha", "cypress" or "webdriverio", or use configs\.playwright, configs\.jest, configs\.vitest, configs\.mocha, configs\.cypress or configs\.webdriverio$/,
     );
   });
 
@@ -182,8 +182,8 @@ describe('framework', () => {
 
   it('rejects an unknown framework', () => {
     assert.throws(
-      () => compile({ framework: 'mocha' } as never),
-      /framework must be one of "playwright", "jest", "vitest" \(got "mocha"\)/,
+      () => compile({ framework: 'ava' } as never),
+      /framework must be one of "playwright", "jest", "vitest", "mocha", "cypress", "webdriverio" \(got "ava"\)/,
     );
   });
 });

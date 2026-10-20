@@ -90,7 +90,7 @@ becomes `extends: ['test-governance/playwright']`.
 A config that still reads `configs.recommended` fails when it loads:
 
 ```text
-eslint-plugin-test-governance: configs.recommended was removed in 0.5.0. Use the config for your framework: configs.playwright, configs.jest or configs.vitest. See https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/upgrading.md
+eslint-plugin-test-governance: configs.recommended was removed in 0.5.0. Use the config for your framework: configs.playwright, configs.jest, configs.vitest, configs.mocha, configs.cypress or configs.webdriverio. See https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/upgrading.md
 ```
 
 ### The framework option
@@ -121,7 +121,7 @@ Without it, the config fails when it loads:
 
 ```text
 eslint-plugin-test-governance: invalid options:
-  - framework is required: set it to "playwright", "jest" or "vitest", or use configs.playwright, configs.jest or configs.vitest
+  - framework is required: set it to "playwright", "jest", "vitest", "mocha", "cypress" or "webdriverio", or use configs.playwright, configs.jest, configs.vitest, configs.mocha, configs.cypress or configs.webdriverio
 ```
 
 If you write `settings['test-governance']` yourself instead of calling `configure()`, add `framework`
