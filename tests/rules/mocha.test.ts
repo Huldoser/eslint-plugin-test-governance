@@ -36,6 +36,8 @@ runRule('require-ticket (Mocha)', requireTicket, {
     // Under a condition it skips only sometimes.
     "it('fills a limit order', function () {\n  if (isMobile) this.skip();\n});",
     "it('fills a limit order', function () {\n  if (!process.env.BROKER_URL) {\n    return this.skip();\n  }\n});",
+    // As in vscode's tests: the skip only runs when the file already exists.
+    "it('renames a file', async function () {\n  try {\n    await fs.stat(target);\n    this.skip();\n  } catch (error) {\n    assertNotFound(error);\n  }\n});",
     // In a hook it skips the tests the hook runs for, so a marker above their describe covers it.
     "describe('order book', function () {\n  before(function () {\n    if (!broker) this.skip();\n  });\n});",
     "// SKIP: TRADE-1\ndescribe('order book', function () {\n  beforeEach('connect to the broker', function () {\n    this.skip();\n  });\n});",

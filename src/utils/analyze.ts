@@ -691,8 +691,8 @@ function isEarlyExit(statement: TSESTree.Statement): boolean {
 
 /**
  * Whether the call only runs on some paths of its function: under an `if`, a `switch` case, a ternary,
- * the right side of `&&`, `||` or `??`, in a `catch` block, or after an early exit such as
- * `if (ready) return;`. `if (!enabled) test.skip()` is the same as `test.skip(!enabled)`, and
+ * the right side of `&&`, `||` or `??`, in a `catch` block, after other code in a `try` block that has a
+ * `catch`, or after an early exit such as `if (ready) return;`. `if (!enabled) test.skip()` is the same as `test.skip(!enabled)`, and
  * `catch { test.skip(true, 'service is down') }` only skips when the service is down.
  */
 function isGuarded(call: TSESTree.CallExpression): boolean {
@@ -705,6 +705,9 @@ function isGuarded(call: TSESTree.CallExpression): boolean {
     if (node.type === 'BlockStatement') {
       const index = node.body.indexOf(child as TSESTree.Statement);
       if (node.body.slice(0, index).some(isEarlyExit)) return true;
+      // `try { await stat(target); test.skip(); } catch {}`: an error before the skip jumps to the catch.
+      const owner: Node = node.parent;
+      if (index > 0 && owner.type === 'TryStatement' && owner.block === node && owner.handler) return true;
     }
   }
   return false;

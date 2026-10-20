@@ -93,6 +93,9 @@ runRule('require-ticket', rule, {
     "test('places an order', async () => { try { await connectBroker(); } catch { test.skip(); } finally { disconnectBroker(); } });",
     "test('places an order', async ({ page }, testInfo) => { try { await connectBroker(); } catch { if (retry) {} testInfo.fixme(); } });",
     "test('places a market order', async () => { if (marketOpen) return; test.skip(); });",
+    // So is a skip after other code in a `try` with a `catch`: an error before it jumps past it.
+    "test('copies a file', async () => {\n  try {\n    await stat(target);\n    test.skip();\n  } catch {}\n});",
+    "test('copies a file', async ({ page }, testInfo) => {\n  try {\n    const exists = await stat(target);\n    testInfo.skip(true, 'target exists');\n  } catch (error) {\n    assertNotFound(error);\n  } finally {\n    cleanUp();\n  }\n});",
     // A test or describe whose function a condition picks is skipped only sometimes.
     "(isMobile ? test.skip : test)('places an order', async () => {});",
     "(isMobile ? test.describe : test.describe.skip)('order entry', () => {\n  test('places an order', async () => {});\n});",
@@ -619,6 +622,20 @@ runRule('require-ticket', rule, {
     {
       code: "test('places a market order', async () => { test.skip(); if (marketOpen) return; });",
       errors: [missing('skip', 'SKIP', 'This skip call')],
+    },
+    // A skip that starts the `try` block always runs, and with only `finally`, an error fails the test.
+    {
+      code: "test('copies a file', async () => {\n  try {\n    test.skip();\n    await stat(target);\n  } catch {}\n});",
+      errors: [{ ...missing('skip', 'SKIP', 'This skip call'), line: 3 }],
+    },
+    {
+      code: "test('copies a file', async () => {\n  try {\n    await stat(target);\n    test.skip();\n  } finally {\n    cleanUp();\n  }\n});",
+      errors: [{ ...missing('skip', 'SKIP', 'This skip call'), line: 4 }],
+    },
+    {
+      code: "test('copies a file', async () => {\n  try {\n    await stat(target);\n    test.skip();\n  } catch {}\n});",
+      settings: settings({ requireTicketForConditional: true }),
+      errors: [{ ...missing('skip', 'SKIP', 'This skip call'), line: 4 }],
     },
     // A `catch` or early return in another function doesn't guard this call.
     {
