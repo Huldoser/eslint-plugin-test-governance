@@ -20,4 +20,6 @@ module.exports = defineConfig([
   },
   { files: ['tests/unit/**/*.spec.ts'], extends: [testGovernance.configs.vitest] },
   { files: ['tests/jest/**/*.test.js'], extends: [testGovernance.configs.jest] },
+  { files: ['tests/mocha/**/*.test.js'], extends: [testGovernance.configs.mocha] },
+  { files: ['tests/cypress/**/*.cy.js'], extends: [testGovernance.configs.cypress] },
 ]);
