@@ -71,6 +71,7 @@ runRule('require-ticket (Vitest)', requireTicket, {
     "test('fills a limit order', ({ skip: skipTest }) => {\n  // SKIP: TRADE-1\n  skipTest();\n});",
     "test('fills a limit order', (context) => {\n  context.skip(isMobile, 'No order ticket on mobile');\n});",
     "test('fills a limit order', ({ skip }) => {\n  if (isMobile) skip();\n});",
+    "test('fills a limit order', async (context) => {\n  try {\n    await connectBroker();\n    context.skip();\n  } catch {}\n});",
     // A skip with only a note always skips.
     "test('fills a limit order', (context) => {\n  // SKIP: TRADE-1\n  context.skip('Broker sandbox is down');\n});",
     "test.for([1, 2])('buys %i shares', (shares, context) => {\n  // SKIP: TRADE-1\n  context.skip();\n});",

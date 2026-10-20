@@ -21,6 +21,13 @@ All notable changes to this project are documented here. The format follows
 - In Cypress files, tags from @cypress/grep's `{ tags: '@smoke' }` count like tags in the title, and
   `{ browser: '!webkit' }`, which runs the test only in some browsers, is a conditional skip.
 
+### Fixed
+
+- A runtime skip after other code in a `try` block that has a `catch`, as in
+  `try { await stat(target); test.skip(); } catch {}`, is a conditional skip: an error before it jumps to
+  the `catch`, so the test runs. Before, it needed a ticket like an unconditional skip. A skip that starts
+  the `try` block, or one in a `try` with only `finally`, still does. This covers Mocha's `this.skip()` too.
+
 ## [0.6.2] - 2026-10-14
 
 ### Fixed

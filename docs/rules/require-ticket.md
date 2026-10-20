@@ -79,8 +79,10 @@ Conditional skips such as `test.skip(browserName === 'webkit', 'Not supported')`
 permanent platform limit, so they need no ticket unless you set `requireTicketForConditional: true`.
 A runtime skip under an `if`, a `switch` case, a ternary or `&&` counts as conditional too, since
 `if (!enabled) test.skip()` does the same as `test.skip(!enabled)`. So does a skip in a `catch` block,
-such as `catch { test.skip(true, 'Market data feed is down') }`, and a skip after an early exit such as
-`if (ready) return;` or `if (!ok) throw error;` earlier in the same function.
+such as `catch { test.skip(true, 'Market data feed is down') }`, a skip after other code in a `try`
+block that has a `catch`, as in `try { await stat(target); test.skip(); } catch {}`, where an error
+skips past it, and a skip after an early exit such as `if (ready) return;` or `if (!ok) throw error;`
+earlier in the same function.
 
 A test or describe whose function a condition picks is a conditional skip too, in every framework. Its
 title and tags count as usual, and a marker goes above it, or in code without semicolons above the
