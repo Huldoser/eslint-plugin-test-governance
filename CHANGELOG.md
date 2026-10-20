@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A marker in the wrong case directly above a test in that state, as `// todo:` above `test.todo(...)`, is
+  reported once, by `require-ticket`, which asks for uppercase. `require-ticket-in-comments` reported it too.
+
 ## [0.7.0] - 2026-10-20
 
 ### Added

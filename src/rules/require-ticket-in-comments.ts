@@ -1,5 +1,5 @@
 import type { TSESTree } from '@typescript-eslint/utils';
-import { appliesTo, commentLines, isStateMarker, parseTickets } from '../utils/analyze.ts';
+import { appliesTo, commentLines, parseTickets } from '../utils/analyze.ts';
 import { createRule } from '../utils/create-rule.ts';
 import { compileTicketSpec } from '../utils/tickets.ts';
 
@@ -36,11 +36,13 @@ export default createRule({
     const { sourceCode } = context;
     const matcher = options.commentTicket;
 
-    // A marker directly above a test in that state belongs to require-ticket.
+    // A marker directly above a test in that state belongs to require-ticket, which also reports one
+    // in the wrong case.
     const owned = new Set<TSESTree.Comment>();
     for (const subject of analysis.subjects) {
       for (const marker of subject.markers) {
-        if (isStateMarker(marker) && appliesTo(subject, marker.state.name)) owned.add(marker.comment);
+        const state = marker.state ?? marker.caseOf;
+        if (state && appliesTo(subject, state.name)) owned.add(marker.comment);
       }
     }
 
