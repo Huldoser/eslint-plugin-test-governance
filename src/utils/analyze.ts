@@ -949,10 +949,10 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     return modifiers;
   };
 
-  /** Keeps the body of a Mocha test or hook written as a `function`, whose `this` can skip it. */
+  /** Keeps the body of a test or hook written as a `function`, whose `this` can skip it, as in Mocha. */
   const addThisBody = (args: TSESTree.CallExpressionArgument[]): void => {
     const body = args.findLast(isFunction);
-    if (framework.thisSkip && body?.type === 'FunctionExpression') thisBodies.add(body);
+    if (body?.type === 'FunctionExpression') thisBodies.add(body);
   };
 
   /** What a body can change the test's state with: Playwright's `testInfo` or Vitest's test context. */
@@ -1052,8 +1052,9 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     // Vitest's `beforeEach((context) => context.skip())` and Mocha's `before(function () { this.skip(); })`
     // skip the tests they run for.
     if (declaration === undefined) {
+      if (callee.root.noContext) return { infos: [] };
       addThisBody(args);
-      return { infos: callee.root.noContext ? [] : bodyInfos(args, path) };
+      return { infos: bodyInfos(args, path) };
     }
 
     if (framework.playwright) {
@@ -1094,9 +1095,10 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const name = memberName(callee);
     if (name === undefined) return undefined;
     const { object } = callee;
-    // Mocha's `this.skip()`, in a test or hook whose `function` gives it the test's `this`.
+    // Mocha's `this.skip()` or node:test's `this.todo()`, in a test or hook whose `function` gives it the
+    // test's `this`.
     if (object.type === 'ThisExpression') {
-      const owner = name === 'skip' ? thisFunction(call) : undefined;
+      const owner = framework.thisMethods.has(name) ? thisFunction(call) : undefined;
       return owner !== undefined && thisBodies.has(owner) ? runtimeSubject(call, name) : undefined;
     }
     if (object.type === 'Identifier') {

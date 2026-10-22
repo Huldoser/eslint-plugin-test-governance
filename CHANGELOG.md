@@ -13,9 +13,9 @@ All notable changes to this project are documented here. The format follows
   `node:test`, their `skip`, `todo` and `expectFailure` members, which `node:test` also exports by name,
   and the same options. Node counts an option set to any value but `false` or `undefined`, so
   `{ skip: 'broker sandbox is down' }` always skips and needs a ticket, while `{ skip: isWindows }` is a
-  conditional skip. `t.skip()` and `t.todo()` on a test's context count in a test, `beforeEach` and
-  `afterEach`, and subtests declared with `t.test()` are checked like tests. `expectFailure` is the `fail`
-  state, which is off by default.
+  conditional skip. `t.skip()` and `t.todo()` on a test's context, or `this.skip()` and `this.todo()` in a
+  `function`, count in a test, `beforeEach` and `afterEach`, and subtests declared with `t.test()` are
+  checked like tests. `expectFailure` is the `fail` state, which is off by default.
 
 ### Fixed
 

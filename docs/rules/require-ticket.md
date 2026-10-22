@@ -26,8 +26,8 @@ A test is in a state when it is:
 In Jest and Vitest, `xit`, `xdescribe`, Vitest's `{ skip: true }`, `skipIf(true)`, `context.skip()` and
 `context.skip('note')`, in a test or in `beforeEach`, skip a test too, and `test.failing` and `test.fails` put it in the `fail` state. In Mocha, Cypress and WebdriverIO, `xit`, `xdescribe` and
 `this.skip()` in a test or hook skip a test too, and Cypress's `{ browser: '!webkit' }` skips it in other
-browsers, which counts as a conditional skip. In `node:test`, `{ skip: 'reason' }` and `t.skip()` skip a test, `{ todo: true }` and
-`t.todo()` make it a todo, `t.test()` subtests count as tests, and `test.expectFailure` puts it in the `fail` state. The
+browsers, which counts as a conditional skip. In `node:test`, `{ skip: 'reason' }`, `t.skip()` and `this.skip()` skip a test, `{ todo: true }`,
+`t.todo()` and `this.todo()` make it a todo, `t.test()` subtests count as tests, and `test.expectFailure` puts it in the `fail` state. The
 [README](../../README.md#frameworks) lists every form.
 
 Tags are read from the title (`'places a limit order @new'`) and from `{ tag: '@new' }` or `{ tag: ['@new', '@smoke'] }`,

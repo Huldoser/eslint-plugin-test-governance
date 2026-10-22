@@ -87,8 +87,11 @@ export interface Framework {
    * `context.skip('why')`. In Playwright the first argument is always a condition.
    */
   skipNotes: boolean;
-  /** Whether a test or hook written as a `function` can skip at runtime with `this.skip()`, as in Mocha. */
-  thisSkip: boolean;
+  /**
+   * The methods a test or hook written as a `function` can change its state with at runtime through `this`,
+   * as Mocha's `this.skip()`. Empty when `this` can't.
+   */
+  thisMethods: ReadonlySet<string>;
   /** Whether a test with only a title written out is a todo, as Mocha's pending `it('title')`. */
   todoWithoutBody: boolean;
   /** Built-in states a test can be put in with this framework. */
@@ -142,7 +145,7 @@ const playwright: Framework = {
   subtests: false,
   skipWithoutBody: false,
   skipNotes: false,
-  thisSkip: false,
+  thisMethods: new Set(),
   todoWithoutBody: false,
   states: new Set(['skip', 'fixme', 'fail', 'slow', 'new', 'quarantined']),
   playwright: true,
@@ -182,7 +185,7 @@ const jest: Framework = {
   subtests: false,
   skipWithoutBody: false,
   skipNotes: false,
-  thisSkip: false,
+  thisMethods: new Set(),
   todoWithoutBody: false,
   states: new Set(['skip', 'todo', 'fail', 'new', 'quarantined']),
   playwright: false,
@@ -231,7 +234,7 @@ const vitest: Framework = {
   subtests: false,
   skipWithoutBody: true,
   skipNotes: true,
-  thisSkip: false,
+  thisMethods: new Set(),
   todoWithoutBody: false,
   states: new Set(['skip', 'todo', 'fail', 'new', 'quarantined']),
   playwright: false,
@@ -280,18 +283,21 @@ const mocha: Omit<Framework, 'name'> = {
   subtests: false,
   skipWithoutBody: true,
   skipNotes: false,
-  thisSkip: true,
+  thisMethods: new Set(['skip']),
   todoWithoutBody: true,
   states: new Set(['skip', 'todo', 'new', 'quarantined']),
   playwright: false,
 };
 
 const NODE_TEST_MEMBERS = new Set(['only', 'skip', 'todo', 'expectFailure']);
+/** What a test's context can do to it, as `t.skip()`, or as `this.skip()` in a `function`. */
+const NODE_TEST_CONTEXT = new Set(['skip', 'todo']);
 
 /**
  * Node's built-in runner. `test` and `it` are one function, as are `describe` and `suite`, and the state
- * members are exported by name too. Only `beforeEach` and `afterEach` get the test's context; `before` and
- * `after` in a describe get the suite's, which can't skip.
+ * members are exported by name too. Only `beforeEach` and `afterEach` get the test's context, as a test
+ * does: as their first parameter, and as `this` when written as a `function`. `before`, `after` and the
+ * describe itself get the suite's, which can't skip.
  */
 const nodeTest: Framework = {
   name: 'node-test',
@@ -328,12 +334,12 @@ const nodeTest: Framework = {
   exclusiveStates: ['skip', 'todo', 'fail'],
   optionalTitle: true,
   plainTags: false,
-  info: { param: 0, methods: new Set(['skip', 'todo']) },
+  info: { param: 0, methods: NODE_TEST_CONTEXT },
   subtests: true,
   skipWithoutBody: true,
   // `t.skip('why')` takes a message, not a condition.
   skipNotes: true,
-  thisSkip: false,
+  thisMethods: NODE_TEST_CONTEXT,
   todoWithoutBody: false,
   states: new Set(['skip', 'todo', 'fail', 'new', 'quarantined']),
   playwright: false,

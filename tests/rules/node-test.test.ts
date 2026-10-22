@@ -31,6 +31,8 @@ runRule('require-ticket (node:test)', requireTicket, {
     "import { describe, beforeEach } from 'node:test';\n// SKIP: TRADE-1\ndescribe('order book', () => {\n  beforeEach((t) => {\n    t.skip();\n  });\n});",
     // A describe's body, and `before` and `after` in it, get the suite's context, which can't skip.
     "import { describe, before, after } from 'node:test';\ndescribe('order book', (suite) => {\n  suite.skip();\n  before((s) => s.skip());\n  after((s) => s.todo());\n});",
+    // Their `this` is that context too, and an arrow function has none of its own.
+    "import { describe, before, after, test } from 'node:test';\ndescribe('order book', function () {\n  this.skip();\n  before(function () {\n    this.skip();\n  });\n  after(function () {\n    this.todo();\n  });\n});\ntest('fills a limit order', () => {\n  this.skip();\n});",
     // Subtests declared through the context.
     "import { test } from 'node:test';\ntest('order book', async (t) => {\n  // SKIP: TRADE-1\n  await t.test('fills a limit order', { skip: true }, () => {});\n  await t.test('cancels an order', (t) => {\n    // SKIP: TRADE-2\n    t.skip();\n  });\n});",
     // A subtest with no function passes, as a test does.
@@ -143,6 +145,16 @@ runRule('require-ticket (node:test)', requireTicket, {
       errors: [
         { ...missing('skip', 'SKIP', 'This skip call'), line: 3 },
         { ...missing('todo', 'TODO', 'This todo call'), line: 5 },
+      ],
+    },
+    // A test, subtest or `beforeEach` written as a `function` gets the context as `this` as well.
+    {
+      code: "import { test, describe, beforeEach } from 'node:test';\ntest('fills a limit order', function () {\n  this.skip('broker sandbox is down');\n});\ntest('settles at T+1', async function () {\n  this.todo();\n});\ndescribe('order book', () => {\n  beforeEach(function () {\n    this.skip();\n  });\n});\ntest('quotes', async (t) => {\n  await t.test('cancels an order', function () {\n    this.skip();\n  });\n});",
+      errors: [
+        { ...missing('skip', 'SKIP', 'This skip call'), line: 3 },
+        { ...missing('todo', 'TODO', 'This todo call'), line: 6 },
+        { ...missing('skip', 'SKIP', 'This skip call'), line: 10 },
+        { ...missing('skip', 'SKIP', 'This skip call'), line: 15 },
       ],
     },
     // A subtest takes the same options, and its body gets a context of its own.
