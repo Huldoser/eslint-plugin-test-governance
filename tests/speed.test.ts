@@ -79,6 +79,35 @@ describe('orders ${i}', { tags: '@smoke' }, function () {
 });
 `,
   },
+  'node:test': {
+    options: { framework: 'node-test', lifecycleTags: true, states: { fail: true } },
+    header: "import { describe, test, beforeEach } from 'node:test';\n",
+    // Options, context calls in hooks, tests and nested subtests, a title left out and pending tests.
+    block: (i) => `
+const TITLE_${i} = 'settles order ${i}';
+describe('orders ${i}', { skip: process.platform === 'win32' }, () => {
+  beforeEach((t) => {
+    if (!process.env.BROKER_URL) t.skip();
+  });
+
+  // SKIP: TRADE-${i}
+  test('cancels order ${i}', { skip: 'broker sandbox is down' }, async () => {
+    // TODO: TRADE-${i}
+    await rows(${i});
+  });
+
+  test('fills order ${i} @new', async (t) => {
+    await t.test('submits the order', { todo: true }, async (t) => {
+      await t.test('confirms the fill', () => t.skip('flaky'));
+    });
+  });
+
+  test.expectFailure(TITLE_${i}, () => {});
+  // FIXME: the broker sandbox drops the fill
+  test({ name: 'lists order ${i} @quarantined', todo: 'needs the clearing API' }, () => {});
+});
+`,
+  },
 };
 
 function spec({ header, block }: Spec, lines: number): string {
