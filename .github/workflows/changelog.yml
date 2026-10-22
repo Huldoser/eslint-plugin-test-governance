@@ -7,8 +7,6 @@ on:
   pull_request:
     # Adding or removing the label runs the check again.
     types: [opened, synchronize, reopened, labeled, unlabeled]
-  # Started by prepare-release.yml for the release pull request.
-  workflow_dispatch:
 
 permissions:
   contents: read
