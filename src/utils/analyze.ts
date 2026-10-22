@@ -564,7 +564,7 @@ interface Details {
  * `test('title', { tag: '@smoke' }, fn)` or Vitest's `test('title', { skip: true }, fn)`, also when it
  * is a constant declared in this file. With `optionsFirst`, the first: node:test's `test({ skip: true }, fn)`.
  */
-function detailsOf(sourceCode: SourceCode, call: TSESTree.CallExpression, optionsFirst = false): Details {
+function detailsOf(sourceCode: SourceCode, call: TSESTree.CallExpression, optionsFirst: boolean): Details {
   const details = call.arguments.at(optionsFirst ? 0 : 1);
   if (details === undefined || isFunction(details)) return { entries: [] };
   const target = unwrap(details);
