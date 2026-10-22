@@ -246,6 +246,8 @@ function collectTestNames(program: TSESTree.Program, framework: Framework, confi
           if (spec.type === 'ImportNamespaceSpecifier') modules.add(local);
           else if (spec.type === 'ImportDefaultSpecifier') {
             if (framework.defaultExport) roots.set(local, framework.defaultExport);
+            // `import test from 'node:test'` also has `test.describe`.
+            if (framework.moduleIsDefault) modules.add(local);
           } else {
             const root = framework.exports.get(importedName(spec));
             if (root) roots.set(local, root);
@@ -268,9 +270,13 @@ function collectTestNames(program: TSESTree.Program, framework: Framework, confi
         // `const test = require('node:test')` is another runner's `test`, like an import from it.
         else if (isOtherFramework(init)) setOther(name);
         else {
-          // `const pw = require('@playwright/test')`, used as `pw.test`.
+          // `const pw = require('@playwright/test')`, used as `pw.test`, or `const test = require('node:test')`,
+          // which is `test` itself.
           const source = requireSource(init);
-          if (source !== undefined && framework.ownsModule(source)) modules.add(name);
+          if (source !== undefined && framework.ownsModule(source)) {
+            modules.add(name);
+            if (framework.moduleIsDefault && framework.defaultExport) roots.set(name, framework.defaultExport);
+          }
         }
       } else if (declarator.id.type === 'ObjectPattern') {
         // Playwright's `const { describe } = test`, used as `describe.skip(...)`.
@@ -556,10 +562,10 @@ interface Details {
 /**
  * The details or options object of a declaration, the second argument in
  * `test('title', { tag: '@smoke' }, fn)` or Vitest's `test('title', { skip: true }, fn)`, also when it
- * is a constant declared in this file.
+ * is a constant declared in this file. With `optionsFirst`, the first: node:test's `test({ skip: true }, fn)`.
  */
-function detailsOf(sourceCode: SourceCode, call: TSESTree.CallExpression): Details {
-  const details = call.arguments.at(1);
+function detailsOf(sourceCode: SourceCode, call: TSESTree.CallExpression, optionsFirst: boolean): Details {
+  const details = call.arguments.at(optionsFirst ? 0 : 1);
   if (details === undefined || isFunction(details)) return { entries: [] };
   const target = unwrap(details);
   const value = target.type === 'ObjectExpression' ? target : constantValue(sourceCode, target);
@@ -567,7 +573,9 @@ function detailsOf(sourceCode: SourceCode, call: TSESTree.CallExpression): Detai
   if (object?.type !== 'ObjectExpression') {
     // A name that can't be read is the details object only when a body comes after it:
     // `test.skip('places an order', placeOrder)` has a body defined elsewhere and no details.
-    return call.arguments.slice(2).some(isFunction) ? { entries: [], unread: details } : { entries: [] };
+    return call.arguments.slice(optionsFirst ? 1 : 2).some(isFunction)
+      ? { entries: [], unread: details }
+      : { entries: [] };
   }
   const entries = object.properties.flatMap((prop): [string, Node][] => {
     if (prop.type !== 'Property' || prop.computed) return [];
@@ -616,6 +624,26 @@ function collectTags(
   return { tags, dynamic: title.unread.size > 0, unread, opaqueDetails: details.unread !== undefined };
 }
 
+/** Whether `node` is an object written out or held in a constant declared in this file. */
+function isObject(sourceCode: SourceCode, node: Node): boolean {
+  const target = unwrap(node);
+  const value = target.type === 'ObjectExpression' ? target : constantValue(sourceCode, target);
+  return value !== undefined && unwrap(value).type === 'ObjectExpression';
+}
+
+/**
+ * Whether a declaration leaves out its title: a describe with only a body, or in node:test any test or
+ * describe that starts with its body or its options.
+ */
+function leavesOutTitle(
+  sourceCode: SourceCode,
+  framework: Framework,
+  args: TSESTree.CallExpressionArgument[],
+): boolean {
+  const [first] = args;
+  return isFunction(first) || (framework.optionalTitle && isObject(sourceCode, first));
+}
+
 /** Whether a title is text, written out or held in a constant declared in this file. */
 function isTextTitle(sourceCode: SourceCode, node: Node): boolean {
   const title = unwrap(node);
@@ -626,8 +654,9 @@ function isTextTitle(sourceCode: SourceCode, node: Node): boolean {
 /**
  * Whether a call declares a test or describe block: a title and a body, as in `test('title', fn)`,
  * `test('title', details, fn)` or `test.skip(title, payWithCard)` with the body defined elsewhere, a
- * describe with only a body, or a `todo` with only a title, in Vitest and Mocha a `skip` with only a
- * title, and in Mocha a test with only a title written out, which it runs as pending.
+ * describe with only a body, or a `todo` with only a title, in Vitest, Mocha and node:test a `skip` with
+ * only a title, in Mocha a test with only a title written out, which it runs as pending, and in node:test
+ * a test or describe with no title.
  * Only Playwright has a runtime `test.skip(isMobile, 'why')`; there a title, written out or held in a
  * constant, or a body written in place tells the two apart.
  */
@@ -639,8 +668,10 @@ function isDeclaration(
   members: string[],
 ): boolean {
   const first = args.at(0);
-  if (isFunction(first)) return kind === 'describe';
+  if (isFunction(first)) return kind === 'describe' || framework.optionalTitle;
   if (first === undefined) return false;
+  // node:test's `test({ skip: true }, fn)`, or `test({ name, fn })` with everything in the options.
+  if (framework.optionalTitle && isObject(sourceCode, first)) return true;
   if (args.length === 1) {
     if (members.includes('todo') || (framework.skipWithoutBody && members.includes('skip'))) return true;
     return framework.todoWithoutBody && kind === 'test' && isTextTitle(sourceCode, first);
@@ -662,6 +693,29 @@ function thisFunction(node: Node): Node | undefined {
 function booleanOf(node: Node | undefined): boolean | undefined {
   return node?.type === 'Literal' && typeof node.value === 'boolean' ? node.value : undefined;
 }
+
+/**
+ * Whether a node:test option applies: Node counts any value but `false` and `undefined`, so a reason such
+ * as `{ skip: 'flaky' }`, `''`, `0`, `null`, and an `expectFailure` pattern or matcher always do. Undefined
+ * for a value only known when the test runs, such as `{ skip: isWindows }`.
+ */
+function optionApplies(node: Node): boolean | undefined {
+  const value = unwrap(node);
+  if (value.type === 'Identifier' && value.name === 'undefined') return false;
+  if (value.type === 'Literal') return value.value !== false;
+  return OPTION_VALUES.has(value.type) ? true : undefined;
+}
+
+/** Values that are never `false` or `undefined`. */
+const OPTION_VALUES = new Set([
+  'TemplateLiteral',
+  'ObjectExpression',
+  'ArrayExpression',
+  'ArrowFunctionExpression',
+  'FunctionExpression',
+  'ClassExpression',
+  'NewExpression',
+]);
 
 /**
  * Whether a runtime call always applies: it has no condition, or `true`, or with `notes` only a note, as
@@ -757,8 +811,10 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const { root, path, args } = chain;
     let base = testNames.roots.get(root.name);
     let rest = path;
-    if (base === undefined && testNames.modules.has(root.name)) {
-      base = framework.exports.get(path[0]);
+    // `pw.test.skip`, or node:test's `test.describe`, whose module is also its `test`.
+    const member = testNames.modules.has(root.name) ? framework.exports.get(path[0]) : undefined;
+    if (member !== undefined || base === undefined) {
+      base = member;
       rest = path.slice(1);
     }
     return base !== undefined && !isLocalVariable(sourceCode, root) ? { root: base, path: rest, args } : undefined;
@@ -870,9 +926,11 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     // `{ skip: true }` always skips, `{ skip: isMobile }` only sometimes, `{ skip: false }` never.
     for (const [key, value] of details) {
       const modifier = framework.optionEffects.get(key);
-      const literal = booleanOf(value);
-      if (modifier && literal !== false) add(modifier, literal === true);
+      const always = framework.anyOptionValue ? optionApplies(value) : booleanOf(value);
+      if (modifier && always !== false) add(modifier, always === true);
     }
+    const first = framework.exclusiveStates.findIndex((state) => modifiers.get(state) === true);
+    if (first !== -1) for (const state of framework.exclusiveStates.slice(first + 1)) modifiers.delete(state);
     return modifiers;
   };
 
@@ -891,10 +949,10 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     return modifiers;
   };
 
-  /** Keeps the body of a Mocha test or hook written as a `function`, whose `this` can skip it. */
+  /** Keeps the body of a test or hook written as a `function`, whose `this` can skip it, as in Mocha. */
   const addThisBody = (args: TSESTree.CallExpressionArgument[]): void => {
     const body = args.findLast(isFunction);
-    if (framework.thisSkip && body?.type === 'FunctionExpression') thisBodies.add(body);
+    if (body?.type === 'FunctionExpression') thisBodies.add(body);
   };
 
   /** What a body can change the test's state with: Playwright's `testInfo` or Vitest's test context. */
@@ -939,8 +997,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     if (yes === undefined || no === undefined) return undefined;
     if (yes.kind !== no.kind || !declares(yes, args) || !declares(no, args)) return undefined;
     usesTest = true;
-    const details = detailsOf(sourceCode, call);
-    const tagInfo = collectTags(sourceCode, call, !isFunction(args[0]), framework, details);
+    const { details, tagInfo } = headOf(call);
     const [ifYes, ifNo] = [yes, no].map(({ members, args: conditions }) =>
       declarationModifiers(yes.kind, args, modifiersOf(members, details.entries, conditions)),
     );
@@ -949,12 +1006,45 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     for (const modifier of new Set([...ifYes.keys(), ...ifNo.keys()])) {
       modifiers.set(modifier, ifYes.get(modifier) === true && ifNo.get(modifier) === true);
     }
-    return { subject: makeSubject(yes.kind, call, modifiers, tagInfo), infos: bodyInfos(args, yes.members) };
+    const infos = yes.kind === 'test' ? bodyInfos(args, yes.members) : [];
+    return { subject: makeSubject(yes.kind, call, modifiers, tagInfo), infos };
+  };
+
+  /** The details and tags of a declaration; node:test lets it leave out its title. */
+  const headOf = (call: TSESTree.CallExpression): { details: Details; tagInfo: TagInfo } => {
+    const args = call.arguments;
+    const untitled = leavesOutTitle(sourceCode, framework, args);
+    const details = detailsOf(sourceCode, call, untitled && !isFunction(args[0]));
+    return { details, tagInfo: collectTags(sourceCode, call, !untitled, framework, details) };
+  };
+
+  const declare = (
+    call: TSESTree.CallExpression,
+    { kind, members, args: conditions }: Declaration,
+    infos: InfoName[],
+  ): { subject: Subject; infos: InfoName[] } => {
+    const args = call.arguments;
+    const { details, tagInfo } = headOf(call);
+    const modifiers = declarationModifiers(kind, args, modifiersOf(members, details.entries, conditions));
+    if (kind === 'test') addThisBody(args);
+    return { subject: makeSubject(kind, call, modifiers, tagInfo), infos };
+  };
+
+  /** node:test's `t.test('title', fn)`: a subtest declared through the context of the test around it. */
+  const subtestOf = (call: TSESTree.CallExpression): { subject: Subject; infos: InfoName[] } | undefined => {
+    const { callee } = call;
+    if (!framework.subtests || callee.type !== 'MemberExpression' || memberName(callee) !== 'test') return undefined;
+    const { object } = callee;
+    if (object.type !== 'Identifier' || !infos.findLast((info) => info.name === object.name)?.methods) return undefined;
+    const declaration: Declaration = { kind: 'test', members: [], args: new Map() };
+    return declares(declaration, call.arguments)
+      ? declare(call, declaration, bodyInfos(call.arguments, []))
+      : undefined;
   };
 
   const visitCall = (call: TSESTree.CallExpression): { subject?: Subject; infos?: InfoName[] } => {
     const callee = target(chainOf(call.callee, framework.factories));
-    if (callee === undefined) return pickedDeclaration(call) ?? { subject: runtimeCall(call) };
+    if (callee === undefined) return subtestOf(call) ?? pickedDeclaration(call) ?? { subject: runtimeCall(call) };
     usesTest = true;
     const args = call.arguments;
     const { path } = callee;
@@ -962,6 +1052,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     // Vitest's `beforeEach((context) => context.skip())` and Mocha's `before(function () { this.skip(); })`
     // skip the tests they run for.
     if (declaration === undefined) {
+      if (callee.root.noContext) return { infos: [] };
       addThisBody(args);
       return { infos: bodyInfos(args, path) };
     }
@@ -977,16 +1068,10 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
         return { subject, infos: infoNames(param, STEP_INFO_METHODS, subject) };
       }
     }
-    const bodyInfo = bodyInfos(args, path);
     const { kind, members } = declaration;
-    if (declares(declaration, args)) {
-      // A declaration always has a first argument: its title, or the body of a describe without one.
-      const details = detailsOf(sourceCode, call);
-      const tagInfo = collectTags(sourceCode, call, !isFunction(args[0]), framework, details);
-      const modifiers = declarationModifiers(kind, args, modifiersOf(members, details.entries, callee.args));
-      if (kind === 'test') addThisBody(args);
-      return { subject: makeSubject(kind, call, modifiers, tagInfo), infos: bodyInfo };
-    }
+    // A describe's body gets no test context: node:test passes one that can't skip.
+    const bodyInfo = kind === 'describe' ? [] : bodyInfos(args, path);
+    if (declares(declaration, args)) return declare(call, declaration, bodyInfo);
     // test.skip(), test.fixme(), test.fail() and test.slow() in a test, a describe or a hook.
     if (framework.playwright && members.length === 1 && RUNTIME_MODIFIERS.has(members[0])) {
       return { subject: runtimeSubject(call, members[0]), infos: bodyInfo };
@@ -995,8 +1080,8 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   };
 
   /**
-   * `testInfo.skip()`, `step.skip()`, `test.info().skip()`, Vitest's `context.skip()` or `skip()`, and
-   * Mocha's `this.skip()`.
+   * `testInfo.skip()`, `step.skip()`, `test.info().skip()`, Vitest's `context.skip()` or `skip()`,
+   * Mocha's `this.skip()`, and node:test's `t.skip()` and `t.todo()`.
    */
   const runtimeCall = (call: TSESTree.CallExpression): Subject | undefined => {
     const { callee } = call;
@@ -1008,11 +1093,12 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     }
     if (callee.type !== 'MemberExpression') return undefined;
     const name = memberName(callee);
-    if (name === undefined || !RUNTIME_MODIFIERS.has(name)) return undefined;
+    if (name === undefined) return undefined;
     const { object } = callee;
-    // Mocha's `this.skip()`, in a test or hook whose `function` gives it the test's `this`.
+    // Mocha's `this.skip()` or node:test's `this.todo()`, in a test or hook whose `function` gives it the
+    // test's `this`.
     if (object.type === 'ThisExpression') {
-      const owner = name === 'skip' ? thisFunction(call) : undefined;
+      const owner = framework.thisMethods.has(name) ? thisFunction(call) : undefined;
       return owner !== undefined && thisBodies.has(owner) ? runtimeSubject(call, name) : undefined;
     }
     if (object.type === 'Identifier') {
@@ -1020,6 +1106,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       return info?.methods?.has(name) ? runtimeSubject(call, name, info.step) : undefined;
     }
     const isTestInfo =
+      RUNTIME_MODIFIERS.has(name) &&
       object.type === 'CallExpression' &&
       target(chainOf(object.callee, framework.factories))?.path.join('.') === 'info';
     return isTestInfo ? runtimeSubject(call, name) : undefined;
@@ -1160,9 +1247,10 @@ export function strayMarkers(subject: Subject, options: ResolvedOptions): StateM
 export function headLoc(subject: Subject): TSESTree.SourceLocation {
   const { node } = subject;
   if (subject.kind === 'runtime') return node.loc;
-  // A describe can have a body and no title. A todo test has only a title.
+  // A describe, or in node:test any declaration, can start with its body or options and have no title. A
+  // todo test has only a title.
   const [first] = node.arguments;
-  const title = isFunction(first) ? undefined : first;
+  const title = isFunction(first) || first.type === 'ObjectExpression' ? undefined : first;
   return { start: node.callee.loc.start, end: (title ?? node.callee).loc.end };
 }
 

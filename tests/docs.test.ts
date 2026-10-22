@@ -269,7 +269,9 @@ describe('README.md', () => {
   });
 
   it('names every config', () => {
-    for (const name of Object.keys(testGovernance.configs)) assert.ok(readme.includes(`configs.${name}`), name);
+    // `configs['node-test']`: a name with a dash is read with brackets.
+    const access = (name: string): string => (/^\w+$/.test(name) ? `configs.${name}` : `configs['${name}']`);
+    for (const name of Object.keys(testGovernance.configs)) assert.ok(readme.includes(access(name)), name);
   });
 
   it('lists every exported type', () => {
@@ -511,7 +513,9 @@ describe('supported versions', () => {
 describe('package.json', () => {
   it('names every framework in its description and keywords', () => {
     for (const framework of FRAMEWORK_NAMES) {
-      assert.ok(packageJson.description.toLowerCase().includes(framework), framework);
+      // The description names Node's runner by its module, `node:test`.
+      const name = framework === 'node-test' ? 'node:test' : framework;
+      assert.ok(packageJson.description.toLowerCase().includes(name), framework);
       assert.ok(packageJson.keywords.includes(framework), framework);
     }
   });

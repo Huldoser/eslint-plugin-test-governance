@@ -15,7 +15,9 @@ const KEY_PATTERN = '^[A-Z][A-Z0-9_]+$';
 const KEY_HINT = 'an uppercase key as it appears in tickets, such as WEB for WEB-123';
 /** `['"a"', '"b"', '"c"']` as `"a", "b" or "c"`. */
 const orList = (items: string[]): string => `${items.slice(0, -1).join(', ')} or ${items.slice(-1).join('')}`;
-const FRAMEWORK_HINT = `set it to ${orList(FRAMEWORK_NAMES.map((name) => `"${name}"`))}, or use ${orList(FRAMEWORK_NAMES.map((name) => `configs.${name}`))}`;
+/** How code reads a framework's config: `configs.mocha`, or `configs['node-test']` for a name with a dash. */
+const configAccess = (name: string): string => (/^\w+$/.test(name) ? `configs.${name}` : `configs['${name}']`);
+const FRAMEWORK_HINT = `set it to ${orList(FRAMEWORK_NAMES.map((name) => `"${name}"`))}, or use ${orList(FRAMEWORK_NAMES.map(configAccess))}`;
 
 const ticketSpecSchema: Schema = {
   type: 'object',

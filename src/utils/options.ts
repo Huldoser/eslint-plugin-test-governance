@@ -34,7 +34,7 @@ export interface CustomState {
 export interface GovernanceOptions {
   /**
    * The test framework of the files the config applies to: `'playwright'`, `'jest'`, `'vitest'`, `'mocha'`,
-   * `'cypress'` or `'webdriverio'`. Required; each framework's config, such as `configs.mocha`, sets it.
+   * `'cypress'`, `'webdriverio'` or `'node-test'`. Required; each framework's config, such as `configs.mocha`, sets it.
    */
   framework: FrameworkName;
   /**
