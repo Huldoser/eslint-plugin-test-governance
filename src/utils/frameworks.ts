@@ -10,6 +10,8 @@ export type Modifier = 'skip' | 'fixme' | 'fail' | 'slow' | 'todo';
 export interface Root {
   kind: 'test' | 'describe' | 'hook';
   modifiers: readonly string[];
+  /** Set for a hook whose body gets no test context, as node:test's `before` in a describe. */
+  noContext?: true;
 }
 
 /**
@@ -31,6 +33,11 @@ export interface Framework {
   exports: ReadonlyMap<string, Root>;
   /** What a default import from the framework's module is. */
   defaultExport?: Root;
+  /**
+   * Whether the module itself is its default export with the other functions as members, as
+   * `require('node:test')`, which is `test` and has `test.describe`.
+   */
+  moduleIsDefault: boolean;
   /** Test functions that exist without an import, besides `testFunctions`. */
   globals: ReadonlyMap<string, Root>;
   /** The default `testFunctions`. */
@@ -47,6 +54,16 @@ export interface Framework {
   effects: ReadonlyMap<string, Effect>;
   /** Keys of an options object that put a test in a state, as in Vitest's `{ skip: true }`. */
   optionEffects: ReadonlyMap<string, Modifier>;
+  /**
+   * Whether an option counts whatever its value, unless it is `false` or `undefined`, as node:test's
+   * `{ skip: 'reason' }`. Otherwise only `true` always counts and other values are conditions.
+   */
+  anyOptionValue: boolean;
+  /**
+   * Whether the title can be left out, as node:test's `test(fn)` and `test({ skip: true }, fn)`, and an
+   * options object then comes first.
+   */
+  optionalTitle: boolean;
   /** The key of the details or options object that holds tags. */
   tagKey?: string;
   /** Whether that key holds names without their `@`, as Vitest's `tags: ['flaky']`, which stand for `@flaky`. */
@@ -56,6 +73,8 @@ export interface Framework {
    * `testInfo` or Vitest's test context, and the methods it has for that.
    */
   info?: { param: number; methods: ReadonlySet<string> };
+  /** Whether that parameter declares subtests with `t.test(...)`, as in node:test. */
+  subtests: boolean;
   /** Whether `skip` with only a title declares a skipped test or describe, as Vitest's `test.skip('title')`. */
   skipWithoutBody: boolean;
   /**
@@ -97,6 +116,7 @@ const playwright: Framework = {
   ownsModule: isPlaywrightModule,
   exports: new Map([['test', TEST]]),
   defaultExport: TEST,
+  moduleIsDefault: false,
   globals: new Map(),
   testFunctions: ['test'],
   testMembers: new Set(['only', 'skip', 'fixme', 'fail']),
@@ -108,9 +128,12 @@ const playwright: Framework = {
     ['fail', 'fail'],
   ]),
   optionEffects: new Map(),
+  anyOptionValue: false,
+  optionalTitle: false,
   tagKey: 'tag',
   plainTags: false,
   info: { param: 1, methods: RUNTIME_MODIFIERS },
+  subtests: false,
   skipWithoutBody: false,
   skipNotes: false,
   thisSkip: false,
@@ -134,6 +157,7 @@ const jest: Framework = {
   name: 'jest',
   ownsModule: (source) => source === '@jest/globals',
   exports: JEST_FUNCTIONS,
+  moduleIsDefault: false,
   globals: new Map([...JEST_FUNCTIONS].filter(([name]) => name !== 'test' && name !== 'it')),
   testFunctions: ['test', 'it'],
   testMembers: new Set(['only', 'skip', 'todo', 'failing', 'concurrent', 'each()']),
@@ -145,7 +169,10 @@ const jest: Framework = {
     ['failing', 'fail'],
   ]),
   optionEffects: new Map(),
+  anyOptionValue: false,
+  optionalTitle: false,
   plainTags: false,
+  subtests: false,
   skipWithoutBody: false,
   skipNotes: false,
   thisSkip: false,
@@ -166,6 +193,7 @@ const vitest: Framework = {
     ['suite', DESCRIBE],
     ['beforeEach', HOOK],
   ]),
+  moduleIsDefault: false,
   globals: new Map([
     ['describe', DESCRIBE],
     ['suite', DESCRIBE],
@@ -187,9 +215,12 @@ const vitest: Framework = {
     ['todo', 'todo'],
     ['fails', 'fail'],
   ]),
+  anyOptionValue: false,
+  optionalTitle: false,
   tagKey: 'tags',
   plainTags: true,
   info: { param: 0, methods: new Set(['skip']) },
+  subtests: false,
   skipWithoutBody: true,
   skipNotes: true,
   thisSkip: false,
@@ -218,6 +249,7 @@ const MOCHA_EXPORTS = new Map<string, Root>([
 const mocha: Omit<Framework, 'name'> = {
   ownsModule: (source) => source === 'mocha',
   exports: MOCHA_EXPORTS,
+  moduleIsDefault: false,
   globals: new Map([
     ...[...MOCHA_EXPORTS].filter(([name]) => name !== 'it' && name !== 'test'),
     ['context', DESCRIBE],
@@ -231,14 +263,69 @@ const mocha: Omit<Framework, 'name'> = {
   effects: effects([['skip', 'skip']]),
   // Cypress's `{ browser: '!webkit' }` runs the test only in some browsers.
   optionEffects: new Map([['browser', 'skip']]),
+  anyOptionValue: false,
+  optionalTitle: false,
   // @cypress/grep's `{ tags: '@smoke' }`, written with the `@`.
   tagKey: 'tags',
   plainTags: false,
+  subtests: false,
   skipWithoutBody: true,
   skipNotes: false,
   thisSkip: true,
   todoWithoutBody: true,
   states: new Set(['skip', 'todo', 'new', 'quarantined']),
+  playwright: false,
+};
+
+const NODE_TEST_MEMBERS = new Set(['only', 'skip', 'todo', 'expectFailure']);
+
+/**
+ * Node's built-in runner. `test` and `it` are one function, as are `describe` and `suite`, and the state
+ * members are exported by name too. Only `beforeEach` and `afterEach` get the test's context; `before` and
+ * `after` in a describe get the suite's, which can't skip.
+ */
+const nodeTest: Framework = {
+  name: 'node-test',
+  ownsModule: (source) => source === 'node:test',
+  exports: new Map([
+    ['test', TEST],
+    ['it', TEST],
+    ['describe', DESCRIBE],
+    ['suite', DESCRIBE],
+    ...[...NODE_TEST_MEMBERS].map((member): [string, Root] => [member, { kind: 'test', modifiers: [member] }]),
+    ['before', { kind: 'hook', modifiers: [], noContext: true }],
+    ['after', { kind: 'hook', modifiers: [], noContext: true }],
+    ['beforeEach', HOOK],
+    ['afterEach', HOOK],
+  ]),
+  defaultExport: TEST,
+  moduleIsDefault: true,
+  globals: new Map(),
+  testFunctions: ['test', 'it'],
+  testMembers: NODE_TEST_MEMBERS,
+  describeMembers: NODE_TEST_MEMBERS,
+  factories: new Set(),
+  effects: effects([
+    ['skip', 'skip'],
+    ['todo', 'todo'],
+    ['expectFailure', 'fail'],
+  ]),
+  optionEffects: new Map([
+    ['skip', 'skip'],
+    ['todo', 'todo'],
+    ['expectFailure', 'fail'],
+  ]),
+  anyOptionValue: true,
+  optionalTitle: true,
+  plainTags: false,
+  info: { param: 0, methods: new Set(['skip', 'todo']) },
+  subtests: true,
+  skipWithoutBody: true,
+  // `t.skip('why')` takes a message, not a condition.
+  skipNotes: true,
+  thisSkip: false,
+  todoWithoutBody: false,
+  states: new Set(['skip', 'todo', 'fail', 'new', 'quarantined']),
   playwright: false,
 };
 
@@ -249,6 +336,7 @@ export const FRAMEWORKS: Record<FrameworkName, Framework> = {
   mocha: { name: 'mocha', ...mocha },
   cypress: { name: 'cypress', ...mocha },
   webdriverio: { name: 'webdriverio', ...mocha },
+  'node-test': nodeTest,
 };
 
 /** Whether `source` belongs to a test runner other than `framework`, so its names are never tests here. */

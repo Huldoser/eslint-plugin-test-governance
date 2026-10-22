@@ -169,7 +169,7 @@ describe('framework', () => {
     });
   }
 
-  for (const framework of ['jest', 'vitest'] as const) {
+  for (const framework of ['jest', 'vitest', 'node-test'] as const) {
     it(`turns on skip and todo for ${framework}, and has no fixme or slow`, () => {
       assert.deepEqual(stateNames({ framework }), ['skip', 'todo']);
       assert.deepEqual(
@@ -184,7 +184,7 @@ describe('framework', () => {
   it('is required, since there is no default framework', () => {
     assert.throws(
       () => compileOptions({} as never),
-      /framework is required: set it to "playwright", "jest", "vitest", "mocha", "cypress" or "webdriverio", or use configs\.playwright, configs\.jest, configs\.vitest, configs\.mocha, configs\.cypress or configs\.webdriverio$/,
+      /framework is required: set it to "playwright", "jest", "vitest", "mocha", "cypress", "webdriverio" or "node-test", or use configs\.playwright, configs\.jest, configs\.vitest, configs\.mocha, configs\.cypress, configs\.webdriverio or configs\['node-test'\]$/,
     );
   });
 
@@ -195,7 +195,7 @@ describe('framework', () => {
   it('rejects an unknown framework', () => {
     assert.throws(
       () => compile({ framework: 'ava' } as never),
-      /framework must be one of "playwright", "jest", "vitest", "mocha", "cypress", "webdriverio" \(got "ava"\)/,
+      /framework must be one of "playwright", "jest", "vitest", "mocha", "cypress", "webdriverio", "node-test" \(got "ava"\)/,
     );
   });
 });
