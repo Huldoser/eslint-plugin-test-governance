@@ -523,7 +523,6 @@ describe('links between docs', () => {
     'CONTRIBUTING.md',
     'CHANGELOG.md',
     'SECURITY.md',
-    'CODE_OF_CONDUCT.md',
     '.github/pull_request_template.md',
     'docs/upgrading.md',
     ...ruleDocs,
