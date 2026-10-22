@@ -111,4 +111,4 @@ For the maintainer:
 Pushing a `vx.y.z` tag on a commit of `main` by hand still publishes that commit the same way.
 
 By contributing, you agree that your contributions are licensed under the [MIT License](LICENSE)
-and that you'll follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+and that you'll follow the [Code of Conduct](https://github.com/Huldoser/.github/blob/main/CODE_OF_CONDUCT.md).
