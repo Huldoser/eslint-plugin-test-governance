@@ -98,6 +98,22 @@ runRule('require-ticket (node:test)', requireTicket, {
         { ...missing('skip', 'SKIP'), line: 4 },
       ],
     },
+    // Node reports a test in one state only: skip, else todo, else expectFailure.
+    {
+      code: "import { describe, test } from 'node:test';\ndescribe.skip('order book', { todo: 'needs the clearing API' }, () => {});\ntest('fills', { skip: true, todo: 'later', expectFailure: true }, () => {});\ntest.todo('settles', { expectFailure: true }, () => {});\ntest.expectFailure('cancels', { skip: 'flaky' }, () => {});",
+      errors: [
+        { ...missing('skip', 'SKIP', 'This describe block'), line: 2 },
+        { ...missing('skip', 'SKIP'), line: 3 },
+        { ...missing('todo', 'TODO'), line: 4 },
+        { ...missing('skip', 'SKIP'), line: 5 },
+      ],
+      settings: settings({ states: { fail: true } }),
+    },
+    // A skip that applies only sometimes leaves the todo for the other runs.
+    {
+      code: "import { test } from 'node:test';\ntest('fills', { skip: isWindows, todo: 'later' }, () => {});",
+      errors: [missing('todo', 'TODO')],
+    },
     {
       code: "import { test } from 'node:test';\ntest('fills', { skip: process.platform === 'win32' }, () => {});\ntest('cancels', { skip: isCI ? 'slow' : false }, () => {});",
       settings: settings({ requireTicketForConditional: true }),

@@ -163,7 +163,9 @@ In `node:test`, an option counts with any value but `false` or `undefined`, as N
 condition. Subtests declared with `t.test('title', options, fn)` are checked like tests, and a test or
 describe can leave out its title and start with its options or body, as in `test({ skip: true }, fn)`.
 A test with no function, `test('title')`, passes in Node, so it isn't a todo. A describe's body, and
-`before` and `after` inside it, get the suite's context, which can't skip.
+`before` and `after` inside it, get the suite's context, which can't skip. Node reports a test in one
+state only, skip before todo before `expectFailure`, so `describe.skip('title', { todo: 'why' }, fn)`
+needs only a `// SKIP:` marker.
 
 ## Rules
 

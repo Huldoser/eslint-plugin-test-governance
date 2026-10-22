@@ -929,6 +929,8 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       const always = framework.anyOptionValue ? optionApplies(value) : booleanOf(value);
       if (modifier && always !== false) add(modifier, always === true);
     }
+    const first = framework.exclusiveStates.findIndex((state) => modifiers.get(state) === true);
+    if (first !== -1) for (const state of framework.exclusiveStates.slice(first + 1)) modifiers.delete(state);
     return modifiers;
   };
 

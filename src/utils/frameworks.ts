@@ -60,6 +60,11 @@ export interface Framework {
    */
   anyOptionValue: boolean;
   /**
+   * States a test is in only one of: the first that always applies, as node:test reports a skipped todo
+   * test as skipped only. A state that applies only sometimes leaves the later ones for the other runs.
+   */
+  exclusiveStates: readonly Modifier[];
+  /**
    * Whether the title can be left out, as node:test's `test(fn)` and `test({ skip: true }, fn)`, and an
    * options object then comes first.
    */
@@ -129,6 +134,7 @@ const playwright: Framework = {
   ]),
   optionEffects: new Map(),
   anyOptionValue: false,
+  exclusiveStates: [],
   optionalTitle: false,
   tagKey: 'tag',
   plainTags: false,
@@ -170,6 +176,7 @@ const jest: Framework = {
   ]),
   optionEffects: new Map(),
   anyOptionValue: false,
+  exclusiveStates: [],
   optionalTitle: false,
   plainTags: false,
   subtests: false,
@@ -216,6 +223,7 @@ const vitest: Framework = {
     ['fails', 'fail'],
   ]),
   anyOptionValue: false,
+  exclusiveStates: [],
   optionalTitle: false,
   tagKey: 'tags',
   plainTags: true,
@@ -264,6 +272,7 @@ const mocha: Omit<Framework, 'name'> = {
   // Cypress's `{ browser: '!webkit' }` runs the test only in some browsers.
   optionEffects: new Map([['browser', 'skip']]),
   anyOptionValue: false,
+  exclusiveStates: [],
   optionalTitle: false,
   // @cypress/grep's `{ tags: '@smoke' }`, written with the `@`.
   tagKey: 'tags',
@@ -316,6 +325,7 @@ const nodeTest: Framework = {
     ['expectFailure', 'fail'],
   ]),
   anyOptionValue: true,
+  exclusiveStates: ['skip', 'todo', 'fail'],
   optionalTitle: true,
   plainTags: false,
   info: { param: 0, methods: new Set(['skip', 'todo']) },
