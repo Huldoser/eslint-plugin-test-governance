@@ -39,6 +39,12 @@ runRule('require-ticket (node:test)', requireTicket, {
     "import { test } from 'node:test';\ntest('order book', async (t) => {\n  await t.test('settles at T+1');\n});",
     // Not a context: `test` on any other object, and a regex's `test`.
     "import { test } from 'node:test';\nconst client = { test() {} };\nclient.test('fills a limit order', { skip: true }, () => {});\ntest('quotes', () => {\n  /^Q-/.test(quote);\n});",
+    "import { test } from 'node:test';\ntest('quotes', (t) => {\n  client.test('fills a limit order', { skip: true }, () => {});\n});",
+    // `undefined` never applies, so it isn't a condition either.
+    {
+      code: "import { test } from 'node:test';\ntest('fills a limit order', { skip: undefined }, () => {});",
+      settings: settings({ requireTicketForConditional: true }),
+    },
     // node:test lets a test or describe leave out its title.
     "import { test, describe } from 'node:test';\n// SKIP: TRADE-1\ntest({ skip: true }, () => {});\ndescribe(() => {});\ntest(function fillsALimitOrder() {});",
     // A test with no function is a passing no-op, not a todo.
@@ -125,6 +131,11 @@ runRule('require-ticket (node:test)', requireTicket, {
       ],
     },
     {
+      code: "import { test } from 'node:test';\ntest('fills', { skip: isWindows }, () => {});",
+      settings: settings({ requireTicketForConditional: true }),
+      errors: [{ ...missing('skip', 'SKIP'), line: 2 }],
+    },
+    {
       code: "import { test } from 'node:test';\ntest('fills a limit order', (t) => {\n  t.skip();\n});",
       errors: [{ ...missing('skip', 'SKIP', 'This skip call'), line: 3 }],
     },
@@ -177,6 +188,10 @@ runRule('require-ticket (node:test)', requireTicket, {
       ],
     },
     {
+      code: "import { test } from 'node:test';\nconst options = { skip: 'broker sandbox is down' };\ntest(options, () => {});",
+      errors: [{ ...missing('skip', 'SKIP'), line: 3 }],
+    },
+    {
       code: "const test = require('node:test');\ntest.skip('fills', () => {});\ntest.describe.skip('order book', () => {});\ntest('cancels', { skip: true }, () => {});",
       errors: [
         { ...missing('skip', 'SKIP'), line: 2 },
@@ -206,6 +221,10 @@ runRule('require-ticket (node:test)', requireTicket, {
       ],
     },
     {
+      code: "import * as nodeTest from 'node:test';\nnodeTest.test.skip('fills', () => {});",
+      errors: [{ ...missing('skip', 'SKIP'), line: 2 }],
+    },
+    {
       code: "import { test, describe, expectFailure } from 'node:test';\ntest.expectFailure('rejects a short sale', () => {});\ntest('rejects a margin call', { expectFailure: /margin/ }, () => {});\ndescribe('limits', { expectFailure: { label: 'not built', match: /limit/ } }, () => {});\nexpectFailure('rejects a stop order', () => {});",
       settings: settings({ states: { fail: true } }),
       errors: [
@@ -213,6 +232,26 @@ runRule('require-ticket (node:test)', requireTicket, {
         { ...missing('fail', 'FAIL'), line: 3 },
         { ...missing('fail', 'FAIL', 'This describe block'), line: 4 },
         { ...missing('fail', 'FAIL'), line: 5 },
+      ],
+    },
+    // A function, a class or an object made with `new` checks the error, so it always applies.
+    {
+      code: "import { test } from 'node:test';\ntest('fills', { expectFailure: (error) => error.code === 'ECONNRESET' }, () => {});\ntest('cancels', { expectFailure: function (error) { return error instanceof RangeError; } }, () => {});\ntest('quotes', { expectFailure: class extends RangeError {} }, () => {});\ntest('settles', { expectFailure: new RegExp('timed out') }, () => {});",
+      settings: settings({ states: { fail: true } }),
+      errors: [
+        { ...missing('fail', 'FAIL'), line: 2 },
+        { ...missing('fail', 'FAIL'), line: 3 },
+        { ...missing('fail', 'FAIL'), line: 4 },
+        { ...missing('fail', 'FAIL'), line: 5 },
+      ],
+    },
+    // `only` keeps a test's state, and a test picked by a condition gets the context too.
+    {
+      code: "import { test, only } from 'node:test';\ntest.only('fills', { skip: true }, () => {});\nonly('cancels', function () {\n  this.todo();\n});\n(isCI ? test.only : test)('quotes', (t) => {\n  t.skip();\n});",
+      errors: [
+        { ...missing('skip', 'SKIP'), line: 2 },
+        { ...missing('todo', 'TODO', 'This todo call'), line: 4 },
+        { ...missing('skip', 'SKIP', 'This skip call'), line: 7 },
       ],
     },
     {

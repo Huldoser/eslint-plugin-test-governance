@@ -42,6 +42,8 @@ runRule('require-ticket (Mocha)', requireTicket, {
     "describe('order book', function () {\n  before(function () {\n    if (!broker) this.skip();\n  });\n});",
     "// SKIP: TRADE-1\ndescribe('order book', function () {\n  beforeEach('connect to the broker', function () {\n    this.skip();\n  });\n});",
     "suite('order book', function () {\n  setup(function () {\n    // SKIP: TRADE-1\n    this.skip();\n  });\n});",
+    // Mocha's `this` has no `todo`.
+    "it('settles at T+1', function () {\n  this.todo();\n});",
     // Not Mocha's `this`: an arrow body gets no test context, and a nested function, a describe body and
     // any other function have a `this` of their own.
     "it('fills a limit order', () => {\n  this.skip();\n});",
