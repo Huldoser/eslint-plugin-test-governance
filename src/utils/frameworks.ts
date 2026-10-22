@@ -34,8 +34,8 @@ export interface Framework {
   /** What a default import from the framework's module is. */
   defaultExport?: Root;
   /**
-   * Whether the module itself is its default export with the other functions as members, as
-   * `require('node:test')`, which is `test` and has `test.describe`.
+   * Whether the default export is the module itself, with the other functions as members: node:test's and
+   * Playwright's are `test`, which has `test.describe`, and Mocha's has `mocha.it`.
    */
   moduleIsDefault: boolean;
   /** Test functions that exist without an import, besides `testFunctions`. */
@@ -124,7 +124,7 @@ const playwright: Framework = {
   ownsModule: isPlaywrightModule,
   exports: new Map([['test', TEST]]),
   defaultExport: TEST,
-  moduleIsDefault: false,
+  moduleIsDefault: true,
   globals: new Map(),
   testFunctions: ['test'],
   testMembers: new Set(['only', 'skip', 'fixme', 'fail']),
@@ -260,7 +260,7 @@ const MOCHA_EXPORTS = new Map<string, Root>([
 const mocha: Omit<Framework, 'name'> = {
   ownsModule: (source) => source === 'mocha',
   exports: MOCHA_EXPORTS,
-  moduleIsDefault: false,
+  moduleIsDefault: true,
   globals: new Map([
     ...[...MOCHA_EXPORTS].filter(([name]) => name !== 'it' && name !== 'test'),
     ['context', DESCRIBE],

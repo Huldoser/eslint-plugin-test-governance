@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- In Playwright files, `const pw = require('@playwright/test')` and `import pw from '@playwright/test'`
+  are `test` itself, so `pw.skip(...)`, `pw.describe.fixme(...)` and `pw.test.skip(...)` are checked.
+  They were missed.
+- In Mocha, Cypress and WebdriverIO files, `mocha.it.skip(...)` after `import mocha from 'mocha'` is
+  checked, as it already was after `import * as mocha from 'mocha'` and `require('mocha')`.
+
 ## [0.8.0] - 2026-10-22
 
 ### Added

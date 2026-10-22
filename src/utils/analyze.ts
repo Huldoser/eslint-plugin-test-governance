@@ -246,7 +246,7 @@ function collectTestNames(program: TSESTree.Program, framework: Framework, confi
           if (spec.type === 'ImportNamespaceSpecifier') modules.add(local);
           else if (spec.type === 'ImportDefaultSpecifier') {
             if (framework.defaultExport) roots.set(local, framework.defaultExport);
-            // `import test from 'node:test'` also has `test.describe`.
+            // `import test from 'node:test'` also has `test.describe`, and `import mocha from 'mocha'` has `mocha.it`.
             if (framework.moduleIsDefault) modules.add(local);
           } else {
             const root = framework.exports.get(importedName(spec));
@@ -270,8 +270,8 @@ function collectTestNames(program: TSESTree.Program, framework: Framework, confi
         // `const test = require('node:test')` is another runner's `test`, like an import from it.
         else if (isOtherFramework(init)) setOther(name);
         else {
-          // `const pw = require('@playwright/test')`, used as `pw.test`, or `const test = require('node:test')`,
-          // which is `test` itself.
+          // `const mocha = require('mocha')`, used as `mocha.it`, or `const pw = require('@playwright/test')`,
+          // which is `test` itself, as `require('node:test')` is.
           const source = requireSource(init);
           if (source !== undefined && framework.ownsModule(source)) {
             modules.add(name);
