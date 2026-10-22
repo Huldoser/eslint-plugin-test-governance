@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `node:test` support. `configs['node-test']`, or `configure({ framework: 'node-test' })`, checks tests
+  written with Node's built-in runner: `test`, `it`, `describe` and `suite` imported or required from
+  `node:test`, their `skip`, `todo` and `expectFailure` members, which `node:test` also exports by name,
+  and the same options. Node counts an option set to any value but `false` or `undefined`, so
+  `{ skip: 'broker sandbox is down' }` always skips and needs a ticket, while `{ skip: isWindows }` is a
+  conditional skip. `t.skip()` and `t.todo()` on a test's context count in a test, `beforeEach` and
+  `afterEach`, and subtests declared with `t.test()` are checked like tests. `expectFailure` is the `fail`
+  state, which is off by default.
+
 ### Fixed
 
 - A marker in the wrong case directly above a test in that state, as `// todo:` above `test.todo(...)`, is

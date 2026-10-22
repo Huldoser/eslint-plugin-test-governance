@@ -13,6 +13,7 @@ export default {
     ['mocha', '☕'],
     ['cypress', '🌲'],
     ['webdriverio', '🤖'],
+    ['node-test', '🟢'],
   ],
   // Options are shared by all rules and documented once in the README.
   ruleDocSectionOptions: false,
