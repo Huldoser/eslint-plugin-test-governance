@@ -30,6 +30,8 @@ runRule('require-ticket (Mocha)', requireTicket, {
     "import { describe as block, it as check } from 'mocha';\n// SKIP: TRADE-1\ncheck.skip('fills', () => {});\n// SKIP: TRADE-2\nblock.skip('order book', () => {});",
     "const { it, suite } = require('mocha');\n// SKIP: TRADE-1\nit.skip('fills', () => {});\n// SKIP: TRADE-2\nsuite.skip('order book', () => {});",
     "import * as mocha from 'mocha';\n// SKIP: TRADE-1\nmocha.it.skip('fills', () => {});",
+    // The default import is the module, as `require('mocha')` is.
+    "import mocha from 'mocha';\n// SKIP: TRADE-1\nmocha.it.skip('fills', () => {});\nnew mocha({ ui: 'bdd' }).run();",
     // `this.skip()` in a test, with the marker above the call or above the test.
     "it('fills a limit order', function () {\n  // SKIP: TRADE-1\n  this.skip();\n});",
     "// SKIP: TRADE-1\nit('fills a limit order', async function () {\n  this.skip();\n});",
@@ -106,6 +108,10 @@ runRule('require-ticket (Mocha)', requireTicket, {
     {
       code: "import * as mocha from 'mocha';\nmocha.describe.skip('order book', () => {});",
       errors: [missing('skip', 'SKIP', 'This describe block')],
+    },
+    {
+      code: "import mocha from 'mocha';\nmocha.describe.skip('order book', () => {});\nmocha.xit('fills', () => {});",
+      errors: [missing('skip', 'SKIP', 'This describe block'), missing('skip', 'SKIP')],
     },
     {
       code: "it('fills a limit order', function () {\n  this.skip();\n});",

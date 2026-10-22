@@ -302,8 +302,9 @@ In Playwright files:
 - `test` imported from `@playwright/test`, `playwright/test` or a component-testing package such as
   `@playwright/experimental-ct-react`, including the default import, aliases such as
   `import { test as it }` or `const it = test`, and `const { test } = require('@playwright/test')`.
-- `pw.test` on the whole module, after `import * as pw from '@playwright/test'` or
-  `const pw = require('@playwright/test')`.
+- `pw.test` on the whole module, after `import * as pw from '@playwright/test'`. The default import
+  and `const pw = require('@playwright/test')` are `test` itself, so `pw.skip(...)` and
+  `pw.test.skip(...)` both count.
 - Fixtures made with `.extend()` or `mergeTests()` in the same file, such as
   `const test = base.extend({...})`.
 - Any name in `testFunctions`, for fixtures imported from your own modules. The default `['test']`
@@ -322,7 +323,8 @@ In Mocha, Cypress and WebdriverIO files:
 - The globals `it`, `specify`, `describe` and `context`, their `x` forms, the TDD names `suite` and
   `test`, and the hooks `before`, `beforeEach`, `after`, `afterEach`, `suiteSetup`, `setup`,
   `suiteTeardown` and `teardown`.
-- The names imported or required from `mocha`, including aliases and `import * as mocha from 'mocha'`.
+- The names imported or required from `mocha`, including aliases, and the whole module, as `mocha.it`
+  after `import * as mocha from 'mocha'`, `import mocha from 'mocha'` or `const mocha = require('mocha')`.
 - Any name in `testFunctions`, which defaults to `['it', 'specify', 'test']`.
 
 In `node:test` files:
