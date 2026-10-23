@@ -68,9 +68,9 @@ jobs:
           url=$(node -e '
             const { readFileSync } = require("node:fs");
             const { GITHUB_SERVER_URL, GITHUB_REPOSITORY, VERSION } = process.env;
-            const title = encodeURIComponent(`Release ${VERSION}`);
+            const title = encodeURIComponent("Release " + VERSION);
             const body = encodeURIComponent(readFileSync("body.md", "utf8"));
-            console.log(`${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/main...release/v${VERSION}?expand=1&title=${title}&body=${body}`);
+            console.log(GITHUB_SERVER_URL + "/" + GITHUB_REPOSITORY + "/compare/main...release/v" + VERSION + "?expand=1&title=" + title + "&body=" + body);
           ')
           echo "Open the release pull request: $url"
           {
