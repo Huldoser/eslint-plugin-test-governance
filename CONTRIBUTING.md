@@ -98,10 +98,10 @@ For the maintainer:
 
 1. Run the **Prepare release** workflow (Actions → Prepare release → Run workflow) with `patch`,
    `minor`, `major` or an exact version. It bumps `package.json` and `package-lock.json`, moves the
-   `[Unreleased]` entries of `CHANGELOG.md` into a `[x.y.z] - <date>` section, opens a
-   "Release x.y.z" pull request and starts CI on it. `node scripts/prepare-release.mjs patch` makes
-   the same changes locally.
-2. Review and merge that pull request.
+   `[Unreleased]` entries of `CHANGELOG.md` into a `[x.y.z] - <date>` section and pushes them to a
+   `release/vx.y.z` branch. `node scripts/prepare-release.mjs patch` makes the same changes locally.
+2. Open the "Release x.y.z" pull request from the link in the run's summary, which fills in its
+   title and description, then review and merge it once CI passes.
 3. The Release workflow sees the new version on `main` and checks that it matches the tag it will
    create, that the changelog has an entry for it and nothing left under `[Unreleased]`. It then
    runs the checks above, publishes the version to npm with provenance, where it becomes the

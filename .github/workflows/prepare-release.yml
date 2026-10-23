@@ -1,8 +1,9 @@
 name: Prepare release
 
 # Run by hand to start a release. Bumps the version, moves the [Unreleased] changelog entries into a
-# section for it, and opens a "Release x.y.z" pull request. Merging that pull request publishes the
-# version (see release.yml).
+# section for it, pushes a release/vx.y.z branch and prints a link that opens the "Release x.y.z" pull
+# request. The workflow token can't open pull requests, so the maintainer opens it from that link, and
+# CI runs on it like on any other pull request. Merging it publishes the version (see release.yml).
 
 on:
   workflow_dispatch:
@@ -25,8 +26,6 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: write # push the release branch
-      pull-requests: write # open the release pull request
-      actions: write # start CI and the changelog check on it
     steps:
       # The token stays out of .git/config while `npm ci` runs install scripts; the push step below hands
       # it to git through gh.
@@ -45,7 +44,7 @@ jobs:
           BUMP: ${{ inputs.bump }}
         run: echo "version=$(node scripts/prepare-release.mjs "$BUMP")" >> "$GITHUB_OUTPUT"
       - run: npm run format:check
-      - name: Open the release pull request
+      - name: Push the release branch
         env:
           VERSION: ${{ steps.bump.outputs.version }}
           GH_TOKEN: ${{ github.token }}
@@ -57,12 +56,29 @@ jobs:
           git commit -am "Release $VERSION"
           gh auth setup-git
           git push origin "$branch"
+      - name: Print the link that opens the release pull request
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
           {
             echo "Merging this publishes $VERSION to npm with provenance, tags the merge commit v$VERSION and creates the GitHub release with these notes:"
             echo
             node scripts/changelog-section.mjs "$VERSION"
           } > body.md
-          gh pr create --base main --head "$branch" --title "Release $VERSION" --body-file body.md
-          # Pull requests opened with this workflow's token don't start CI on their own.
-          gh workflow run ci.yml --ref "$branch"
-          gh workflow run changelog.yml --ref "$branch"
+          url=$(node -e '
+            const { readFileSync } = require("node:fs");
+            const { GITHUB_SERVER_URL, GITHUB_REPOSITORY, VERSION } = process.env;
+            const title = encodeURIComponent(`Release ${VERSION}`);
+            const body = encodeURIComponent(readFileSync("body.md", "utf8"));
+            console.log(`${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/main...release/v${VERSION}?expand=1&title=${title}&body=${body}`);
+          ')
+          echo "Open the release pull request: $url"
+          {
+            echo "[Open the Release $VERSION pull request]($url)"
+            echo
+            echo "If the link doesn't fill in the description, paste this:"
+            echo
+            echo '```markdown'
+            cat body.md
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
