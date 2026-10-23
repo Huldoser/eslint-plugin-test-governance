@@ -131,6 +131,7 @@ jobs:
     permissions:
       contents: read
       id-token: write # trusted publishing and provenance
+    environment: release
     env:
       TAG: ${{ needs.version.outputs.tag }}
     steps:
