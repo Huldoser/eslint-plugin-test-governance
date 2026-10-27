@@ -14,6 +14,7 @@ export default {
     ['cypress', '🌲'],
     ['webdriverio', '🤖'],
     ['node-test', '🟢'],
+    ['jasmine', '🌼'],
   ],
   // Options are shared by all rules and documented once in the README.
   ruleDocSectionOptions: false,

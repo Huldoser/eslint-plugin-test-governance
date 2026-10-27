@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Jasmine support. `configs.jasmine`, or `configure({ framework: 'jasmine' })`, checks tests run by
+  Jasmine on its own, on Karma with karma-jasmine (as Angular's karma builder sets up) or by WebdriverIO's
+  Jasmine framework: the globals `it`, `xit`, `fit`, `describe`, `xdescribe` and `fdescribe`, or the same
+  names from `jasmine-core`. `xit` and `xdescribe` skip a test, and `it('title')` with no function is a
+  todo. `pending()` and Jasmine 7's `notApplicable()` skip the running test in a test, `beforeEach` or
+  `afterEach`; like `t.skip('reason')`, `pending('reason')` needs a ticket unless a condition guards it.
+  `testFunctions` defaults to `['it']`, since Jasmine has no `test`.
+
 ## [0.8.1] - 2026-10-22
 
 ### Fixed
