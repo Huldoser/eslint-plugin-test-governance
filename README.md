@@ -4,7 +4,7 @@
 [![CI](https://github.com/Huldoser/eslint-plugin-test-governance/actions/workflows/ci.yml/badge.svg)](https://github.com/Huldoser/eslint-plugin-test-governance/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/npm/l/eslint-plugin-test-governance)](LICENSE)
 
-ESLint rules that keep a Playwright, Jest, Vitest, Mocha, Cypress, WebdriverIO or `node:test` suite honest. Every skipped, fixme, todo, `@new`
+ESLint rules that keep a Playwright, Jest, Vitest, Mocha, Cypress, WebdriverIO, `node:test` or Jasmine suite honest. Every skipped, fixme, todo, `@new`
 or `@quarantined` test must point at the ticket that tracks it:
 
 <!-- example: valid -->
@@ -35,8 +35,8 @@ Requires ESLint 9 or 10 with flat config, and Node.js 22.12 or later. For TypeSc
 ## Usage
 
 Pick the config for the framework your tests use, `configs.playwright`, `configs.jest`,
-`configs.vitest`, `configs.mocha`, `configs.cypress`, `configs.webdriverio` or `configs['node-test']` for
-Node's built-in runner, and point it at those test files with `files`:
+`configs.vitest`, `configs.mocha`, `configs.cypress`, `configs.webdriverio`, `configs['node-test']` for
+Node's built-in runner or `configs.jasmine`, and point it at those test files with `files`:
 
 ```js
 // eslint.config.js
@@ -53,16 +53,17 @@ export default [
 ```
 
 There is no default config. Each framework declares, skips and tags tests its own way, so the rules
-need to know which one a file uses. In a Jest, Vitest or Mocha config, `test`, `it` and `describe` belong
-to that framework, whether they are globals or imported from `@jest/globals`, `vitest` or `mocha`, the
-way the Jest, Vitest and Mocha ESLint plugins are set up. `node:test` has no globals, so in its config
+need to know which one a file uses. In a Jest, Vitest, Mocha or Jasmine config, the framework's functions,
+such as `it` and `describe`, belong to it, whether they are globals or imported from `@jest/globals`,
+`vitest`, `mocha` or `jasmine-core`, the way the Jest, Vitest and Mocha ESLint plugins are set up. `node:test` has no globals, so in its config
 they are the names imported or required from `node:test`, and `test` and `it` from `testFunctions`.
 
 Cypress and WebdriverIO run their tests on Mocha, so `configs.cypress` and `configs.webdriverio` read the
-same calls as `configs.mocha`. `webdriverio` means WebdriverIO's Mocha framework; its Jasmine framework
-isn't supported yet. Puppeteer has no test functions of its own, so use the config of the runner its
-tests run on: `configs.jest` for jest-puppeteer, or `configs.vitest`, `configs.mocha` or
-`configs['node-test']`.
+same calls as `configs.mocha`. `webdriverio` means WebdriverIO's Mocha framework; for its Jasmine
+framework, use `configs.jasmine`. Karma runs Jasmine or Mocha tests, so use `configs.jasmine` with
+karma-jasmine, which Angular's karma builder sets up, and `configs.mocha` with karma-mocha. Puppeteer has
+no test functions of its own, so use the config of the runner its tests run on: `configs.jest` for
+jest-puppeteer, or `configs.vitest`, `configs.mocha`, `configs['node-test']` or `configs.jasmine`.
 
 With ESLint's `defineConfig()` (ESLint 9.22 or later), put the config in `extends`:
 
@@ -133,26 +134,30 @@ export default [
 ];
 ```
 
+This matters most for Jasmine next to Jest or Mocha, whose `it`, `xit` and `describe` look the same:
+only the `files` of each config tell them apart.
+
 Each framework's config, such as `configs.playwright`, sets only the framework, so one listed after a
 `configure()` for the same files keeps that config's options and changes only the framework. They all
 turn on the same rules. What puts a test in a state in each framework:
 
-| State (marker)                         | Playwright                                                                                                          | Jest                                                                 | Vitest                                                                                                                                                                                     | Mocha                                                                                                                                                                     | Cypress                                  | WebdriverIO | node-test                                                                                                                                                                                         |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `skip` (`// SKIP:`)                    | `test.skip(...)`, `test.describe.skip`, `test.skip()` in a body, `testInfo.skip()`, `test.step.skip`, `step.skip()` | `test.skip`, `it.skip`, `describe.skip`, `xit`, `xtest`, `xdescribe` | `test.skip`, `it.skip`, `describe.skip`, `suite.skip`, `skipIf(true)`, `runIf(false)`, `{ skip: true }`, `context.skip()`, `context.skip('note')` or `skip()` in a body or in `beforeEach` | `it.skip`, `specify.skip`, `describe.skip`, `context.skip`, `xit`, `xspecify`, `xdescribe`, `xcontext`, TDD `test.skip` and `suite.skip`, `this.skip()` in a test or hook | as Mocha                                 | as Mocha    | `test.skip`, `it.skip`, `describe.skip`, `suite.skip`, `skip()`, `{ skip: true }` or `{ skip: 'reason' }`, `t.skip()`, `t.skip('reason')` or `this.skip()` in a test, `beforeEach` or `afterEach` |
-| `todo` (`// TODO:`)                    |                                                                                                                     | `test.todo`, `it.todo`                                               | `test.todo`, `describe.todo`, `{ todo: true }`                                                                                                                                             | a test with only a title, `it('title')`, which Mocha runs as pending                                                                                                      | as Mocha                                 | as Mocha    | `test.todo`, `it.todo`, `describe.todo`, `suite.todo`, `todo()`, `{ todo: true }` or `{ todo: 'reason' }`, `t.todo()`, `this.todo()`                                                              |
-| `fixme` (`// FIXME:`)                  | `test.fixme(...)`, `test.describe.fixme`, `testInfo.fixme()`                                                        |                                                                      |                                                                                                                                                                                            |                                                                                                                                                                           |                                          |             |                                                                                                                                                                                                   |
-| `fail` (`// FAIL:`), off by default    | `test.fail(...)`, `testInfo.fail()`                                                                                 | `test.failing`                                                       | `test.fails`, `{ fails: true }`                                                                                                                                                            |                                                                                                                                                                           |                                          |             | `test.expectFailure`, `expectFailure()`, `{ expectFailure }`                                                                                                                                      |
-| `slow` (`// SLOW:`), off by default    | `test.slow()`, `testInfo.slow()`                                                                                    |                                                                      |                                                                                                                                                                                            |                                                                                                                                                                           |                                          |             |                                                                                                                                                                                                   |
-| conditional skip, no ticket by default | `test.skip(condition)`, `if (...) test.skip()`, `(condition ? test.skip : test)(...)`                               | `(condition ? it.skip : it)(...)`                                    | `skipIf(condition)`, `runIf(condition)`, `{ skip: condition }`, `context.skip(condition)`, `if (...) context.skip()`, `(condition ? it.skip : it)(...)`                                    | `if (...) this.skip()`, `(condition ? it.skip : it)(...)`                                                                                                                 | as Mocha, and `{ browser: '!webkit' }`   | as Mocha    | `{ skip: condition }`, `{ todo: condition }`, `if (...) t.skip()`, `(condition ? it.skip : it)(...)`                                                                                              |
-| tags such as `@new` (`// NEW:`)        | the title, `{ tag }`                                                                                                | the title                                                            | the title, `{ tags }`, where `'new'` and `'@new'` both mean `@new`                                                                                                                         | the title                                                                                                                                                                 | the title, `{ tags }` from @cypress/grep | the title   | the title                                                                                                                                                                                         |
+| State (marker)                         | Playwright                                                                                                          | Jest                                                                 | Vitest                                                                                                                                                                                     | Mocha                                                                                                                                                                     | Cypress                                  | WebdriverIO | node-test                                                                                                                                                                                         | Jasmine                                                                                                                  |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `skip` (`// SKIP:`)                    | `test.skip(...)`, `test.describe.skip`, `test.skip()` in a body, `testInfo.skip()`, `test.step.skip`, `step.skip()` | `test.skip`, `it.skip`, `describe.skip`, `xit`, `xtest`, `xdescribe` | `test.skip`, `it.skip`, `describe.skip`, `suite.skip`, `skipIf(true)`, `runIf(false)`, `{ skip: true }`, `context.skip()`, `context.skip('note')` or `skip()` in a body or in `beforeEach` | `it.skip`, `specify.skip`, `describe.skip`, `context.skip`, `xit`, `xspecify`, `xdescribe`, `xcontext`, TDD `test.skip` and `suite.skip`, `this.skip()` in a test or hook | as Mocha                                 | as Mocha    | `test.skip`, `it.skip`, `describe.skip`, `suite.skip`, `skip()`, `{ skip: true }` or `{ skip: 'reason' }`, `t.skip()`, `t.skip('reason')` or `this.skip()` in a test, `beforeEach` or `afterEach` | `xit`, `xdescribe`, `pending()`, `pending('reason')` or `notApplicable('reason')` in a test, `beforeEach` or `afterEach` |
+| `todo` (`// TODO:`)                    |                                                                                                                     | `test.todo`, `it.todo`                                               | `test.todo`, `describe.todo`, `{ todo: true }`                                                                                                                                             | a test with only a title, `it('title')`, which Mocha runs as pending                                                                                                      | as Mocha                                 | as Mocha    | `test.todo`, `it.todo`, `describe.todo`, `suite.todo`, `todo()`, `{ todo: true }` or `{ todo: 'reason' }`, `t.todo()`, `this.todo()`                                                              | a test with only a title, `it('title')`, which Jasmine reports as pending                                                |
+| `fixme` (`// FIXME:`)                  | `test.fixme(...)`, `test.describe.fixme`, `testInfo.fixme()`                                                        |                                                                      |                                                                                                                                                                                            |                                                                                                                                                                           |                                          |             |                                                                                                                                                                                                   |                                                                                                                          |
+| `fail` (`// FAIL:`), off by default    | `test.fail(...)`, `testInfo.fail()`                                                                                 | `test.failing`                                                       | `test.fails`, `{ fails: true }`                                                                                                                                                            |                                                                                                                                                                           |                                          |             | `test.expectFailure`, `expectFailure()`, `{ expectFailure }`                                                                                                                                      |                                                                                                                          |
+| `slow` (`// SLOW:`), off by default    | `test.slow()`, `testInfo.slow()`                                                                                    |                                                                      |                                                                                                                                                                                            |                                                                                                                                                                           |                                          |             |                                                                                                                                                                                                   |                                                                                                                          |
+| conditional skip, no ticket by default | `test.skip(condition)`, `if (...) test.skip()`, `(condition ? test.skip : test)(...)`                               | `(condition ? it.skip : it)(...)`                                    | `skipIf(condition)`, `runIf(condition)`, `{ skip: condition }`, `context.skip(condition)`, `if (...) context.skip()`, `(condition ? it.skip : it)(...)`                                    | `if (...) this.skip()`, `(condition ? it.skip : it)(...)`                                                                                                                 | as Mocha, and `{ browser: '!webkit' }`   | as Mocha    | `{ skip: condition }`, `{ todo: condition }`, `if (...) t.skip()`, `(condition ? it.skip : it)(...)`                                                                                              | `if (...) pending()`, `(condition ? xit : it)(...)`                                                                      |
+| tags such as `@new` (`// NEW:`)        | the title, `{ tag }`                                                                                                | the title                                                            | the title, `{ tags }`, where `'new'` and `'@new'` both mean `@new`                                                                                                                         | the title                                                                                                                                                                 | the title, `{ tags }` from @cypress/grep | the title   | the title                                                                                                                                                                                         | the title                                                                                                                |
 
 Table-driven tests count too: `test.skip.each(table)(...)`, `describe.skip.each` and Vitest's `.for`.
 A test or describe whose function a condition picks, as in `(isMobile ? test.skip : test)('title', fn)`,
 is a conditional skip in every framework.
 A literal condition decides on its own: `skipIf(true)` and `runIf(false)` always skip, and `skipIf(false)`,
 `runIf(true)` and `{ skip: false }` never do.
-In Vitest, Mocha and `node:test`, `test.skip('title')` and `describe.skip('title')` with no body are skipped too.
+In Vitest, Mocha and `node:test`, `test.skip('title')` and `describe.skip('title')` with no body are skipped too,
+as is `xit('title')` in Jasmine.
 In Mocha, `this.skip()` counts in a test or hook written as a `function`; an arrow function gets no
 Mocha context, so its `this` is not the test's. `this.slow(ms)` only sets Mocha's speed threshold, so
 it isn't the `slow` state.
@@ -167,6 +172,10 @@ A test with no function, `test('title')`, passes in Node, so it isn't a todo. A 
 `before` and `after` inside it, get the suite's context, which can't skip. Node reports a test in one
 state only, skip before todo before `expectFailure`, so `describe.skip('title', { todo: 'why' }, fn)`
 needs only a `// SKIP:` marker.
+In Jasmine, `pending()` and Jasmine 7's `notApplicable()` stop the running test, so they count in a test,
+`beforeEach` or `afterEach`; in `beforeAll`, `afterAll` or a describe's body Jasmine fails the suite
+instead, so they are left alone there. Like `t.skip('reason')`, `pending('reason')` takes a reason, not a
+condition. A function or variable of your own called `pending` is not Jasmine's.
 
 ## Rules
 
@@ -175,6 +184,7 @@ needs only a `// SKIP:` marker.
 💼 [Configurations](https://github.com/Huldoser/eslint-plugin-test-governance#usage) enabled in.\
 ⚠️ [Configurations](https://github.com/Huldoser/eslint-plugin-test-governance#usage) set to warn in.\
 🌲 Set in the `cypress` [configuration](https://github.com/Huldoser/eslint-plugin-test-governance#usage).\
+🌼 Set in the `jasmine` [configuration](https://github.com/Huldoser/eslint-plugin-test-governance#usage).\
 🃏 Set in the `jest` [configuration](https://github.com/Huldoser/eslint-plugin-test-governance#usage).\
 ☕ Set in the `mocha` [configuration](https://github.com/Huldoser/eslint-plugin-test-governance#usage).\
 🟢 Set in the `node-test` [configuration](https://github.com/Huldoser/eslint-plugin-test-governance#usage).\
@@ -184,13 +194,13 @@ needs only a `// SKIP:` marker.
 🔧 Automatically fixable by the [`--fix` CLI option](https://eslint.org/docs/user-guide/command-line-interface#--fix).\
 💡 Manually fixable by [editor suggestions](https://eslint.org/docs/latest/use/core-concepts#rule-suggestions).
 
-| Name                                                                   | Description                                                                       | 💼                   | ⚠️                   | 🔧  | 💡  |
-| :--------------------------------------------------------------------- | :-------------------------------------------------------------------------------- | :------------------- | :------------------- | :-- | :-- |
-| [marker-matches-state](docs/rules/marker-matches-state.md)             | Require the marker keyword to match the test's state                              | 🌲 🃏 ☕ 🟢 🎭 ⚡ 🤖 |                      |     | 💡  |
-| [no-conflicting-states](docs/rules/no-conflicting-states.md)           | Disallow state tags that contradict each other, differ in case or look like typos |                      | 🌲 🃏 ☕ 🟢 🎭 ⚡ 🤖 | 🔧  |     |
-| [no-orphaned-marker](docs/rules/no-orphaned-marker.md)                 | Disallow marker comments that no longer match a test state                        | 🌲 🃏 ☕ 🟢 🎭 ⚡ 🤖 |                      |     | 💡  |
-| [require-ticket](docs/rules/require-ticket.md)                         | Require a ticket marker comment above skipped, fixme and tagged tests             | 🌲 🃏 ☕ 🟢 🎭 ⚡ 🤖 |                      |     | 💡  |
-| [require-ticket-in-comments](docs/rules/require-ticket-in-comments.md) | Require FIXME and TODO comments in test files to start with a ticket              | 🌲 🃏 ☕ 🟢 🎭 ⚡ 🤖 |                      |     | 💡  |
+| Name                                                                   | Description                                                                       | 💼                      | ⚠️                      | 🔧  | 💡  |
+| :--------------------------------------------------------------------- | :-------------------------------------------------------------------------------- | :---------------------- | :---------------------- | :-- | :-- |
+| [marker-matches-state](docs/rules/marker-matches-state.md)             | Require the marker keyword to match the test's state                              | 🌲 🌼 🃏 ☕ 🟢 🎭 ⚡ 🤖 |                         |     | 💡  |
+| [no-conflicting-states](docs/rules/no-conflicting-states.md)           | Disallow state tags that contradict each other, differ in case or look like typos |                         | 🌲 🌼 🃏 ☕ 🟢 🎭 ⚡ 🤖 | 🔧  |     |
+| [no-orphaned-marker](docs/rules/no-orphaned-marker.md)                 | Disallow marker comments that no longer match a test state                        | 🌲 🌼 🃏 ☕ 🟢 🎭 ⚡ 🤖 |                         |     | 💡  |
+| [require-ticket](docs/rules/require-ticket.md)                         | Require a ticket marker comment above skipped, fixme and tagged tests             | 🌲 🌼 🃏 ☕ 🟢 🎭 ⚡ 🤖 |                         |     | 💡  |
+| [require-ticket-in-comments](docs/rules/require-ticket-in-comments.md) | Require FIXME and TODO comments in test files to start with a ticket              | 🌲 🌼 🃏 ☕ 🟢 🎭 ⚡ 🤖 |                         |     | 💡  |
 
 <!-- end auto-generated rules list -->
 
@@ -232,7 +242,7 @@ and markers. To turn a rule off, set it to `'off'` as usual.
 | `allowBlankLine`              | `boolean`                                                                     | `false`                           | Let blank lines separate a marker from its test.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `allowNotes`                  | `boolean`                                                                     | `false`                           | Allow free text after the tickets, e.g. `// SKIP: TRADE-123 flaky on CI`. Applies to markers and to `FIXME` / `TODO` comments.                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `comments`                    | `false \| { keywords?: string[] }`                                            | `{ keywords: ['FIXME', 'TODO'] }` | Comment keywords that must start with a ticket anywhere in a test file, e.g. `// TODO: TRADE-123`. Your keywords replace the default ones. `false` allows free-form comments.                                                                                                                                                                                                                                                                                                                                                                |
-| `testFunctions`               | `string[]`                                                                    | `['test']`                        | Names treated as the framework's `test`. Jest and Vitest default to `['test', 'it']`, and Mocha, Cypress and WebdriverIO to `['it', 'specify', 'test']`. Your list replaces the default one, so include those names if you still need them. See below.                                                                                                                                                                                                                                                                                       |
+| `testFunctions`               | `string[]`                                                                    | `['test']`                        | Names treated as the framework's `test`. Jest and Vitest default to `['test', 'it']`, Mocha, Cypress and WebdriverIO to `['it', 'specify', 'test']`, and Jasmine to `['it']`. Your list replaces the default one, so include those names if you still need them. See below.                                                                                                                                                                                                                                                                  |
 | `reportUnreadableTags`        | `boolean`                                                                     | `false`                           | When a tag state is on, report titles that aren't static text, and tags or details that can't be read in the file, such as ones imported from another module, since their tags can't be checked.                                                                                                                                                                                                                                                                                                                                             |
 
 ### Tag names
@@ -337,8 +347,17 @@ In `node:test` files:
 - Subtests: `t.test(...)` on the context a test's body receives.
 - Any name in `testFunctions`, which defaults to `['test', 'it']`. `node:test` has no globals.
 
+In Jasmine files:
+
+- The globals `it`, `xit`, `fit`, `describe`, `xdescribe`, `fdescribe`, and the hooks `beforeEach`,
+  `afterEach`, `beforeAll` and `afterAll`. With the runner's `globals: false`, Jasmine 7 takes the same
+  names from `jasmine-core`, so names imported or required from it count too, including aliases and
+  the whole module, as `core.xit` after `const core = require('jasmine-core')`.
+- `pending()` and `notApplicable()`, as globals or imported by name.
+- Any name in `testFunctions`, which defaults to `['it']`. Jasmine has no `test`.
+
 A name imported or required from another test runner (Playwright, `vitest`, `@jest/globals`,
-`node:test`, `bun:test`, `mocha`, `ava`, `tap`, `uvu`), or a variable set from one such as
+`node:test`, `jasmine-core`, `bun:test`, `mocha`, `ava`, `tap`, `uvu`), or a variable set from one such as
 `const test = require('ava')`, is never treated as the framework's `test`, and neither is a local
 variable or function declared inside a function that happens to be called `test`.
 
@@ -366,8 +385,9 @@ Not covered in this version: tests generated in loops with dynamic titles, and t
 from other modules (see `reportUnreadableTags`), fixtures imported from other modules under a name not in
 `testFunctions`, a Vitest test with only a title, which Vitest runs as a todo but which looks the same as a
 helper called `test`, Playwright annotations as markers, Cypress tests skipped with @cypress/skip-test's
-`skipOn()` and `onlyOn()`, `node:test`'s experimental `tags` option and `getTestContext()`, and other
-runners such as Jasmine and Bun.
+`skipOn()` and `onlyOn()`, `node:test`'s experimental `tags` option and `getTestContext()`, Jasmine's
+`pending()` in a helper function that tests call, Jasmine 5 and 6's `require('jasmine-core').noGlobals()`,
+and other runners such as Bun.
 
 ## TypeScript
 

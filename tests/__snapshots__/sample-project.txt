@@ -1,4 +1,6 @@
 tests/cypress/checkout.cy.js:8:3 error test-governance/require-ticket This test is in the 'quarantined' state but has no `// QUARANTINED: <ticket>` comment directly above it, e.g. `// QUARANTINED: TRADE-123`.
+tests/jasmine/quotes.spec.js:6:5 error test-governance/require-ticket This pending call is in the 'skip' state but has no `// SKIP: <ticket>` comment directly above it, e.g. `// SKIP: TRADE-123`.
+tests/jasmine/quotes.spec.js:14:3 error test-governance/require-ticket This test is in the 'todo' state but has no `// TODO: <ticket>` comment directly above it, e.g. `// TODO: TRADE-123`.
 tests/jest/risk.test.js:6:3 error test-governance/require-ticket This test is in the 'skip' state but has no `// SKIP: <ticket>` comment directly above it, e.g. `// SKIP: TRADE-123`.
 tests/jest/risk.test.js:11:3 error test-governance/marker-matches-state `SKIP:` doesn't match this code: this test is in the 'todo' state, so the marker should be `TODO:`.
 tests/jest/risk.test.js:12:3 error test-governance/require-ticket This test is in the 'todo' state but has no `// TODO: <ticket>` comment directly above it, e.g. `// TODO: TRADE-123`.
