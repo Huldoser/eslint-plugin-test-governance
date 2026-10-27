@@ -95,7 +95,7 @@ for (const framework of FRAMEWORK_NAMES) {
 Object.defineProperty(plugin.configs, 'recommended', {
   get(): never {
     throw new ConfigError(
-      "configs.recommended was removed in 0.5.0. Use the config for your framework: configs.playwright, configs.jest, configs.vitest, configs.mocha, configs.cypress, configs.webdriverio or configs['node-test']. See https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/upgrading.md",
+      "configs.recommended was removed in 0.5.0. Use the config for your framework: configs.playwright, configs.jest, configs.vitest, configs.mocha, configs.cypress, configs.webdriverio, configs['node-test'] or configs.jasmine. See https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/upgrading.md",
     );
   },
 });

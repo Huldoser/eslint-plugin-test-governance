@@ -181,10 +181,19 @@ describe('framework', () => {
     });
   }
 
+  it('turns on skip and todo for jasmine, and reads only `it` by default', () => {
+    assert.deepEqual(stateNames({ framework: 'jasmine' }), ['skip', 'todo']);
+    assert.deepEqual(
+      stateNames({ framework: 'jasmine', lifecycleTags: true, states: { fixme: true, slow: true, fail: true } }),
+      ['skip', 'todo', 'new', 'quarantined'],
+    );
+    assert.deepEqual([...compile({ framework: 'jasmine' }).testFunctions], ['it']);
+  });
+
   it('is required, since there is no default framework', () => {
     assert.throws(
       () => compileOptions({} as never),
-      /framework is required: set it to "playwright", "jest", "vitest", "mocha", "cypress", "webdriverio" or "node-test", or use configs\.playwright, configs\.jest, configs\.vitest, configs\.mocha, configs\.cypress, configs\.webdriverio or configs\['node-test'\]$/,
+      /framework is required: set it to "playwright", "jest", "vitest", "mocha", "cypress", "webdriverio", "node-test" or "jasmine", or use configs\.playwright, configs\.jest, configs\.vitest, configs\.mocha, configs\.cypress, configs\.webdriverio, configs\['node-test'\] or configs\.jasmine$/,
     );
   });
 
@@ -195,7 +204,7 @@ describe('framework', () => {
   it('rejects an unknown framework', () => {
     assert.throws(
       () => compile({ framework: 'ava' } as never),
-      /framework must be one of "playwright", "jest", "vitest", "mocha", "cypress", "webdriverio", "node-test" \(got "ava"\)/,
+      /framework must be one of "playwright", "jest", "vitest", "mocha", "cypress", "webdriverio", "node-test", "jasmine" \(got "ava"\)/,
     );
   });
 });

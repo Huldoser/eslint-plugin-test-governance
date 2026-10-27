@@ -108,6 +108,37 @@ describe('orders ${i}', { skip: process.platform === 'win32' }, () => {
 });
 `,
   },
+  Jasmine: {
+    options: { framework: 'jasmine', lifecycleTags: true },
+    header: '',
+    // The x and f forms, pending tests, and runtime functions in hooks, tests and their callbacks.
+    block: (i) => `
+const TITLE_${i} = 'settles order ${i}';
+describe('orders ${i}', () => {
+  beforeEach(() => {
+    if (!process.env.BROKER_URL) pending('needs the broker');
+  });
+
+  // SKIP: TRADE-${i}
+  xit('cancels order ${i}', async () => {
+    // TODO: TRADE-${i}
+    await rows(${i});
+  });
+
+  it('fills order ${i} @new', async () => {
+    orders.forEach((order) => {
+      if (order.halted) notApplicable('halted');
+    });
+    pending();
+  });
+
+  fit(TITLE_${i}, () => {});
+  // FIXME: the broker sandbox drops the fill
+  it('lists order ${i} @quarantined');
+  (isCI ? xdescribe : describe)('quotes ${i}', () => {});
+});
+`,
+  },
 };
 
 function spec({ header, block }: Spec, lines: number): string {

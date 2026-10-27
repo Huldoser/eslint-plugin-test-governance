@@ -94,6 +94,11 @@ export interface Framework {
   thisMethods: ReadonlySet<string>;
   /** Whether a test with only a title written out is a todo, as Mocha's pending `it('title')`. */
   todoWithoutBody: boolean;
+  /**
+   * Functions, global or imported by name, that change the state of the test whose body calls them, or
+   * whose `beforeEach` or `afterEach` does, as Jasmine's `pending()`, with the state each puts it in.
+   */
+  runtimeFunctions: ReadonlyMap<string, Modifier>;
   /** Built-in states a test can be put in with this framework. */
   states: ReadonlySet<BuiltinStateName>;
   /** Playwright's own API on `test`: `test.describe`, `test.step`, `test.info()` and runtime `test.skip()`. */
@@ -106,7 +111,17 @@ const HOOK: Root = { kind: 'hook', modifiers: [] };
 
 const PLAYWRIGHT_MODULES = new Set(['@playwright/test', 'playwright/test']);
 /** Test runners besides Playwright. A name imported from one of them belongs to that runner. */
-const OTHER_RUNNERS = new Set(['vitest', '@jest/globals', 'node:test', 'bun:test', 'mocha', 'ava', 'tap', 'uvu']);
+const OTHER_RUNNERS = new Set([
+  'vitest',
+  '@jest/globals',
+  'node:test',
+  'jasmine-core',
+  'bun:test',
+  'mocha',
+  'ava',
+  'tap',
+  'uvu',
+]);
 
 /** `@playwright/test` and the component-testing packages such as `@playwright/experimental-ct-react`. */
 function isPlaywrightModule(source: string): boolean {
@@ -147,6 +162,7 @@ const playwright: Framework = {
   skipNotes: false,
   thisMethods: new Set(),
   todoWithoutBody: false,
+  runtimeFunctions: new Map(),
   states: new Set(['skip', 'fixme', 'fail', 'slow', 'new', 'quarantined']),
   playwright: true,
 };
@@ -187,6 +203,7 @@ const jest: Framework = {
   skipNotes: false,
   thisMethods: new Set(),
   todoWithoutBody: false,
+  runtimeFunctions: new Map(),
   states: new Set(['skip', 'todo', 'fail', 'new', 'quarantined']),
   playwright: false,
 };
@@ -236,6 +253,7 @@ const vitest: Framework = {
   skipNotes: true,
   thisMethods: new Set(),
   todoWithoutBody: false,
+  runtimeFunctions: new Map(),
   states: new Set(['skip', 'todo', 'fail', 'new', 'quarantined']),
   playwright: false,
 };
@@ -285,6 +303,7 @@ const mocha: Omit<Framework, 'name'> = {
   skipNotes: false,
   thisMethods: new Set(['skip']),
   todoWithoutBody: true,
+  runtimeFunctions: new Map(),
   states: new Set(['skip', 'todo', 'new', 'quarantined']),
   playwright: false,
 };
@@ -341,7 +360,57 @@ const nodeTest: Framework = {
   skipNotes: true,
   thisMethods: NODE_TEST_CONTEXT,
   todoWithoutBody: false,
+  runtimeFunctions: new Map(),
   states: new Set(['skip', 'todo', 'fail', 'new', 'quarantined']),
+  playwright: false,
+};
+
+const JASMINE_FUNCTIONS = new Map<string, Root>([
+  ['it', TEST],
+  ['xit', SKIPPED_TEST],
+  ['fit', { kind: 'test', modifiers: ['only'] }],
+  ['describe', DESCRIBE],
+  ['xdescribe', SKIPPED_DESCRIBE],
+  ['fdescribe', { kind: 'describe', modifiers: ['only'] }],
+  ['beforeEach', HOOK],
+  ['afterEach', HOOK],
+  // A `pending()` in `beforeAll` or `afterAll` fails the suite instead of skipping its tests.
+  ['beforeAll', { kind: 'hook', modifiers: [], noContext: true }],
+  ['afterAll', { kind: 'hook', modifiers: [], noContext: true }],
+]);
+
+/**
+ * Jasmine, run on its own, on Karma or by WebdriverIO's Jasmine framework. Its functions are globals, or
+ * with `globals: false` in Jasmine 7 exports of `jasmine-core`, and have no members: the `x` and `f` forms
+ * are functions of their own. `pending()` and Jasmine 7's `notApplicable()` skip the running test.
+ */
+const jasmine: Framework = {
+  name: 'jasmine',
+  ownsModule: (source) => source === 'jasmine-core',
+  exports: JASMINE_FUNCTIONS,
+  moduleIsDefault: true,
+  globals: new Map([...JASMINE_FUNCTIONS].filter(([name]) => name !== 'it')),
+  testFunctions: ['it'],
+  testMembers: new Set(),
+  describeMembers: new Set(),
+  factories: new Set(),
+  effects: effects([['skip', 'skip']]),
+  optionEffects: new Map(),
+  anyOptionValue: false,
+  exclusiveStates: [],
+  optionalTitle: false,
+  plainTags: false,
+  subtests: false,
+  skipWithoutBody: true,
+  // `pending('why')` takes a reason, not a condition.
+  skipNotes: true,
+  thisMethods: new Set(),
+  todoWithoutBody: true,
+  runtimeFunctions: new Map([
+    ['pending', 'skip'],
+    ['notApplicable', 'skip'],
+  ]),
+  states: new Set(['skip', 'todo', 'new', 'quarantined']),
   playwright: false,
 };
 
@@ -353,6 +422,7 @@ export const FRAMEWORKS: Record<FrameworkName, Framework> = {
   cypress: { name: 'cypress', ...mocha },
   webdriverio: { name: 'webdriverio', ...mocha },
   'node-test': nodeTest,
+  jasmine,
 };
 
 /** Whether `source` belongs to a test runner other than `framework`, so its names are never tests here. */

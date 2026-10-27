@@ -1,5 +1,5 @@
 import type { TSESLint, TSESTree } from '@typescript-eslint/utils';
-import { isOtherRunner, RUNTIME_MODIFIERS, type Framework, type Root } from './frameworks.ts';
+import { isOtherRunner, RUNTIME_MODIFIERS, type Framework, type Modifier, type Root } from './frameworks.ts';
 import type { ResolvedOptions, StateDef } from './options.ts';
 import type { TicketCheck, TicketMatcher } from './tickets.ts';
 
@@ -88,6 +88,8 @@ export interface Subject {
   ownSkip: boolean;
   markers: Marker[];
   dynamicTitle: boolean;
+  /** For a runtime function such as Jasmine's `pending()`, its name; messages call the others by their state. */
+  functionName?: string;
 }
 
 export interface Analysis {
@@ -114,13 +116,15 @@ interface Chain {
 
 /**
  * A name for what can change a test's state at runtime: a parameter such as `testInfo`, a step's
- * `TestStepInfo` or Vitest's test context, with its methods, or one of those methods taken out of it,
- * as `skip` in Vitest's `({ skip }) => ...`.
+ * `TestStepInfo` or Vitest's test context, with its methods, one of those methods taken out of it, as
+ * `skip` in Vitest's `({ skip }) => ...`, or a runtime function such as Jasmine's `pending`.
  */
 type InfoName = {
   name: string;
   /** The step a `TestStepInfo` belongs to. Unset for the others, which act on the whole test. */
   step?: Subject;
+  /** For a runtime function, its own name, as `pending` also when imported as `pend`, and how it is reached. */
+  runtimeFunction?: { name: string; imported: boolean };
 } & ({ methods: ReadonlySet<string>; method?: undefined } | { method: string; methods?: undefined });
 
 /** The names a parameter gives to runtime info: `testInfo`, or `skip` in `({ skip }) => ...`. */
@@ -189,17 +193,25 @@ function isFunction(node: Node | undefined): node is TSESTree.ArrowFunctionExpre
   return node?.type === 'ArrowFunctionExpression' || node?.type === 'FunctionExpression';
 }
 
+interface RuntimeFunction {
+  name: string;
+  modifier: Modifier;
+}
+
 interface TestNames {
   /** Names that refer to the framework's test functions, with what each one is. */
   roots: Map<string, Root>;
   /** Names bound to a whole framework module, as in `import * as pw`, whose `test` is `pw.test`. */
   modules: Set<string>;
+  /** Names imported for the framework's runtime functions, as `pend` in `import { pending as pend }`. */
+  runtime: Map<string, RuntimeFunction>;
 }
 
 /** Collects the top-level names that refer to the framework's test functions or to its module. */
 function collectTestNames(program: TSESTree.Program, framework: Framework, configured: Set<string>): TestNames {
   const roots = new Map(framework.globals);
   for (const name of configured) roots.set(name, TEST);
+  const runtime = new Map<string, RuntimeFunction>();
   const modules = new Set<string>();
   const mergeTests = new Set<string>();
   /** Names bound to another test runner, such as `ava` in `import ava from 'ava'`. */
@@ -234,6 +246,11 @@ function collectTestNames(program: TSESTree.Program, framework: Framework, confi
     roots.delete(name);
     others.add(name);
   };
+  /** Takes `name` for the runtime function `imported`, as in `const { pending: pend } = require('jasmine-core')`. */
+  const bindRuntime = (name: string, imported: string | undefined): void => {
+    const modifier = imported === undefined ? undefined : framework.runtimeFunctions.get(imported);
+    if (imported !== undefined && modifier !== undefined) runtime.set(name, { name: imported, modifier });
+  };
 
   for (const statement of program.body) {
     if (statement.type === 'ImportDeclaration') {
@@ -250,6 +267,7 @@ function collectTestNames(program: TSESTree.Program, framework: Framework, confi
             if (framework.moduleIsDefault) modules.add(local);
           } else {
             const root = framework.exports.get(importedName(spec));
+            bindRuntime(local, importedName(spec));
             if (root) roots.set(local, root);
             else if (importedName(spec) === 'mergeTests') mergeTests.add(local);
           }
@@ -295,13 +313,14 @@ function collectTestNames(program: TSESTree.Program, framework: Framework, confi
           if (isOtherRunner(framework, source)) setOther(prop.value.name);
           else if (framework.ownsModule(source)) {
             const root = framework.exports.get(propertyName(prop) ?? '');
+            bindRuntime(prop.value.name, propertyName(prop));
             if (root) roots.set(prop.value.name, root);
           }
         }
       }
     }
   }
-  return { roots, modules };
+  return { roots, modules, runtime };
 }
 
 /** The name a property key spells out: `test` in `{ test }`, `{ 'test': t }` or `{ ['test']: t }`. */
@@ -320,6 +339,20 @@ function requireSource(node: Node): string | undefined {
     return undefined;
   const first = node.arguments.at(0);
   return first?.type === 'Literal' && typeof first.value === 'string' ? first.value : undefined;
+}
+
+/**
+ * Where the file declares what `id` refers to: `inside` a function or block, a parameter included, at the
+ * `top` level, or nowhere, for a `global`.
+ */
+function declaredWhere(sourceCode: SourceCode, id: TSESTree.Identifier): 'inside' | 'top' | 'global' {
+  for (let scope: TSESLint.Scope.Scope | null = sourceCode.getScope(id); scope; scope = scope.upper) {
+    const variable = scope.set.get(id.name);
+    if (!variable) continue;
+    if (scope.block.type !== 'Program') return 'inside';
+    return variable.defs.length > 0 ? 'top' : 'global';
+  }
+  return 'global';
 }
 
 /**
@@ -955,13 +988,29 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     if (body?.type === 'FunctionExpression') thisBodies.add(body);
   };
 
-  /** What a body can change the test's state with: Playwright's `testInfo` or Vitest's test context. */
+  /**
+   * What a body can change the test's state with: Playwright's `testInfo`, Vitest's test context, or
+   * Jasmine's `pending()`.
+   */
   const bodyInfos = (args: TSESTree.CallExpressionArgument[], path: string[]): InfoName[] => {
     const body = args.findLast(isFunction);
+    if (!body) return [];
+    const functions = [
+      ...[...framework.runtimeFunctions].map(([name, modifier]): InfoName => ({
+        name,
+        method: modifier,
+        runtimeFunction: { name, imported: false },
+      })),
+      ...[...testNames.runtime].map(([local, fn]): InfoName => ({
+        name: local,
+        method: fn.modifier,
+        runtimeFunction: { name: fn.name, imported: true },
+      })),
+    ];
     // `test.each(table)` passes the row to the body, and `test.for(cases)` passes it before the context.
-    if (!framework.info || !body || path.includes('each()')) return [];
+    if (!framework.info || path.includes('each()')) return functions;
     const param = body.params.at(framework.info.param + (path.includes('for()') ? 1 : 0));
-    return infoNames(param, framework.info.methods);
+    return [...functions, ...infoNames(param, framework.info.methods)];
   };
 
   /**
@@ -972,14 +1021,18 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     if (root.kind === 'hook') return undefined;
     const playwrightDescribe = framework.playwright && path[0] === 'describe';
     const kind = playwrightDescribe ? 'describe' : root.kind;
-    return { kind, members: [...root.modifiers, ...(playwrightDescribe ? path.slice(1) : path)], args };
+    const written = playwrightDescribe ? path.slice(1) : path;
+    return { kind, members: [...root.modifiers, ...written], written, args };
   };
   type Declaration = NonNullable<ReturnType<typeof declarationOf>>;
 
-  /** Whether a call with these members and arguments declares a test or describe of this kind. */
-  const declares = ({ kind, members }: Declaration, args: TSESTree.CallExpressionArgument[]): boolean => {
+  /**
+   * Whether a call with these members and arguments declares a test or describe of this kind. Only the
+   * members written after the name must exist: Jasmine's `xit` skips, but it has no `it.skip`.
+   */
+  const declares = ({ kind, members, written }: Declaration, args: TSESTree.CallExpressionArgument[]): boolean => {
     const allowed = kind === 'test' ? framework.testMembers : framework.describeMembers;
-    return members.every((m) => allowed.has(m)) && isDeclaration(sourceCode, framework, kind, args, members);
+    return written.every((m) => allowed.has(m)) && isDeclaration(sourceCode, framework, kind, args, members);
   };
 
   /**
@@ -1036,7 +1089,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     if (!framework.subtests || callee.type !== 'MemberExpression' || memberName(callee) !== 'test') return undefined;
     const { object } = callee;
     if (object.type !== 'Identifier' || !infos.findLast((info) => info.name === object.name)?.methods) return undefined;
-    const declaration: Declaration = { kind: 'test', members: [], args: new Map() };
+    const declaration: Declaration = { kind: 'test', members: [], written: [], args: new Map() };
     return declares(declaration, call.arguments)
       ? declare(call, declaration, bodyInfos(call.arguments, []))
       : undefined;
@@ -1081,7 +1134,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
 
   /**
    * `testInfo.skip()`, `step.skip()`, `test.info().skip()`, Vitest's `context.skip()` or `skip()`,
-   * Mocha's `this.skip()`, and node:test's `t.skip()` and `t.todo()`.
+   * Mocha's `this.skip()`, node:test's `t.skip()` and `t.todo()`, and Jasmine's `pending()`.
    */
   const runtimeCall = (call: TSESTree.CallExpression): Subject | undefined => {
     const { callee } = call;
@@ -1089,7 +1142,14 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const innermost = (name: string): InfoName | undefined => infos.findLast((info) => info.name === name);
     if (callee.type === 'Identifier') {
       const info = innermost(callee.name);
-      return info?.method !== undefined ? runtimeSubject(call, info.method, info.step) : undefined;
+      if (info?.method === undefined) return undefined;
+      // A global such as Jasmine's `pending` counts unless the file declares the name itself; an import of
+      // one counts unless a function or block declares the name again.
+      const fn = info.runtimeFunction;
+      if (fn && declaredWhere(sourceCode, callee) !== (fn.imported ? 'top' : 'global')) return undefined;
+      const subject = runtimeSubject(call, info.method, info.step);
+      if (subject) subject.functionName = fn?.name;
+      return subject;
     }
     if (callee.type !== 'MemberExpression') return undefined;
     const name = memberName(callee);
@@ -1257,6 +1317,6 @@ export function headLoc(subject: Subject): TSESTree.SourceLocation {
 export function describeSubject(subject: Subject): string {
   if (subject.kind === 'describe') return 'This describe block';
   if (subject.kind === 'step') return 'This step';
-  if (subject.kind === 'runtime') return `This ${subject.states[0].state.modifier} call`;
+  if (subject.kind === 'runtime') return `This ${subject.functionName ?? subject.states[0].state.modifier} call`;
   return 'This test';
 }
