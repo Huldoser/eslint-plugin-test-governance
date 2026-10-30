@@ -7,6 +7,16 @@ export type TicketSpec =
   | { preset: 'gitlab'; host?: string }
   | { preset: 'linear'; teams?: string[] }
   | { preset: 'azure-devops'; host?: string }
+  | { preset: 'trello' }
+  | { preset: 'notion'; prefixes?: string[]; host?: string }
+  | { preset: 'asana' }
+  | { preset: 'clickup'; prefixes?: string[] }
+  | { preset: 'redmine'; host?: string }
+  | { preset: 'monday'; prefixes?: string[] }
+  | { preset: 'youtrack'; projects?: string[]; host?: string }
+  | { preset: 'basecamp' }
+  | { preset: 'shortcut' }
+  | { preset: 'url'; hosts: string[] }
   | { preset: 'numeric'; minLength?: number; maxLength?: number }
   | { preset: 'pattern'; pattern: string; flags?: string };
 
@@ -36,8 +46,26 @@ const GITHUB_PATH_RE = /^\/[^/]+\/[^/]+\/(?:issues|pull)\/\d+\/?$/;
 const GITLAB_PATH_RE = /\/-\/(?:issues|merge_requests|work_items)\/\d+\/?$/;
 const LINEAR_PATH_RE = /^\/[^/]+\/issue\/([A-Z][A-Z0-9]*-\d+)(?:\/[^/]*)?$/;
 const AZURE_PATH_RE = /\/_workitems\/edit\/\d+\/?$/;
-// No tracker issues number 0, so PROJ-0, #0, AB#0, .../issues/0 and 000 are always placeholders.
-const ZERO_ID_RE = /(?:^|[-#/])0+\/?$/;
+const TRELLO_PATH_RE = /^\/c\/[A-Za-z0-9]{8}(?:\/[^/]*)?$/;
+// A Notion page ID is 32 hex digits, plain or dashed as a UUID, at the end of the page's last path segment.
+const NOTION_ID = '[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+const NOTION_PAGE_RE = new RegExp(`(?:^|-)(?:${NOTION_ID})$`);
+const NOTION_ID_RE = new RegExp(`^(?:${NOTION_ID})$`);
+const ASANA_PATH_RE = /^\/(?:0\/\d+\/\d+(?:\/f)?|1\/\d+(?:\/project\/\d+|\/home)?\/task\/\d+(?:\/comment\/\d+)?)\/?$/;
+const CLICKUP_ID_RE = /^[a-z0-9]+$/;
+const CLICKUP_REF_RE = /^(?:CU-|#)[a-z0-9]+$/;
+const CLICKUP_TASK_PATH_RE = /^\/t\/(?:\d+\/)?([^/]+)\/?$/;
+const CLICKUP_VIEW_PATH_RE = /^\/\d+\/v\//;
+const REDMINE_PATH_RE = /\/issues\/\d+(?:\.(?:json|xml|pdf|atom))?\/?$/;
+const MONDAY_PATH_RE = /^\/boards\/\d+\/pulses\/\d+(?:\/.*)?$/;
+// YouTrack project IDs may start with a digit (4DM-12) but can't be digits only.
+const YOUTRACK_KEY_RE = /^([A-Z0-9_]+)-\d+$/;
+const YOUTRACK_PATH_RE = /\/issue\/([A-Z0-9_]+-\d+)(?:\/[^/]*)?$/;
+const BASECAMP_PATH_RE = /^\/\d+\/buckets\/\d+\/(?:todos|card_tables\/cards)\/\d+\/?$/;
+const SHORTCUT_REF_RE = /^(?:sc-[1-9]\d*|\[sc-[1-9]\d*\])$/i;
+const SHORTCUT_PATH_RE = /^\/[^/]+\/story\/\d+(?:\/[^/]*)?$/;
+// No tracker issues number 0, so PROJ-0, #0, AB#0, [sc-0], .../issues/0 and 000 are always placeholders.
+const ZERO_ID_RE = /(?:^|[-#/])0+[/\]]?$/;
 
 type Predicate = (ticket: string) => boolean;
 
@@ -60,8 +88,26 @@ function hostMatches(url: URL, host: string): boolean {
   return url.hostname.toLowerCase() === host.toLowerCase();
 }
 
+/** `*.example.com` matches the subdomains of example.com; any other entry matches its host exactly. */
+function hostInList(url: URL, hosts: string[]): boolean {
+  const hostname = url.hostname.toLowerCase();
+  return hosts.some((host) => {
+    const lower = host.toLowerCase();
+    return lower.startsWith('*.') ? hostname.endsWith(lower.slice(1)) : hostname === lower;
+  });
+}
+
+function isYouTrackKey(key: string, projects: string[] | undefined): boolean {
+  const project = YOUTRACK_KEY_RE.exec(key)?.[1];
+  return project !== undefined && /[A-Z]/.test(project) && inList(project, projects);
+}
+
 function inList(value: string, list: string[] | undefined): boolean {
   return list === undefined || list.includes(value);
+}
+
+function keyInList(key: string, list: string[] | undefined): boolean {
+  return inList(key.slice(0, key.lastIndexOf('-')), list);
 }
 
 function describeList(noun: string, list: string[] | undefined): string {
@@ -78,7 +124,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
       };
     case 'jira': {
       const { projects, host } = spec;
-      const keyOk = (key: string): boolean => inList(key.slice(0, key.lastIndexOf('-')), projects);
+      const keyOk = (key: string): boolean => keyInList(key, projects);
       return {
         test: (t) => {
           if (KEY_RE.test(t)) return keyOk(t);
@@ -117,7 +163,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
     }
     case 'linear': {
       const { teams } = spec;
-      const keyOk = (key: string): boolean => inList(key.slice(0, key.lastIndexOf('-')), teams);
+      const keyOk = (key: string): boolean => keyInList(key, teams);
       return {
         test: (t) => {
           if (KEY_RE.test(t)) return keyOk(t);
@@ -134,7 +180,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
       const { host } = spec;
       return {
         test: (t) => {
-          if (AZURE_REF_RE.test(t)) return true;
+          if (AZURE_REF_RE.test(t) || ISSUE_NUMBER_RE.test(t)) return true;
           const url = parseUrl(t);
           if (!url) return false;
           const hostOk =
@@ -143,8 +189,144 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
               : hostMatches(url, host);
           return hostOk && AZURE_PATH_RE.test(url.pathname);
         },
-        expected: 'an Azure Boards work item like AB#4821, or a work item URL',
+        expected: 'an Azure Boards work item like AB#4821 or #4821, or a work item URL',
         example: 'AB#4821',
+      };
+    }
+    case 'trello':
+      return {
+        test: (t) => {
+          const url = parseUrl(t);
+          return url !== undefined && hostMatches(url, 'trello.com') && TRELLO_PATH_RE.test(url.pathname);
+        },
+        expected: 'a Trello card link like https://trello.com/c/nqPiDKmw',
+        example: 'https://trello.com/c/nqPiDKmw',
+      };
+    case 'notion': {
+      const { prefixes, host } = spec;
+      const hosts = host === undefined ? ['notion.so', 'www.notion.so', '*.notion.site'] : [host];
+      return {
+        test: (t) => {
+          if (KEY_RE.test(t)) return keyInList(t, prefixes);
+          const url = parseUrl(t);
+          if (!url || !hostInList(url, hosts)) return false;
+          const peek = url.searchParams.get('p');
+          if (peek !== null) return NOTION_ID_RE.test(peek);
+          if (url.searchParams.has('v')) return false;
+          const segment = /^\/(?:[^/]+\/)?([^/]+)$/.exec(url.pathname)?.[1];
+          if (segment === undefined) return false;
+          return KEY_RE.test(segment) ? keyInList(segment, prefixes) : NOTION_PAGE_RE.test(segment);
+        },
+        expected: `a Notion ID like ${prefixes?.[0] ?? 'TASK'}-123${describeList('prefix', prefixes)}, or a Notion page link`,
+        example: `${prefixes?.[0] ?? 'TASK'}-123`,
+      };
+    }
+    case 'asana':
+      return {
+        test: (t) => {
+          const url = parseUrl(t);
+          return url !== undefined && hostMatches(url, 'app.asana.com') && ASANA_PATH_RE.test(url.pathname);
+        },
+        expected: 'an Asana task link like https://app.asana.com/0/0/1204821736251904',
+        example: 'https://app.asana.com/0/0/1204821736251904',
+      };
+    case 'clickup': {
+      const { prefixes } = spec;
+      const idOk = (id: string): boolean => CLICKUP_ID_RE.test(id) || (KEY_RE.test(id) && keyInList(id, prefixes));
+      return {
+        test: (t) => {
+          if (CLICKUP_REF_RE.test(t)) return true;
+          if (KEY_RE.test(t)) return keyInList(t, prefixes);
+          const url = parseUrl(t);
+          if (!url || !hostMatches(url, 'app.clickup.com')) return false;
+          if (CLICKUP_VIEW_PATH_RE.test(url.pathname)) return CLICKUP_ID_RE.test(url.searchParams.get('p') ?? '');
+          const id = CLICKUP_TASK_PATH_RE.exec(url.pathname)?.[1];
+          return id !== undefined && idOk(id);
+        },
+        expected: `a ClickUp task like CU-86abc123 or ${prefixes?.[0] ?? 'DEV'}-123${describeList('prefix', prefixes)}, or a ClickUp task link`,
+        example: prefixes === undefined ? 'CU-86abc123' : `${prefixes[0]}-123`,
+      };
+    }
+    case 'redmine': {
+      const { host } = spec;
+      return {
+        test: (t) => {
+          if (ISSUE_NUMBER_RE.test(t)) return true;
+          const url = parseUrl(t);
+          return (
+            url !== undefined && host !== undefined && hostMatches(url, host) && REDMINE_PATH_RE.test(url.pathname)
+          );
+        },
+        expected:
+          host === undefined
+            ? 'a Redmine issue like #4821 (set host to accept issue links)'
+            : `a Redmine issue like #4821, or an issue URL on ${host}`,
+        example: '#4821',
+      };
+    }
+    case 'monday': {
+      const { prefixes } = spec;
+      return {
+        test: (t) => {
+          if (KEY_RE.test(t)) return keyInList(t, prefixes);
+          const url = parseUrl(t);
+          return url !== undefined && hostInList(url, ['*.monday.com']) && MONDAY_PATH_RE.test(url.pathname);
+        },
+        expected: `a monday.com item link like https://acme.monday.com/boards/1234567890/pulses/1234567891, or a custom key like ${prefixes?.[0] ?? 'TIX'}-001${describeList('prefix', prefixes)}`,
+        example: 'https://acme.monday.com/boards/1234567890/pulses/1234567891',
+      };
+    }
+    case 'youtrack': {
+      const { projects, host } = spec;
+      const hosts = host === undefined ? ['youtrack.jetbrains.com', '*.youtrack.cloud', '*.myjetbrains.com'] : [host];
+      return {
+        test: (t) => {
+          if (YOUTRACK_KEY_RE.test(t)) return isYouTrackKey(t, projects);
+          const url = parseUrl(t);
+          if (!url || !hostInList(url, hosts)) return false;
+          const key = YOUTRACK_PATH_RE.exec(url.pathname)?.[1];
+          return key !== undefined && isYouTrackKey(key, projects);
+        },
+        expected: `a YouTrack issue like ${projects?.[0] ?? 'PROJ'}-123${describeList('project', projects)}, or a YouTrack issue link`,
+        example: `${projects?.[0] ?? 'PROJ'}-123`,
+      };
+    }
+    case 'basecamp':
+      return {
+        test: (t) => {
+          const url = parseUrl(t);
+          return url !== undefined && hostMatches(url, '3.basecamp.com') && BASECAMP_PATH_RE.test(url.pathname);
+        },
+        expected: 'a Basecamp to-do or card link like https://3.basecamp.com/4821/buckets/4822/todos/4823',
+        example: 'https://3.basecamp.com/4821/buckets/4822/todos/4823',
+      };
+    case 'shortcut':
+      return {
+        test: (t) => {
+          if (SHORTCUT_REF_RE.test(t)) return true;
+          const url = parseUrl(t);
+          return (
+            url !== undefined &&
+            hostInList(url, ['app.shortcut.com', 'app.clubhouse.io']) &&
+            SHORTCUT_PATH_RE.test(url.pathname)
+          );
+        },
+        expected: 'a Shortcut story like sc-123, or a story link',
+        example: 'sc-123',
+      };
+    case 'url': {
+      // The schema can't tie `hosts` to this preset, so check it here.
+      const { hosts } = spec as { hosts?: string[] };
+      if (hosts === undefined) {
+        throw new ConfigError('the "url" ticket preset needs `hosts`, the hosts its links may point to.');
+      }
+      return {
+        test: (t) => {
+          const url = parseUrl(t);
+          return url !== undefined && hostInList(url, hosts);
+        },
+        expected: `a link to ${hosts.join(', ')}`,
+        example: `https://${hosts[0].replace(/^\*\./, 'tasks.')}/4821`,
       };
     }
     case 'numeric': {

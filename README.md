@@ -274,21 +274,44 @@ a `customStates` entry.
 
 ### Ticket presets
 
-| Preset         | Accepts                                                                                                                                       | Options                                                                              |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `any`          | `PROJ-123`, `#123`, `owner/repo#123`, any http(s) URL                                                                                         |                                                                                      |
-| `jira`         | `TRADE-123`, `https://<host>/browse/TRADE-123` (also under a path, as in `/jira/browse/TRADE-123`), board URLs with `selectedIssue=TRADE-123` | `projects`; `host` (any host by default)                                             |
-| `github`       | `#123`, `owner/repo#123`, `https://github.com/owner/repo/issues/123` (or `/pull/`)                                                            | `host` for GitHub Enterprise (`github.com` by default)                               |
-| `gitlab`       | `#123`, `group/project#123`, `https://gitlab.com/group/project/-/issues/123`                                                                  | `host` for self-managed (`gitlab.com` by default)                                    |
-| `linear`       | `RISK-123`, `https://linear.app/<workspace>/issue/RISK-123/...`                                                                               | `teams`                                                                              |
-| `azure-devops` | `AB#123`, `https://dev.azure.com/<org>/<project>/_workitems/edit/123`                                                                         | `host` for Azure DevOps Server (`dev.azure.com` and `*.visualstudio.com` by default) |
-| `numeric`      | `4821`                                                                                                                                        | `minLength` (1), `maxLength` (20)                                                    |
-| `pattern`      | anything matching your regex, anchored at both ends                                                                                           | `pattern`, `flags`                                                                   |
+| Preset         | Accepts                                                                                                                                                 | Options                                                                                                                            |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `any`          | `PROJ-123`, `#123`, `owner/repo#123`, any http(s) URL                                                                                                   |                                                                                                                                    |
+| `jira`         | `TRADE-123`, `https://<host>/browse/TRADE-123` (also under a path, as in `/jira/browse/TRADE-123`), board URLs with `selectedIssue=TRADE-123`           | `projects`; `host` (any host by default)                                                                                           |
+| `github`       | `#123`, `owner/repo#123`, `https://github.com/owner/repo/issues/123` (or `/pull/`)                                                                      | `host` for GitHub Enterprise (`github.com` by default)                                                                             |
+| `gitlab`       | `#123`, `group/project#123`, `https://gitlab.com/group/project/-/issues/123`                                                                            | `host` for self-managed (`gitlab.com` by default)                                                                                  |
+| `linear`       | `RISK-123`, `https://linear.app/<workspace>/issue/RISK-123/...`                                                                                         | `teams`                                                                                                                            |
+| `azure-devops` | `AB#123`, `#123`, `https://dev.azure.com/<org>/<project>/_workitems/edit/123`                                                                           | `host` for Azure DevOps Server (`dev.azure.com` and `*.visualstudio.com` by default)                                               |
+| `trello`       | card links, `https://trello.com/c/nqPiDKmw` with or without the `/9-title` after it                                                                     |                                                                                                                                    |
+| `notion`       | Unique IDs such as `TASK-123`, `https://www.notion.so/TASK-123`, page links that end in the page ID, database links with `?p=<page ID>`                 | `prefixes`; `host` for a custom domain (`notion.so`, `www.notion.so` and `*.notion.site` by default)                               |
+| `asana`        | task links, `https://app.asana.com/0/<project>/<task>` and the newer `https://app.asana.com/1/<workspace>/.../task/<task>`                              |                                                                                                                                    |
+| `clickup`      | `CU-86abc123`, `#86abc123`, custom IDs such as `DEV-123`, `https://app.clickup.com/t/86abc123` or `/t/<workspace>/DEV-123`, view links with `?p=<task>` | `prefixes` for custom IDs                                                                                                          |
+| `redmine`      | `#123`; with `host`, `https://<host>/issues/123` (also under a path)                                                                                    | `host`, needed for links                                                                                                           |
+| `monday`       | item links, `https://<account>.monday.com/boards/<board>/pulses/<item>`, and custom keys such as `TIX-001`                                              | `prefixes` for custom keys                                                                                                         |
+| `youtrack`     | `KT-123`, `https://<host>/issue/KT-123/...` (also under a path, as in `/youtrack/issue/KT-123`)                                                         | `projects`; `host` for Server or a custom domain (`youtrack.jetbrains.com`, `*.youtrack.cloud` and `*.myjetbrains.com` by default) |
+| `basecamp`     | to-do and card links, `https://3.basecamp.com/<account>/buckets/<project>/todos/<id>` or `/card_tables/cards/<id>`                                      |                                                                                                                                    |
+| `shortcut`     | `sc-123`, `[sc-123]`, `https://app.shortcut.com/<workspace>/story/123/...`                                                                              |                                                                                                                                    |
+| `url`          | links to the hosts you list, and nothing else                                                                                                           | `hosts`, required: host names such as `tasks.example.com`, with no scheme, port or path; `*.example.com` matches its subdomains    |
+| `numeric`      | `4821`                                                                                                                                                  | `minLength` (1), `maxLength` (20)                                                                                                  |
+| `pattern`      | anything matching your regex, anchored at both ends                                                                                                     | `pattern`, `flags`                                                                                                                 |
 
-`projects` (Jira) and `teams` (Linear) are keys as they appear in tickets, in uppercase: `TRADE` for
-`TRADE-123`. Each preset takes only its own options, so `host` on the `any` preset fails with a clear
-message instead of being ignored. A `pattern` always matches the whole ticket, so the `g` and `y`
-flags make no difference and are ignored.
+`projects` (Jira, YouTrack), `teams` (Linear) and `prefixes` (Notion, ClickUp, monday.com) are keys as
+they appear in tickets, in uppercase: `TRADE` for `TRADE-123`. YouTrack project IDs may also start with a digit, as `4DM`. Without them, any key passes. Each preset
+takes only its own options, so `host` on the `any` preset fails with a clear message instead of being
+ignored. A `pattern` always matches the whole ticket, so the `g` and `y` flags make no difference and are
+ignored.
+
+A preset rejects links that aren't one ticket in its tracker, such as a Trello board, an Asana project or
+a Notion database view. Redmine runs on your own server, and `/issues/123` is also GitHub's path, so its
+links pass only once `host` is set.
+
+For a tracker without a preset, use `url` with its host, for example
+`{ preset: 'url', hosts: ['www.wrike.com'] }` for Wrike links such as
+`https://www.wrike.com/open.htm?id=4821`. It works the same for Microsoft Planner (`tasks.office.com`),
+Airtable (`airtable.com`), Smartsheet (`app.smartsheet.com`) and trackers of your own. For another
+tracker's keys, such as `WEB-12`, `any` or `pattern` works. Gitea, Forgejo and Codeberg use GitHub's link layout,
+so the `github` preset with their `host` covers them. Bitbucket has no issue tracker since August 2026,
+so it has no preset.
 
 Presets combine, and each state can have its own format. For example, bugs in Jira and flaky-test
 reports in GitHub:

@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Ticket presets for more trackers: `trello`, `notion`, `asana`, `clickup`, `redmine`, `monday`,
+  `youtrack`, `basecamp` and `shortcut`. Each accepts its tracker's ticket keys and links to one ticket,
+  and rejects links to boards, projects, views and other sites. `prefixes` limits the keys Notion,
+  ClickUp and monday.com accept, and `projects` the YouTrack projects; `host` sets a custom domain for
+  Notion, a server for YouTrack, and the server whose links Redmine accepts.
+- A `url` preset for any other tracker: it accepts links to the `hosts` you list, and `*.example.com`
+  matches subdomains.
+- The `azure-devops` preset accepts `#123`, which Azure Repos links to work item 123 in commit messages
+  and pull requests.
+
 ## [0.9.0] - 2026-10-27
 
 ### Added

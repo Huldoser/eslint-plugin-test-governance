@@ -64,6 +64,25 @@ describe('compileOptions', () => {
     );
   });
 
+  it('accepts the options of the presets for other trackers', () => {
+    assert.doesNotThrow(() =>
+      compile({
+        ticket: [
+          { preset: 'notion', prefixes: ['TASK'], host: 'docs.acme.io' },
+          { preset: 'clickup', prefixes: ['DEV'] },
+          { preset: 'redmine', host: 'redmine.acme.io' },
+          { preset: 'monday', prefixes: ['TIX'] },
+          { preset: 'youtrack', projects: ['KT', '4DM'], host: 'yt.acme.io' },
+          { preset: 'url', hosts: ['www.wrike.com'] },
+          { preset: 'trello' },
+          { preset: 'asana' },
+          { preset: 'basecamp' },
+          { preset: 'shortcut' },
+        ],
+      }),
+    );
+  });
+
   it('treats a state set to undefined as not set', () => {
     assert.deepEqual(stateNames({ states: { skip: undefined } }), ['skip', 'fixme']);
   });
@@ -129,12 +148,35 @@ describe('compileOptions', () => {
     ],
     [{ ticket: { preset: 'linear', teams: ['Eng'] } }, /ticket\.teams\[0\] must be an uppercase key/],
     [
+      { ticket: { preset: 'jira', projects: ['TRADE', '4DM'] } },
+      /ticket\.projects\[1\] must start with a letter and have at least two characters, as Jira keys do \(got "4DM"\)/,
+    ],
+    [
+      { ticket: { preset: 'jira', projects: ['A'] } },
+      /ticket\.projects\[0\] must start with a letter and have at least two characters, as Jira keys do \(got "A"\)/,
+    ],
+    [{ ticket: { preset: 'youtrack', projects: ['123'] } }, /ticket\.projects\[0\] must be an uppercase key/],
+    [
+      { ticket: { preset: 'url', hosts: ['tracker.io:8080'] } },
+      /ticket\.hosts\[0\] must be a host name such as tasks\.example\.com or \*\.example\.com/,
+    ],
+    [{ ticket: { preset: 'url', hosts: ['https://tracker.io'] } }, /ticket\.hosts\[0\] must be a host name/],
+    [{ ticket: { preset: 'url', hosts: ['*'] } }, /ticket\.hosts\[0\] must be a host name/],
+    [{ ticket: { preset: 'notion', prefixes: ['task'] } }, /ticket\.prefixes\[0\] must be an uppercase key/],
+    [{ ticket: { preset: 'url' } }, /the "url" ticket preset needs `hosts`/],
+    [{ ticket: { preset: 'url', hosts: [] } }, /ticket\.hosts must have at least 1 item/],
+    [{ ticket: { preset: 'trello', host: 'trello.acme.io' } }, /ticket\.host is not an option of the "trello" preset/],
+    [
+      { ticket: { preset: 'clickup', projects: ['DEV'] } },
+      /ticket\.projects is not an option of the "clickup" preset \(it applies to "jira", "youtrack"\)/,
+    ],
+    [
       { ticket: { preset: 'any', host: 'jira.acme.com' } },
-      /ticket\.host is not an option of the "any" preset \(it applies to "jira", "github", "gitlab", "azure-devops"\)/,
+      /ticket\.host is not an option of the "any" preset \(it applies to "jira", "github", "gitlab", "azure-devops", "notion", "redmine", "youtrack"\)/,
     ],
     [
       { ticket: [{ preset: 'jira' }, { preset: 'numeric', projects: ['TRADE'] }] },
-      /ticket\[1\]\.projects is not an option of the "numeric" preset \(it applies to "jira"\)/,
+      /ticket\[1\]\.projects is not an option of the "numeric" preset \(it applies to "jira", "youtrack"\)/,
     ],
     [
       { states: { fixme: { ticket: { preset: 'github', teams: ['ENG'] } } } },

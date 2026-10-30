@@ -235,7 +235,9 @@ describe('README.md', () => {
     const samples: Record<string, unknown> = {
       projects: ['TRADE'],
       teams: ['RISK'],
+      prefixes: ['TASK'],
       host: 'tickets.example.com',
+      hosts: ['tickets.example.com'],
       minLength: 1,
       maxLength: 9,
       pattern: 'TRADE-\\d+',
