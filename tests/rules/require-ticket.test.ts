@@ -1,4 +1,5 @@
 import rule from '../../src/rules/require-ticket.ts';
+import type { TicketSpec } from '../../src/utils/tickets.ts';
 import { runRule, settings } from '../helpers.ts';
 
 const ANY = 'a ticket key like PROJ-123, an issue like #4821 or owner/repo#4821, or a URL';
@@ -316,6 +317,21 @@ runRule('require-ticket', rule, {
     "// FIXME: TRADE-1\ntest('places an order', async ({ page }, testInfo) => {\n  await test.step('fills the order', async (step) => {\n    testInfo.fixme();\n  });\n});",
     // A step needs a title and a body.
     "test('places an order', async () => {\n  await test.step.skip('confirms the fill');\n});",
+    // Ticket forms of the presets for other trackers, as they appear above skipped tests.
+    ...(
+      [
+        [{ preset: 'asana' }, 'https://app.asana.com/0/1202805690238892/1203106234191599/f'],
+        [{ preset: 'trello' }, 'https://trello.com/c/p5Fv7jne/106-bug-fix-gif-encoding-strips-transparency'],
+        [{ preset: 'clickup' }, 'CU-86bbkcz29'],
+        [{ preset: 'youtrack' }, 'https://youtrack.jetbrains.com/issue/KTOR-9561'],
+        [{ preset: 'shortcut' }, '[sc-27971]'],
+        [{ preset: 'azure-devops' }, '#4821'],
+        [{ preset: 'url', hosts: ['www.wrike.com'] }, 'https://www.wrike.com/open.htm?id=4821'],
+      ] satisfies [TicketSpec, string][]
+    ).map(([ticket, marker]) => ({
+      code: `// SKIP: ${marker}\ntest.skip('places an order', async () => {});`,
+      settings: settings({ ticket }),
+    })),
   ],
   invalid: [
     { code: "test.skip('places an order', async () => {});", errors: [missing('skip', 'SKIP')] },
@@ -874,6 +890,25 @@ runRule('require-ticket', rule, {
       code: "test['skip']('places an order', async () => {});",
       errors: [missing('skip', 'SKIP')],
     },
+    ...(
+      [
+        [
+          { preset: 'trello' },
+          'https://trello.com/b/nqPiDKmw/trading',
+          'a Trello card link like https://trello.com/c/nqPiDKmw',
+        ],
+        [
+          { preset: 'redmine' },
+          'https://redmine.acme.io/issues/4821',
+          'a Redmine issue like #4821 (set host to accept issue links)',
+        ],
+        [{ preset: 'shortcut' }, 'sc-new-story', 'a Shortcut story like sc-123, or a story link'],
+      ] satisfies [TicketSpec, string, string][]
+    ).map(([ticket, marker, expected]) => ({
+      code: `// SKIP: ${marker}\ntest.skip('places an order', async () => {});`,
+      settings: settings({ ticket }),
+      errors: [{ messageId: 'invalidTicket' as const, data: { ticket: marker, state: 'skip', expected } }],
+    })),
     {
       code: "// SKIP: OPS-1\ntest.skip('closes all positions at market close', async () => {});",
       settings: settings({ ticket: { preset: 'jira', projects: ['TRADE'] } }),

@@ -123,11 +123,13 @@ const tables: Record<string, Table> = {
     spec: { preset: 'azure-devops' },
     accepts: [
       'AB#4821',
+      // Azure Repos links #4821 in commit messages and pull request descriptions.
+      '#4821',
       'https://dev.azure.com/acme/trading-engine/_workitems/edit/4821',
       'https://acme.visualstudio.com/trading-engine/_workitems/edit/4821/',
     ],
     rejects: [
-      '#4821',
+      '#4821x',
       'ab#1',
       'https://example.com/acme/trading-engine/_workitems/edit/4821',
       'https://dev.azure.com/acme/trading-engine/_boards',
@@ -140,6 +142,231 @@ const tables: Record<string, Table> = {
     spec: { preset: 'azure-devops', host: 'tfs.acme.io' },
     accepts: ['https://tfs.acme.io/acme/trading-engine/_workitems/edit/1'],
     rejects: ['https://dev.azure.com/acme/trading-engine/_workitems/edit/1'],
+  },
+  trello: {
+    spec: { preset: 'trello' },
+    accepts: [
+      'https://trello.com/c/nqPiDKmw',
+      'https://trello.com/c/nqPiDKmw/',
+      'https://trello.com/c/nqPiDKmw/9-fix-stop-loss-rounding',
+    ],
+    rejects: [
+      '#9',
+      'nqPiDKmw',
+      'https://trello.com/b/nqPiDKmw/trading',
+      'https://trello.com/c/nqPiDKm',
+      'https://trello.com/c/nqPiDKmw1',
+      'https://trello.com/c/nqPiDKmw/9-slug/extra',
+      'https://example.com/c/nqPiDKmw',
+    ],
+  },
+  notion: {
+    spec: { preset: 'notion' },
+    accepts: [
+      'TASK-123',
+      'https://www.notion.so/TASK-123',
+      'https://www.notion.so/Fix-stop-loss-rounding-1429989fe8ac4effbc8f57f56486db54',
+      'https://notion.so/acme/1429989fe8ac4effbc8f57f56486db54',
+      'https://www.notion.so/acme/Fix-1429989f-e8ac-4eff-bc8f-57f56486db54',
+      'https://acme.notion.site/Fix-stop-loss-1429989fe8ac4effbc8f57f56486db54',
+      'https://www.notion.so/acme/9a1f0c2b3d4e4f5a8b6c7d8e9f0a1b2c?v=0b1c2d3e4f5a4b6c8d7e9f0a1b2c3d4e&p=1429989fe8ac4effbc8f57f56486db54&pm=s',
+      'https://www.notion.so/Fix-1429989fe8ac4effbc8f57f56486db54#0b1c2d3e4f5a4b6c8d7e9f0a1b2c3d4e',
+    ],
+    rejects: [
+      'task-123',
+      'https://www.notion.so/acme/9a1f0c2b3d4e4f5a8b6c7d8e9f0a1b2c?v=0b1c2d3e4f5a4b6c8d7e9f0a1b2c3d4e',
+      'https://www.notion.so/acme/x?p=nope',
+      'https://acme.notion.site/',
+      'https://acme.notion.site/my-custom-slug',
+      'https://www.notion.so/Fix-1429989fe8ac4effbc8f57f56486db5',
+      'https://www.notion.so/Fix-1429989fe8ac4effbc8f57f56486db54x',
+      'https://www.notion.so/1429989fe8ac4effbc8f57f56486db54/comments',
+      'https://example.com/Fix-1429989fe8ac4effbc8f57f56486db54',
+      'https://notion.site/Fix-1429989fe8ac4effbc8f57f56486db54',
+    ],
+  },
+  'notion with prefixes and a custom domain': {
+    spec: { preset: 'notion', prefixes: ['TASK'], host: 'docs.acme.io' },
+    accepts: ['TASK-1', 'https://docs.acme.io/TASK-1', 'https://docs.acme.io/Fix-1429989fe8ac4effbc8f57f56486db54'],
+    rejects: ['BUG-1', 'https://docs.acme.io/BUG-1', 'https://www.notion.so/Fix-1429989fe8ac4effbc8f57f56486db54'],
+  },
+  asana: {
+    spec: { preset: 'asana' },
+    accepts: [
+      'https://app.asana.com/0/1202805690238892/1203106234191599',
+      'https://app.asana.com/0/1202805690238892/1203106234191599/f',
+      'https://app.asana.com/0/0/1203106234191599',
+      'https://app.asana.com/1/1201234567890123/project/1202805690238892/task/1203106234191599',
+      'https://app.asana.com/1/1201234567890123/task/1203106234191599?focus=true',
+      'https://app.asana.com/1/1201234567890123/home/task/1203106234191599',
+      'https://app.asana.com/1/1201234567890123/task/1203106234191599/comment/1203106234191600',
+    ],
+    rejects: [
+      'https://app.asana.com/0/1202805690238892/list',
+      'https://app.asana.com/0/1202805690238892/board',
+      'https://app.asana.com/1/1201234567890123/project/1202805690238892',
+      'https://app.asana.com/1/1201234567890123/project/1202805690238892/list/1202805690238893',
+      'https://app.asana.com/1/1201234567890123/home',
+      'https://app.asana.com/1/1201234567890123/inbox/1201234567890124/item/1203106234191599/story/1',
+      'https://example.com/0/1202805690238892/1203106234191599',
+      '#1203106234191599',
+    ],
+  },
+  clickup: {
+    spec: { preset: 'clickup' },
+    accepts: [
+      'CU-86abc123',
+      '#86abc123',
+      'DEV-123',
+      'https://app.clickup.com/t/86abc123',
+      'https://app.clickup.com/t/9015210959/DEV-123',
+      'https://app.clickup.com/t/9015210959/86abc123/',
+      'https://app.clickup.com/9015210959/v/li/901500000001?p=86abc123',
+    ],
+    rejects: [
+      'CU-86ABC123',
+      'cu-86abc123',
+      'dev-123',
+      '#86abc12_',
+      'https://app.clickup.com/9015210959/v/li/901500000001',
+      'https://app.clickup.com/9015210959/v/li/901500000001?p=86ABC',
+      'https://app.clickup.com/t/9015210959/dev-123',
+      'https://sharing.clickup.com/9015210959/t/h/86abc123/0123456789ABCDEF',
+      'https://example.com/t/86abc123',
+    ],
+  },
+  'clickup with prefixes': {
+    spec: { preset: 'clickup', prefixes: ['DEV'] },
+    accepts: ['DEV-1', 'CU-86abc123', 'https://app.clickup.com/t/9015210959/DEV-1'],
+    rejects: ['OPS-1', 'https://app.clickup.com/t/9015210959/OPS-1'],
+  },
+  redmine: {
+    spec: { preset: 'redmine' },
+    accepts: ['#4821'],
+    rejects: ['issue#4821', '4821', 'https://redmine.acme.io/issues/4821', 'https://github.com/acme/x/issues/4821'],
+  },
+  'redmine with host': {
+    spec: { preset: 'redmine', host: 'redmine.acme.io' },
+    accepts: [
+      '#4821',
+      'https://redmine.acme.io/issues/4821',
+      'https://redmine.acme.io/issues/4821/',
+      'https://redmine.acme.io/issues/4821#note-4',
+      'https://redmine.acme.io/issues/4821.json',
+      'https://redmine.acme.io/redmine/issues/4821.pdf',
+    ],
+    rejects: [
+      'https://redmine.acme.io/issues/new',
+      'https://redmine.acme.io/issues/gantt',
+      'https://redmine.acme.io/projects/trading/issues',
+      'https://redmine.acme.io/issues/4821/edit',
+      'https://redmine.acme.io/issues/4821.html',
+      'https://other.io/issues/4821',
+    ],
+  },
+  monday: {
+    spec: { preset: 'monday' },
+    accepts: [
+      'TIX-001',
+      'https://acme.monday.com/boards/1234567890/pulses/1234567891',
+      'https://acme.monday.com/boards/1234567890/pulses/1234567891/item_views/1',
+    ],
+    rejects: [
+      '1234567891',
+      'tix-001',
+      'https://acme.monday.com/boards/1234567890',
+      'https://acme.monday.com/boards/1234567890/views/2',
+      'https://acme.monday.com/boards/1234567890/pulses/x',
+      'https://monday.com.example.io/boards/1234567890/pulses/1234567891',
+      'https://example.com/boards/1234567890/pulses/1234567891',
+    ],
+  },
+  'monday with prefixes': {
+    spec: { preset: 'monday', prefixes: ['TIX'] },
+    accepts: ['TIX-12'],
+    rejects: ['OPS-12'],
+  },
+  youtrack: {
+    spec: { preset: 'youtrack' },
+    accepts: [
+      'KT-11468',
+      '4DM-12',
+      'PRJ_ROAD-7',
+      'https://youtrack.jetbrains.com/issue/KT-11468',
+      'https://youtrack.jetbrains.com/issue/KT-11468/Fix-stop-loss-rounding',
+      'https://acme.youtrack.cloud/issue/TRADE-1/',
+      'https://acme.myjetbrains.com/youtrack/issue/TRADE-1',
+    ],
+    rejects: [
+      '123-4',
+      'kt-1',
+      'https://youtrack.jetbrains.com/issues/KT',
+      'https://youtrack.jetbrains.com/issue/KT-1/slug/extra',
+      'https://youtrack.jetbrains.com/issue/kt-1',
+      'https://youtrack.example.com/issue/KT-1',
+      'https://jetbrains.com/issue/KT-1',
+    ],
+  },
+  'youtrack on a server with projects': {
+    spec: { preset: 'youtrack', host: 'yt.acme.io', projects: ['TRADE', '4DM'] },
+    accepts: ['TRADE-1', '4DM-2', 'https://yt.acme.io/youtrack/issue/TRADE-1'],
+    rejects: ['KT-1', 'https://yt.acme.io/issue/KT-1', 'https://acme.youtrack.cloud/issue/TRADE-1'],
+  },
+  basecamp: {
+    spec: { preset: 'basecamp' },
+    accepts: [
+      'https://3.basecamp.com/4821/buckets/4822/todos/4823',
+      'https://3.basecamp.com/4821/buckets/4822/card_tables/cards/4823',
+      'https://3.basecamp.com/4821/buckets/4822/card_tables/cards/4823#__recording_4824',
+    ],
+    rejects: [
+      'https://3.basecamp.com/4821/buckets/4822/messages/4823',
+      'https://3.basecamp.com/4821/buckets/4822/todolists/4823',
+      'https://3.basecamp.com/4821/buckets/4822/documents/4823',
+      'https://3.basecamp.com/4821/buckets/4822/card_tables/4823',
+      'https://3.basecampapi.com/4821/buckets/4822/todos/4823.json',
+      '#4823',
+    ],
+  },
+  shortcut: {
+    spec: { preset: 'shortcut' },
+    accepts: [
+      'sc-27971',
+      'SC-27971',
+      '[sc-27971]',
+      'https://app.shortcut.com/acme/story/27971',
+      'https://app.shortcut.com/acme/story/27971/fix-stop-loss-rounding',
+      'https://app.clubhouse.io/acme/story/27971',
+    ],
+    rejects: [
+      'sc-new-story',
+      '[sc-new-story]',
+      '[sc-27971',
+      'sc27971',
+      'ch27971',
+      '[sc-0]',
+      'https://app.shortcut.com/acme/epic/27971',
+      'https://app.shortcut.com/acme/iteration/27971',
+      'https://app.shortcut.com/acme/story/new',
+      'https://example.com/acme/story/27971',
+    ],
+  },
+  url: {
+    spec: { preset: 'url', hosts: ['www.wrike.com', '*.acme.io'] },
+    accepts: [
+      'https://www.wrike.com/open.htm?id=4821',
+      'https://WWW.Wrike.com/open.htm?id=4821',
+      'https://tracker.acme.io/tasks/4821',
+      'https://a.b.acme.io/x',
+    ],
+    rejects: [
+      'https://wrike.com/open.htm?id=4821',
+      'https://acme.io/tasks/4821',
+      'https://evilacme.io/x',
+      'https://example.com/x',
+      'TRADE-1',
+      '#4821',
+    ],
   },
   numeric: {
     spec: { preset: 'numeric', minLength: 4, maxLength: 6 },
@@ -215,10 +442,15 @@ describe('placeholders', () => {
     'https://github.com/acme/trading-engine/issues/0',
     'https://x.io/browse/TRADE-0/',
     '000',
+    'TASK-000',
+    'sc-0',
   ]) {
     it(`rejects ${ticket}, since no tracker issues number 0`, () => {
       assert.equal(
-        compileTicketSpec([{ preset: 'any' }, { preset: 'azure-devops' }, { preset: 'numeric' }], []).check(ticket),
+        compileTicketSpec(
+          [{ preset: 'any' }, { preset: 'azure-devops' }, { preset: 'numeric' }, { preset: 'shortcut' }],
+          [],
+        ).check(ticket),
         'placeholder',
       );
     });
@@ -274,7 +506,74 @@ describe('messages', () => {
     );
     assert.equal(
       expectedOf({ preset: 'azure-devops' }).expected,
-      'an Azure Boards work item like AB#4821, or a work item URL',
+      'an Azure Boards work item like AB#4821 or #4821, or a work item URL',
+    );
+  });
+
+  it('describes the presets for other trackers', () => {
+    assert.deepEqual(
+      (
+        [
+          { preset: 'trello' },
+          { preset: 'notion' },
+          { preset: 'notion', prefixes: ['DOC', 'BUG'] },
+          { preset: 'asana' },
+          { preset: 'clickup' },
+          { preset: 'clickup', prefixes: ['DEV'] },
+          { preset: 'redmine' },
+          { preset: 'redmine', host: 'redmine.acme.io' },
+          { preset: 'monday', prefixes: ['TIX'] },
+          { preset: 'youtrack', projects: ['KT'] },
+          { preset: 'basecamp' },
+          { preset: 'shortcut' },
+          { preset: 'url', hosts: ['www.wrike.com', '*.acme.io'] },
+        ] satisfies TicketSpec[]
+      ).map((spec) => expectedOf(spec).expected),
+      [
+        'a Trello card link like https://trello.com/c/nqPiDKmw',
+        'a Notion ID like TASK-123, or a Notion page link',
+        'a Notion ID like DOC-123 in prefix DOC, BUG, or a Notion page link',
+        'an Asana task link like https://app.asana.com/0/0/1204821736251904',
+        'a ClickUp task like CU-86abc123 or DEV-123, or a ClickUp task link',
+        'a ClickUp task like CU-86abc123 or DEV-123 in prefix DEV, or a ClickUp task link',
+        'a Redmine issue like #4821 (set host to accept issue links)',
+        'a Redmine issue like #4821, or an issue URL on redmine.acme.io',
+        'a monday.com item link like https://acme.monday.com/boards/1234567890/pulses/1234567891, or a custom key like TIX-001 in prefix TIX',
+        'a YouTrack issue like KT-123 in project KT, or a YouTrack issue link',
+        'a Basecamp to-do or card link like https://3.basecamp.com/4821/buckets/4822/todos/4823',
+        'a Shortcut story like sc-123, or a story link',
+        'a link to www.wrike.com, *.acme.io',
+      ],
+    );
+  });
+
+  it('gives an example each new preset accepts', () => {
+    const specs: TicketSpec[] = [
+      { preset: 'trello' },
+      { preset: 'notion' },
+      { preset: 'asana' },
+      { preset: 'clickup' },
+      { preset: 'clickup', prefixes: ['DEV'] },
+      { preset: 'redmine' },
+      { preset: 'monday' },
+      { preset: 'youtrack' },
+      { preset: 'basecamp' },
+      { preset: 'shortcut' },
+      { preset: 'url', hosts: ['*.acme.io'] },
+      { preset: 'azure-devops' },
+    ];
+    for (const spec of specs) {
+      const matcher = compileTicketSpec([spec], DEFAULT_PLACEHOLDERS);
+      assert.equal(matcher.check(matcher.example), 'ok', `${spec.preset}: ${matcher.example}`);
+    }
+    assert.equal(expectedOf({ preset: 'clickup', prefixes: ['DEV'] }).example, 'DEV-123');
+    assert.equal(expectedOf({ preset: 'url', hosts: ['*.acme.io'] }).example, 'https://tasks.acme.io/4821');
+  });
+
+  it('rejects a url preset without hosts', () => {
+    assert.throws(
+      () => compileTicketSpec([{ preset: 'url' } as TicketSpec], []),
+      /the "url" ticket preset needs `hosts`/,
     );
   });
 
@@ -323,6 +622,16 @@ describe('backtracking', () => {
     { preset: 'gitlab' },
     { preset: 'linear' },
     { preset: 'azure-devops' },
+    { preset: 'trello' },
+    { preset: 'notion' },
+    { preset: 'asana' },
+    { preset: 'clickup' },
+    { preset: 'redmine', host: 'x.io' },
+    { preset: 'monday' },
+    { preset: 'youtrack', host: 'x.io' },
+    { preset: 'basecamp' },
+    { preset: 'shortcut' },
+    { preset: 'url', hosts: ['*.x.io'] },
     { preset: 'numeric' },
   ];
   const n = 50_000;
@@ -338,6 +647,13 @@ describe('backtracking', () => {
     'https://linear.app/a/issue/' + 'A'.repeat(n) + '-',
     'https://x.io/browse/' + 'A'.repeat(n),
     'https://x.io' + '/browse/A'.repeat(n / 10) + '-',
+    'https://www.notion.so/' + 'a-'.repeat(n) + 'x',
+    'https://www.notion.so/' + '0'.repeat(n) + 'x',
+    'https://app.asana.com/1/1' + '/project/1'.repeat(n / 10) + '/x',
+    'https://x.io' + '/issues/1'.repeat(n / 10) + 'x',
+    'https://x.io' + '/issue/A-1'.repeat(n / 10) + '/x/',
+    'https://app.clickup.com/t/' + '1'.repeat(n) + '/x/',
+    '[sc-' + '1'.repeat(n),
   ];
 
   for (const preset of presets) {

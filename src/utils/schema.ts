@@ -13,6 +13,8 @@ const TAG_HINT = 'a tag such as @needs-data';
 /** Jira project and Linear team keys, as they appear in tickets: `WEB` in `WEB-123`. */
 const KEY_PATTERN = '^[A-Z][A-Z0-9_]+$';
 const KEY_HINT = 'an uppercase key as it appears in tickets, such as WEB for WEB-123';
+/** YouTrack project IDs may also start with a digit, as `4DM` in `4DM-12`; `jira` checks its own in options.ts. */
+const PROJECT_PATTERN = '^(?=[A-Z0-9_]*[A-Z])[A-Z0-9_]+$';
 /** `['"a"', '"b"', '"c"']` as `"a", "b" or "c"`. */
 const orList = (items: string[]): string => `${items.slice(0, -1).join(', ')} or ${items.slice(-1).join('')}`;
 /** How code reads a framework's config: `configs.mocha`, or `configs['node-test']` for a name with a dash. */
@@ -23,9 +25,11 @@ const ticketSpecSchema: Schema = {
   type: 'object',
   properties: {
     preset: { type: 'string', enum: [...TICKET_PRESETS] },
-    projects: { type: 'array', items: { type: 'string', pattern: KEY_PATTERN, patternHint: KEY_HINT } },
+    projects: { type: 'array', items: { type: 'string', pattern: PROJECT_PATTERN, patternHint: KEY_HINT } },
     teams: { type: 'array', items: { type: 'string', pattern: KEY_PATTERN, patternHint: KEY_HINT } },
+    prefixes: { type: 'array', items: { type: 'string', pattern: KEY_PATTERN, patternHint: KEY_HINT } },
     host: { type: 'string' },
+    hosts: { type: 'array', items: { type: 'string' }, minItems: 1 },
     minLength: { type: 'integer', minimum: 1 },
     maxLength: { type: 'integer', minimum: 1 },
     pattern: { type: 'string' },

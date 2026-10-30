@@ -164,6 +164,16 @@ const PRESET_OPTIONS: Record<TicketSpec['preset'], string[]> = {
   gitlab: ['host'],
   linear: ['teams'],
   'azure-devops': ['host'],
+  trello: [],
+  notion: ['prefixes', 'host'],
+  asana: [],
+  clickup: ['prefixes'],
+  redmine: ['host'],
+  monday: ['prefixes'],
+  youtrack: ['projects', 'host'],
+  basecamp: [],
+  shortcut: [],
+  url: ['hosts'],
   numeric: ['minLength', 'maxLength'],
   pattern: ['pattern', 'flags'],
 };
@@ -175,7 +185,13 @@ function presetProblems(ticket: TicketSpec | TicketSpec[] | undefined, path: str
   return specs.flatMap((spec, index) => {
     const at = Array.isArray(ticket) ? `${path}[${index}]` : path;
     const allowed = PRESET_OPTIONS[spec.preset];
-    return Object.keys(spec)
+    const jiraKeys =
+      spec.preset === 'jira'
+        ? (spec.projects ?? []).flatMap((key, i) =>
+            /^[A-Z]/.test(key) ? [] : [`${at}.projects[${i}] must start with a letter, as Jira keys do (got "${key}")`],
+          )
+        : [];
+    const misplaced = Object.keys(spec)
       .filter(
         (key) => key !== 'preset' && (spec as Record<string, unknown>)[key] !== undefined && !allowed.includes(key),
       )
@@ -183,6 +199,7 @@ function presetProblems(ticket: TicketSpec | TicketSpec[] | undefined, path: str
         const presets = Object.entries(PRESET_OPTIONS).filter(([, keys]) => keys.includes(key));
         return `${at}.${key} is not an option of the "${spec.preset}" preset (it applies to ${presets.map(([name]) => `"${name}"`).join(', ')})`;
       });
+    return [...misplaced, ...jiraKeys];
   });
 }
 
