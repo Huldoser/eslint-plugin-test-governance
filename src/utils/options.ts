@@ -1,6 +1,7 @@
 import {
   BUILTIN_STATE_NAMES,
   DEFAULT_COMMENT_KEYWORDS,
+  HOST_NAME_RE,
   type BuiltinStateName,
   type FrameworkName,
   type TagStateName,
@@ -56,8 +57,8 @@ export interface GovernanceOptions {
    * Turns built-in states on or off, renames their tag or marker, or gives them their own ticket format.
    * `skip`, `fixme` and `todo` are on by default, `fail` and `slow` off; a setting for `new` or `quarantined`
    * wins over `lifecycleTags`. Only `new` and `quarantined` have a tag, e.g.
-   * `{ quarantined: { tag: '@flaky', marker: 'FLAKY' } }`. `fixme` and `slow` exist only in Playwright and
-   * `todo` only in Jest and Vitest.
+   * `{ quarantined: { tag: '@flaky', marker: 'FLAKY' } }`. `fixme` and `slow` exist only in Playwright,
+   * `todo` in every framework but Playwright, and `fail` in Playwright, Jest and Vitest.
    */
   states?: Partial<Record<BuiltinStateName, boolean | StateOverride>>;
   /** Adds a state for a tag, e.g. `{ 'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' } }`. */
@@ -178,6 +179,36 @@ const PRESET_OPTIONS: Record<TicketSpec['preset'], string[]> = {
   pattern: ['pattern', 'flags'],
 };
 
+/**
+ * Presets whose `host` must be a plain host name. The older presets still take any string, since
+ * rejecting one now would break configs whose short forms, such as `#123`, already work.
+ */
+const STRICT_HOST_PRESETS = new Set<TicketSpec['preset']>(['notion', 'redmine', 'youtrack']);
+
+/** Option values the schema allows for every preset but this one can't use. */
+function ownOptionProblems(spec: TicketSpec, at: string): string[] {
+  const problems: string[] = [];
+  if (spec.preset === 'jira') {
+    for (const [i, key] of (spec.projects ?? []).entries()) {
+      if (!/^[A-Z][A-Z0-9_]+$/.test(key)) {
+        problems.push(
+          `${at}.projects[${i}] must start with a letter and have at least two characters, as Jira keys do (got "${key}")`,
+        );
+      }
+    }
+  }
+  const { host } = spec as { host?: string };
+  if (STRICT_HOST_PRESETS.has(spec.preset) && host !== undefined && !HOST_NAME_RE.test(host)) {
+    problems.push(
+      `${at}.host must be a host name such as tracker.example.com, with no scheme, port or path (got "${host}")`,
+    );
+  }
+  if (spec.preset === 'url' && (spec as { hosts?: string[] }).hosts === undefined) {
+    problems.push(`${at}.hosts is required by the "url" preset: the hosts its links may point to`);
+  }
+  return problems;
+}
+
 /** Options set on a ticket spec that its preset ignores, such as `host` on the `any` preset. */
 function presetProblems(ticket: TicketSpec | TicketSpec[] | undefined, path: string): string[] {
   if (ticket === undefined) return [];
@@ -185,16 +216,6 @@ function presetProblems(ticket: TicketSpec | TicketSpec[] | undefined, path: str
   return specs.flatMap((spec, index) => {
     const at = Array.isArray(ticket) ? `${path}[${index}]` : path;
     const allowed = PRESET_OPTIONS[spec.preset];
-    const jiraKeys =
-      spec.preset === 'jira'
-        ? (spec.projects ?? []).flatMap((key, i) =>
-            /^[A-Z][A-Z0-9_]+$/.test(key)
-              ? []
-              : [
-                  `${at}.projects[${i}] must start with a letter and have at least two characters, as Jira keys do (got "${key}")`,
-                ],
-          )
-        : [];
     const misplaced = Object.keys(spec)
       .filter(
         (key) => key !== 'preset' && (spec as Record<string, unknown>)[key] !== undefined && !allowed.includes(key),
@@ -203,7 +224,7 @@ function presetProblems(ticket: TicketSpec | TicketSpec[] | undefined, path: str
         const presets = Object.entries(PRESET_OPTIONS).filter(([, keys]) => keys.includes(key));
         return `${at}.${key} is not an option of the "${spec.preset}" preset (it applies to ${presets.map(([name]) => `"${name}"`).join(', ')})`;
       });
-    return [...misplaced, ...jiraKeys];
+    return [...misplaced, ...ownOptionProblems(spec, at)];
   });
 }
 

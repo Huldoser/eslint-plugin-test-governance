@@ -127,6 +127,9 @@ const tables: Record<string, Table> = {
       '#4821',
       'https://dev.azure.com/acme/trading-engine/_workitems/edit/4821',
       'https://acme.visualstudio.com/trading-engine/_workitems/edit/4821/',
+      // Work items belong to the organization, so links may leave out the project.
+      'https://dev.azure.com/acme/_workitems/edit/4821',
+      'https://dev.azure.com./acme/trading-engine/_workitems/edit/4821',
     ],
     rejects: [
       '#4821x',
@@ -149,6 +152,7 @@ const tables: Record<string, Table> = {
       'https://trello.com/c/nqPiDKmw',
       'https://trello.com/c/nqPiDKmw/',
       'https://trello.com/c/nqPiDKmw/9-fix-stop-loss-rounding',
+      'https://trello.com./c/nqPiDKmw',
     ],
     rejects: [
       '#9',
@@ -171,6 +175,10 @@ const tables: Record<string, Table> = {
       'https://acme.notion.site/Fix-stop-loss-1429989fe8ac4effbc8f57f56486db54',
       'https://www.notion.so/acme/9a1f0c2b3d4e4f5a8b6c7d8e9f0a1b2c?v=0b1c2d3e4f5a4b6c8d7e9f0a1b2c3d4e&p=1429989fe8ac4effbc8f57f56486db54&pm=s',
       'https://www.notion.so/Fix-1429989fe8ac4effbc8f57f56486db54#0b1c2d3e4f5a4b6c8d7e9f0a1b2c3d4e',
+      'https://www.notion.so/Fix-1429989fe8ac4effbc8f57f56486db54?pvs=4',
+      // Notion's own links, since June 2026.
+      'https://app.notion.com/p/1429989fe8ac4effbc8f57f56486db54',
+      'https://app.notion.com/p/Fix-stop-loss-1429989fe8ac4effbc8f57f56486db54',
     ],
     rejects: [
       'task-123',
@@ -226,6 +234,11 @@ const tables: Record<string, Table> = {
     rejects: [
       'CU-86ABC123',
       'cu-86abc123',
+      // ClickUp task IDs always have a digit, so placeholder words aren't IDs.
+      'CU-todo',
+      '#xxx',
+      'https://app.clickup.com/t/todo',
+      'https://app.clickup.com/9015210959/v/li/901500000001?p=tbd',
       'dev-123',
       '#86abc12_',
       'https://app.clickup.com/9015210959/v/li/901500000001',
@@ -242,8 +255,18 @@ const tables: Record<string, Table> = {
   },
   redmine: {
     spec: { preset: 'redmine' },
-    accepts: ['#4821'],
-    rejects: ['issue#4821', '4821', 'https://redmine.acme.io/issues/4821', 'https://github.com/acme/x/issues/4821'],
+    // Redmine's own forms: a note of an issue, and the issue with its tracker and subject.
+    accepts: ['#4821', '#4821-6', '#4821#note-6', '##4821'],
+    rejects: [
+      'issue#4821',
+      '4821',
+      '###4821',
+      '#4821-',
+      '#4821#note-',
+      '#4821#comment-6',
+      'https://redmine.acme.io/issues/4821',
+      'https://github.com/acme/x/issues/4821',
+    ],
   },
   'redmine with host': {
     spec: { preset: 'redmine', host: 'redmine.acme.io' },
@@ -296,11 +319,16 @@ const tables: Record<string, Table> = {
       'https://youtrack.jetbrains.com/issue/KT-11468/Fix-stop-loss-rounding',
       'https://acme.youtrack.cloud/issue/TRADE-1/',
       'https://acme.myjetbrains.com/youtrack/issue/TRADE-1',
+      'https://youtrack.jetbrains.com/projects/KT/issues/KT-15984',
+      'https://youtrack.jetbrains.com/projects/IJPL/issues/IJPL-204613/Losing-comments-on-Gitlab-merge-requests',
+      'https://youtrack.jetbrains.com/issue/KT-14652/slug#focus=Comments-27-1234.0-0',
     ],
     rejects: [
       '123-4',
       'kt-1',
       'https://youtrack.jetbrains.com/issues/KT',
+      'https://youtrack.jetbrains.com/projects/KT/issues',
+      'https://youtrack.jetbrains.com/projects/KT/issues/KT-1/slug/extra',
       'https://youtrack.jetbrains.com/issue/KT-1/slug/extra',
       'https://youtrack.jetbrains.com/issue/kt-1',
       'https://youtrack.example.com/issue/KT-1',
@@ -357,11 +385,16 @@ const tables: Record<string, Table> = {
       'https://WWW.Wrike.com/open.htm?id=4821',
       'https://tracker.acme.io/tasks/4821',
       'https://a.b.acme.io/x',
+      'https://tracker.acme.io/?task=4821',
+      'https://tracker.acme.io/#/tasks/4821',
     ],
     rejects: [
       'https://wrike.com/open.htm?id=4821',
       'https://acme.io/tasks/4821',
       'https://evilacme.io/x',
+      // The site's home page is no ticket.
+      'https://www.wrike.com',
+      'https://tracker.acme.io/',
       'https://example.com/x',
       'TRADE-1',
       '#4821',
@@ -514,7 +547,7 @@ describe('messages', () => {
     assert.equal(expectedOf({ preset: 'jira' }).expected, 'a Jira key like PROJ-123, or a Jira URL');
     assert.equal(
       expectedOf({ preset: 'jira', projects: ['TRADE', 'RISK'] }).expected,
-      'a Jira key like TRADE-123 in project TRADE, RISK, or a Jira URL',
+      'a Jira key like TRADE-123 in project TRADE or RISK, or a Jira URL',
     );
     assert.equal(
       expectedOf({ preset: 'gitlab' }).expected,
@@ -535,7 +568,7 @@ describe('messages', () => {
     assert.equal(expectedOf({ preset: 'linear' }).expected, 'a Linear issue like ENG-123, or a Linear URL');
     assert.equal(
       expectedOf({ preset: 'linear', teams: ['TRADE', 'RISK'] }).expected,
-      'a Linear issue like TRADE-123 in team TRADE, RISK, or a Linear URL',
+      'a Linear issue like TRADE-123 in team TRADE or RISK, or a Linear URL',
     );
     assert.equal(
       expectedOf({ preset: 'azure-devops' }).expected,
@@ -560,22 +593,26 @@ describe('messages', () => {
           { preset: 'basecamp' },
           { preset: 'shortcut' },
           { preset: 'url', hosts: ['www.wrike.com', '*.acme.io'] },
+          { preset: 'notion', host: 'docs.acme.io' },
+          { preset: 'youtrack', host: 'yt.acme.io' },
         ] satisfies TicketSpec[]
       ).map((spec) => expectedOf(spec).expected),
       [
         'a Trello card link like https://trello.com/c/nqPiDKmw',
         'a Notion ID like TASK-123, or a Notion page link',
-        'a Notion ID like DOC-123 in prefix DOC, BUG, or a Notion page link',
+        'a Notion ID like DOC-123 with prefix DOC or BUG, or a Notion page link',
         'an Asana task link like https://app.asana.com/0/0/1204821736251904',
         'a ClickUp task like CU-86abc123 or DEV-123, or a ClickUp task link',
-        'a ClickUp task like CU-86abc123 or DEV-123 in prefix DEV, or a ClickUp task link',
+        'a ClickUp task like CU-86abc123 or DEV-123 with prefix DEV, or a ClickUp task link',
         'a Redmine issue like #4821 (set host to accept issue links)',
         'a Redmine issue like #4821, or an issue URL on redmine.acme.io',
-        'a monday.com item link like https://acme.monday.com/boards/1234567890/pulses/1234567891, or a custom key like TIX-001 in prefix TIX',
+        'a monday.com item link like https://acme.monday.com/boards/1234567890/pulses/1234567891, or a custom key like TIX-001 with prefix TIX',
         'a YouTrack issue like KT-123 in project KT, or a YouTrack issue link',
         'a Basecamp to-do or card link like https://3.basecamp.com/4821/buckets/4822/todos/4823',
         'a Shortcut story like sc-123, or a story link',
         'a link to www.wrike.com, *.acme.io',
+        'a Notion ID like TASK-123, or a Notion page link on docs.acme.io',
+        'a YouTrack issue like PROJ-123, or a YouTrack issue link on yt.acme.io',
       ],
     );
   });
@@ -601,13 +638,6 @@ describe('messages', () => {
     }
     assert.equal(expectedOf({ preset: 'clickup', prefixes: ['DEV'] }).example, 'DEV-123');
     assert.equal(expectedOf({ preset: 'url', hosts: ['*.acme.io'] }).example, 'https://tasks.acme.io/4821');
-  });
-
-  it('rejects a url preset without hosts', () => {
-    assert.throws(
-      () => compileTicketSpec([{ preset: 'url' } as TicketSpec], []),
-      /the "url" ticket preset needs `hosts`/,
-    );
   });
 
   it('gives a sample ticket for each preset', () => {

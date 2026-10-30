@@ -53,15 +53,19 @@ const NOTION_PAGE_RE = new RegExp(`(?:^|-)(${NOTION_ID})$`);
 const NOTION_ID_RE = new RegExp(`^(?:${NOTION_ID})$`);
 const ASANA_PATH_RE =
   /^\/(?:0\/\d+\/(\d+)(?:\/f)?|1\/\d+(?:\/project\/\d+|\/home)?\/task\/(\d+)(?:\/comment\/\d+)?)\/?$/;
-const CLICKUP_ID_RE = /^[a-z0-9]+$/;
+// ClickUp task IDs are lowercase letters and digits, with at least one digit.
+const CLICKUP_ID_RE = /^(?=[a-z]*\d)[a-z0-9]+$/;
 const CLICKUP_REF_RE = /^(?:CU-|#)([a-z0-9]+)$/;
 const CLICKUP_TASK_PATH_RE = /^\/t\/(?:\d+\/)?([^/]+)\/?$/;
 const CLICKUP_VIEW_PATH_RE = /^\/\d+\/v\//;
+// `#123`, a note of it (`#123-4`, `#123#note-4`), and `##123`, which Redmine shows with its subject.
+const REDMINE_REF_RE = /^##?(\d+)(?:-\d+|#note-\d+)?$/;
 const REDMINE_PATH_RE = /\/issues\/(\d+)(?:\.(?:json|xml|pdf|atom))?\/?$/;
 const MONDAY_PATH_RE = /^\/boards\/\d+\/pulses\/(\d+)(?:\/.*)?$/;
 // YouTrack project IDs may start with a digit (4DM-12) but can't be digits only.
 const YOUTRACK_KEY_RE = /^([A-Z0-9_]+)-\d+$/;
-const YOUTRACK_PATH_RE = /\/issue\/([A-Z0-9_]+-\d+)(?:\/[^/]*)?$/;
+// `/issue/KT-1` and the newer `/projects/KT/issues/KT-1`, with an optional title after the key.
+const YOUTRACK_PATH_RE = /\/(?:issue|projects\/[^/]+\/issues)\/([A-Z0-9_]+-\d+)(?:\/[^/]*)?$/;
 const BASECAMP_PATH_RE = /^\/\d+\/buckets\/\d+\/(?:todos|card_tables\/cards)\/(\d+)\/?$/;
 const SHORTCUT_REF_RE = /^(?:sc-(\d+)|\[sc-(\d+)\])$/i;
 const SHORTCUT_PATH_RE = /^\/[^/]+\/story\/(\d+)(?:\/[^/]*)?$/;
@@ -91,13 +95,18 @@ function parseUrl(ticket: string): URL | undefined {
   }
 }
 
+/** The link's host name in lowercase, without the trailing dot that `trello.com.` may have. */
+function hostnameOf(url: URL): string {
+  return url.hostname.toLowerCase().replace(/\.$/, '');
+}
+
 function hostMatches(url: URL, host: string): boolean {
-  return url.hostname.toLowerCase() === host.toLowerCase();
+  return hostnameOf(url) === host.toLowerCase();
 }
 
 /** `*.example.com` matches the subdomains of example.com; any other entry matches its host exactly. */
 function hostInList(url: URL, hosts: string[]): boolean {
-  const hostname = url.hostname.toLowerCase();
+  const hostname = hostnameOf(url);
   return hosts.some((host) => {
     const lower = host.toLowerCase();
     return lower.startsWith('*.') ? hostname.endsWith(lower.slice(1)) : hostname === lower;
@@ -133,8 +142,11 @@ function linkId(url: URL): string {
   return id === undefined ? url.href : numberOf(id);
 }
 
-function describeList(noun: string, list: string[] | undefined): string {
-  return list === undefined ? '' : ` in ${noun} ${list.join(', ')}`;
+/** ` in project TRADE or RISK` for `describeList('in project', ['TRADE', 'RISK'])`. */
+function describeList(words: string, list: string[] | undefined): string {
+  if (list === undefined) return '';
+  const items = list.length === 1 ? list[0] : `${list.slice(0, -1).join(', ')} or ${list[list.length - 1]}`;
+  return ` ${words} ${items}`;
 }
 
 function compilePreset(spec: TicketSpec): CompiledPreset {
@@ -159,7 +171,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
           if (!url || (host !== undefined && !hostMatches(url, host))) return undefined;
           return keyId(JIRA_PATH_RE.exec(url.pathname)?.[1] ?? url.searchParams.get('selectedIssue'), keyOk);
         },
-        expected: `a Jira key like ${projects?.[0] ?? 'PROJ'}-123${describeList('project', projects)}, or a Jira URL`,
+        expected: `a Jira key like ${projects?.[0] ?? 'PROJ'}-123${describeList('in project', projects)}, or a Jira URL`,
         example: `${projects?.[0] ?? 'PROJ'}-123`,
       };
     }
@@ -198,7 +210,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
             ? keyId(LINEAR_PATH_RE.exec(url.pathname)?.[1], keyOk)
             : undefined;
         },
-        expected: `a Linear issue like ${teams?.[0] ?? 'ENG'}-123${describeList('team', teams)}, or a Linear URL`,
+        expected: `a Linear issue like ${teams?.[0] ?? 'ENG'}-123${describeList('in team', teams)}, or a Linear URL`,
         example: `${teams?.[0] ?? 'ENG'}-123`,
       };
     }
@@ -211,7 +223,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
           if (!url) return undefined;
           const hostOk =
             host === undefined
-              ? hostMatches(url, 'dev.azure.com') || url.hostname.toLowerCase().endsWith('.visualstudio.com')
+              ? hostMatches(url, 'dev.azure.com') || hostnameOf(url).endsWith('.visualstudio.com')
               : hostMatches(url, host);
           return hostOk ? AZURE_PATH_RE.exec(url.pathname)?.[1] : undefined;
         },
@@ -230,7 +242,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
       };
     case 'notion': {
       const { prefixes, host } = spec;
-      const hosts = host === undefined ? ['notion.so', 'www.notion.so', '*.notion.site'] : [host];
+      const hosts = host === undefined ? ['notion.so', 'www.notion.so', 'app.notion.com', '*.notion.site'] : [host];
       const keyOk = (key: string): boolean => keyInList(key, prefixes);
       return {
         find: (t) => {
@@ -244,7 +256,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
           if (segment === undefined) return undefined;
           return KEY_RE.test(segment) ? keyId(segment, keyOk) : NOTION_PAGE_RE.exec(segment)?.[1];
         },
-        expected: `a Notion ID like ${prefixes?.[0] ?? 'TASK'}-123${describeList('prefix', prefixes)}, or a Notion page link`,
+        expected: `a Notion ID like ${prefixes?.[0] ?? 'TASK'}-123${describeList('with prefix', prefixes)}, or a Notion page link${host === undefined ? '' : ` on ${host}`}`,
         example: `${prefixes?.[0] ?? 'TASK'}-123`,
       };
     }
@@ -277,7 +289,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
           }
           return taskId(CLICKUP_TASK_PATH_RE.exec(url.pathname)?.[1]);
         },
-        expected: `a ClickUp task like CU-86abc123 or ${prefixes?.[0] ?? 'DEV'}-123${describeList('prefix', prefixes)}, or a ClickUp task link`,
+        expected: `a ClickUp task like CU-86abc123 or ${prefixes?.[0] ?? 'DEV'}-123${describeList('with prefix', prefixes)}, or a ClickUp task link`,
         example: prefixes === undefined ? 'CU-86abc123' : `${prefixes[0]}-123`,
       };
     }
@@ -285,7 +297,8 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
       const { host } = spec;
       return {
         find: (t) => {
-          if (ISSUE_NUMBER_RE.test(t)) return numberOf(t);
+          const ref = REDMINE_REF_RE.exec(t)?.[1];
+          if (ref !== undefined) return ref;
           const url = parseUrl(t);
           return url && host !== undefined && hostMatches(url, host)
             ? REDMINE_PATH_RE.exec(url.pathname)?.[1]
@@ -307,7 +320,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
           const url = parseUrl(t);
           return url && hostInList(url, ['*.monday.com']) ? MONDAY_PATH_RE.exec(url.pathname)?.[1] : undefined;
         },
-        expected: `a monday.com item link like https://acme.monday.com/boards/1234567890/pulses/1234567891, or a custom key like ${prefixes?.[0] ?? 'TIX'}-001${describeList('prefix', prefixes)}`,
+        expected: `a monday.com item link like https://acme.monday.com/boards/1234567890/pulses/1234567891, or a custom key like ${prefixes?.[0] ?? 'TIX'}-001${describeList('with prefix', prefixes)}`,
         example: 'https://acme.monday.com/boards/1234567890/pulses/1234567891',
       };
     }
@@ -321,7 +334,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
           const url = parseUrl(t);
           return url && hostInList(url, hosts) ? keyId(YOUTRACK_PATH_RE.exec(url.pathname)?.[1], keyOk) : undefined;
         },
-        expected: `a YouTrack issue like ${projects?.[0] ?? 'PROJ'}-123${describeList('project', projects)}, or a YouTrack issue link`,
+        expected: `a YouTrack issue like ${projects?.[0] ?? 'PROJ'}-123${describeList('in project', projects)}, or a YouTrack issue link${host === undefined ? '' : ` on ${host}`}`,
         example: `${projects?.[0] ?? 'PROJ'}-123`,
       };
     }
@@ -349,15 +362,13 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
         example: 'sc-123',
       };
     case 'url': {
-      // The schema can't tie `hosts` to this preset, so check it here.
-      const { hosts } = spec as { hosts?: string[] };
-      if (hosts === undefined) {
-        throw new ConfigError('the "url" ticket preset needs `hosts`, the hosts its links may point to.');
-      }
+      const { hosts } = spec;
       return {
         find: (t) => {
           const url = parseUrl(t);
-          return url && hostInList(url, hosts) ? linkId(url) : undefined;
+          if (!url || !hostInList(url, hosts)) return undefined;
+          // The site's home page is no ticket; a query or a `#/route` after it can be.
+          return url.pathname === '/' && url.search === '' && url.hash === '' ? undefined : linkId(url);
         },
         expected: `a link to ${hosts.join(', ')}`,
         example: `https://${hosts[0].replace(/^\*\./, 'tasks.')}/4821`,
