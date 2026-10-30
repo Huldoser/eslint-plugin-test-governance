@@ -42,35 +42,42 @@ const AZURE_REF_RE = /^AB#\d+$/;
 const DIGITS_RE = /^\d+$/;
 // Jira Server and Data Center can run under a path, as in https://issues.example.com/jira/browse/TRADE-1.
 const JIRA_PATH_RE = /\/browse\/([A-Z][A-Z0-9_]+-\d+)\/?$/;
-const GITHUB_PATH_RE = /^\/[^/]+\/[^/]+\/(?:issues|pull)\/\d+\/?$/;
-const GITLAB_PATH_RE = /\/-\/(?:issues|merge_requests|work_items)\/\d+\/?$/;
+const GITHUB_PATH_RE = /^\/[^/]+\/[^/]+\/(?:issues|pull)\/(\d+)\/?$/;
+const GITLAB_PATH_RE = /\/-\/(?:issues|merge_requests|work_items)\/(\d+)\/?$/;
 const LINEAR_PATH_RE = /^\/[^/]+\/issue\/([A-Z][A-Z0-9]*-\d+)(?:\/[^/]*)?$/;
-const AZURE_PATH_RE = /\/_workitems\/edit\/\d+\/?$/;
-const TRELLO_PATH_RE = /^\/c\/[A-Za-z0-9]{8}(?:\/[^/]*)?$/;
+const AZURE_PATH_RE = /\/_workitems\/edit\/(\d+)\/?$/;
+const TRELLO_PATH_RE = /^\/c\/([A-Za-z0-9]{8})(?:\/[^/]*)?$/;
 // A Notion page ID is 32 hex digits, plain or dashed as a UUID, at the end of the page's last path segment.
 const NOTION_ID = '[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
-const NOTION_PAGE_RE = new RegExp(`(?:^|-)(?:${NOTION_ID})$`);
+const NOTION_PAGE_RE = new RegExp(`(?:^|-)(${NOTION_ID})$`);
 const NOTION_ID_RE = new RegExp(`^(?:${NOTION_ID})$`);
-const ASANA_PATH_RE = /^\/(?:0\/\d+\/\d+(?:\/f)?|1\/\d+(?:\/project\/\d+|\/home)?\/task\/\d+(?:\/comment\/\d+)?)\/?$/;
+const ASANA_PATH_RE =
+  /^\/(?:0\/\d+\/(\d+)(?:\/f)?|1\/\d+(?:\/project\/\d+|\/home)?\/task\/(\d+)(?:\/comment\/\d+)?)\/?$/;
 const CLICKUP_ID_RE = /^[a-z0-9]+$/;
-const CLICKUP_REF_RE = /^(?:CU-|#)[a-z0-9]+$/;
+const CLICKUP_REF_RE = /^(?:CU-|#)([a-z0-9]+)$/;
 const CLICKUP_TASK_PATH_RE = /^\/t\/(?:\d+\/)?([^/]+)\/?$/;
 const CLICKUP_VIEW_PATH_RE = /^\/\d+\/v\//;
-const REDMINE_PATH_RE = /\/issues\/\d+(?:\.(?:json|xml|pdf|atom))?\/?$/;
-const MONDAY_PATH_RE = /^\/boards\/\d+\/pulses\/\d+(?:\/.*)?$/;
+const REDMINE_PATH_RE = /\/issues\/(\d+)(?:\.(?:json|xml|pdf|atom))?\/?$/;
+const MONDAY_PATH_RE = /^\/boards\/\d+\/pulses\/(\d+)(?:\/.*)?$/;
 // YouTrack project IDs may start with a digit (4DM-12) but can't be digits only.
 const YOUTRACK_KEY_RE = /^([A-Z0-9_]+)-\d+$/;
 const YOUTRACK_PATH_RE = /\/issue\/([A-Z0-9_]+-\d+)(?:\/[^/]*)?$/;
-const BASECAMP_PATH_RE = /^\/\d+\/buckets\/\d+\/(?:todos|card_tables\/cards)\/\d+\/?$/;
-const SHORTCUT_REF_RE = /^(?:sc-[1-9]\d*|\[sc-[1-9]\d*\])$/i;
-const SHORTCUT_PATH_RE = /^\/[^/]+\/story\/\d+(?:\/[^/]*)?$/;
-// No tracker issues number 0, so PROJ-0, #0, AB#0, [sc-0], .../issues/0 and 000 are always placeholders.
-const ZERO_ID_RE = /(?:^|[-#/])0+[/\]]?$/;
+const BASECAMP_PATH_RE = /^\/\d+\/buckets\/\d+\/(?:todos|card_tables\/cards)\/(\d+)\/?$/;
+const SHORTCUT_REF_RE = /^(?:sc-(\d+)|\[sc-(\d+)\])$/i;
+const SHORTCUT_PATH_RE = /^\/[^/]+\/story\/(\d+)(?:\/[^/]*)?$/;
+// No tracker issues number 0. A preset hands back the ID it finds, and an ID of zeros (0, 000, or a
+// Notion page ID of zeros) makes the ticket a placeholder. A ticket no preset reads is a placeholder
+// when it ends in a zero ID, as PROJ-0, #0, AB#0 or .../issues/0 do.
+const ZERO_RE = /^[0-]+$/;
+const ZERO_ID_RE = /(?:^|[-#/])0+\/?$/;
+// The ID in a link to an unknown tracker: its last path segment, when that is a number or a key.
+const LINK_ID_RE = /\/(\d+|[A-Z][A-Z0-9_]+-\d+)\/?$/;
 
-type Predicate = (ticket: string) => boolean;
+/** The ID a preset finds in a ticket, or undefined when the ticket isn't one of its forms. */
+type Finder = (ticket: string) => string | undefined;
 
 interface CompiledPreset {
-  test: Predicate;
+  find: Finder;
   expected: string;
   example: string;
 }
@@ -110,6 +117,22 @@ function keyInList(key: string, list: string[] | undefined): boolean {
   return inList(key.slice(0, key.lastIndexOf('-')), list);
 }
 
+/** The number in `TRADE-123`, `#123`, `owner/repo#123` or `AB#123`. */
+function numberOf(ticket: string): string {
+  return ticket.slice(Math.max(ticket.lastIndexOf('-'), ticket.lastIndexOf('#')) + 1);
+}
+
+/** `TRADE-123`'s number, when the key passes `ok`. */
+function keyId(key: string | null | undefined, ok: (key: string) => boolean): string | undefined {
+  return key !== null && key !== undefined && ok(key) ? numberOf(key) : undefined;
+}
+
+/** A link's ID: its last path segment if that is a number or key, else the link itself. */
+function linkId(url: URL): string {
+  const id = LINK_ID_RE.exec(url.pathname)?.[1];
+  return id === undefined ? url.href : numberOf(id);
+}
+
 function describeList(noun: string, list: string[] | undefined): string {
   return list === undefined ? '' : ` in ${noun} ${list.join(', ')}`;
 }
@@ -118,20 +141,23 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
   switch (spec.preset) {
     case 'any':
       return {
-        test: (t) => KEY_RE.test(t) || ISSUE_NUMBER_RE.test(t) || GITLAB_REF_RE.test(t) || parseUrl(t) !== undefined,
+        find: (t) => {
+          if (KEY_RE.test(t) || ISSUE_NUMBER_RE.test(t) || GITLAB_REF_RE.test(t)) return numberOf(t);
+          const url = parseUrl(t);
+          return url && linkId(url);
+        },
         expected: 'a ticket key like PROJ-123, an issue like #4821 or owner/repo#4821, or a URL',
         example: 'PROJ-123',
       };
     case 'jira': {
       const { projects, host } = spec;
-      const keyOk = (key: string): boolean => keyInList(key, projects);
+      const keyOk = (key: string): boolean => KEY_RE.test(key) && keyInList(key, projects);
       return {
-        test: (t) => {
-          if (KEY_RE.test(t)) return keyOk(t);
+        find: (t) => {
+          if (KEY_RE.test(t)) return keyId(t, keyOk);
           const url = parseUrl(t);
-          if (!url || (host !== undefined && !hostMatches(url, host))) return false;
-          const key = JIRA_PATH_RE.exec(url.pathname)?.[1] ?? url.searchParams.get('selectedIssue');
-          return key !== null && KEY_RE.test(key) && keyOk(key);
+          if (!url || (host !== undefined && !hostMatches(url, host))) return undefined;
+          return keyId(JIRA_PATH_RE.exec(url.pathname)?.[1] ?? url.searchParams.get('selectedIssue'), keyOk);
         },
         expected: `a Jira key like ${projects?.[0] ?? 'PROJ'}-123${describeList('project', projects)}, or a Jira URL`,
         example: `${projects?.[0] ?? 'PROJ'}-123`,
@@ -140,10 +166,10 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
     case 'github': {
       const host = spec.host ?? 'github.com';
       return {
-        test: (t) => {
-          if (ISSUE_NUMBER_RE.test(t) || GITHUB_REF_RE.test(t)) return true;
+        find: (t) => {
+          if (ISSUE_NUMBER_RE.test(t) || GITHUB_REF_RE.test(t)) return numberOf(t);
           const url = parseUrl(t);
-          return url !== undefined && hostMatches(url, host) && GITHUB_PATH_RE.test(url.pathname);
+          return url && hostMatches(url, host) ? GITHUB_PATH_RE.exec(url.pathname)?.[1] : undefined;
         },
         expected: `a GitHub issue like #4821 or owner/repo#4821, or an issue URL on ${host}`,
         example: '#4821',
@@ -152,10 +178,10 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
     case 'gitlab': {
       const host = spec.host ?? 'gitlab.com';
       return {
-        test: (t) => {
-          if (ISSUE_NUMBER_RE.test(t) || GITLAB_REF_RE.test(t)) return true;
+        find: (t) => {
+          if (ISSUE_NUMBER_RE.test(t) || GITLAB_REF_RE.test(t)) return numberOf(t);
           const url = parseUrl(t);
-          return url !== undefined && hostMatches(url, host) && GITLAB_PATH_RE.test(url.pathname);
+          return url && hostMatches(url, host) ? GITLAB_PATH_RE.exec(url.pathname)?.[1] : undefined;
         },
         expected: `a GitLab issue like #4821 or group/project#4821, or an issue URL on ${host}`,
         example: '#4821',
@@ -165,12 +191,12 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
       const { teams } = spec;
       const keyOk = (key: string): boolean => keyInList(key, teams);
       return {
-        test: (t) => {
-          if (KEY_RE.test(t)) return keyOk(t);
+        find: (t) => {
+          if (KEY_RE.test(t)) return keyId(t, keyOk);
           const url = parseUrl(t);
-          if (!url || !hostMatches(url, 'linear.app')) return false;
-          const key = LINEAR_PATH_RE.exec(url.pathname)?.[1];
-          return key !== undefined && keyOk(key);
+          return url && hostMatches(url, 'linear.app')
+            ? keyId(LINEAR_PATH_RE.exec(url.pathname)?.[1], keyOk)
+            : undefined;
         },
         expected: `a Linear issue like ${teams?.[0] ?? 'ENG'}-123${describeList('team', teams)}, or a Linear URL`,
         example: `${teams?.[0] ?? 'ENG'}-123`,
@@ -179,15 +205,15 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
     case 'azure-devops': {
       const { host } = spec;
       return {
-        test: (t) => {
-          if (AZURE_REF_RE.test(t) || ISSUE_NUMBER_RE.test(t)) return true;
+        find: (t) => {
+          if (AZURE_REF_RE.test(t) || ISSUE_NUMBER_RE.test(t)) return numberOf(t);
           const url = parseUrl(t);
-          if (!url) return false;
+          if (!url) return undefined;
           const hostOk =
             host === undefined
               ? hostMatches(url, 'dev.azure.com') || url.hostname.toLowerCase().endsWith('.visualstudio.com')
               : hostMatches(url, host);
-          return hostOk && AZURE_PATH_RE.test(url.pathname);
+          return hostOk ? AZURE_PATH_RE.exec(url.pathname)?.[1] : undefined;
         },
         expected: 'an Azure Boards work item like AB#4821 or #4821, or a work item URL',
         example: 'AB#4821',
@@ -195,9 +221,9 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
     }
     case 'trello':
       return {
-        test: (t) => {
+        find: (t) => {
           const url = parseUrl(t);
-          return url !== undefined && hostMatches(url, 'trello.com') && TRELLO_PATH_RE.test(url.pathname);
+          return url && hostMatches(url, 'trello.com') ? TRELLO_PATH_RE.exec(url.pathname)?.[1] : undefined;
         },
         expected: 'a Trello card link like https://trello.com/c/nqPiDKmw',
         example: 'https://trello.com/c/nqPiDKmw',
@@ -205,17 +231,18 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
     case 'notion': {
       const { prefixes, host } = spec;
       const hosts = host === undefined ? ['notion.so', 'www.notion.so', '*.notion.site'] : [host];
+      const keyOk = (key: string): boolean => keyInList(key, prefixes);
       return {
-        test: (t) => {
-          if (KEY_RE.test(t)) return keyInList(t, prefixes);
+        find: (t) => {
+          if (KEY_RE.test(t)) return keyId(t, keyOk);
           const url = parseUrl(t);
-          if (!url || !hostInList(url, hosts)) return false;
+          if (!url || !hostInList(url, hosts)) return undefined;
           const peek = url.searchParams.get('p');
-          if (peek !== null) return NOTION_ID_RE.test(peek);
-          if (url.searchParams.has('v')) return false;
+          if (peek !== null) return NOTION_ID_RE.test(peek) ? peek : undefined;
+          if (url.searchParams.has('v')) return undefined;
           const segment = /^\/(?:[^/]+\/)?([^/]+)$/.exec(url.pathname)?.[1];
-          if (segment === undefined) return false;
-          return KEY_RE.test(segment) ? keyInList(segment, prefixes) : NOTION_PAGE_RE.test(segment);
+          if (segment === undefined) return undefined;
+          return KEY_RE.test(segment) ? keyId(segment, keyOk) : NOTION_PAGE_RE.exec(segment)?.[1];
         },
         expected: `a Notion ID like ${prefixes?.[0] ?? 'TASK'}-123${describeList('prefix', prefixes)}, or a Notion page link`,
         example: `${prefixes?.[0] ?? 'TASK'}-123`,
@@ -223,25 +250,32 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
     }
     case 'asana':
       return {
-        test: (t) => {
+        find: (t) => {
           const url = parseUrl(t);
-          return url !== undefined && hostMatches(url, 'app.asana.com') && ASANA_PATH_RE.test(url.pathname);
+          const match = url && hostMatches(url, 'app.asana.com') ? ASANA_PATH_RE.exec(url.pathname) : undefined;
+          // The task ID is in the first group for the /0/ layout and the second for /1/.
+          return match?.slice(1).find(Boolean);
         },
         expected: 'an Asana task link like https://app.asana.com/0/0/1204821736251904',
         example: 'https://app.asana.com/0/0/1204821736251904',
       };
     case 'clickup': {
       const { prefixes } = spec;
-      const idOk = (id: string): boolean => CLICKUP_ID_RE.test(id) || (KEY_RE.test(id) && keyInList(id, prefixes));
+      const keyOk = (key: string): boolean => KEY_RE.test(key) && keyInList(key, prefixes);
+      const taskId = (id: string | null | undefined): string | undefined =>
+        id !== null && id !== undefined && CLICKUP_ID_RE.test(id) ? id : keyId(id, keyOk);
       return {
-        test: (t) => {
-          if (CLICKUP_REF_RE.test(t)) return true;
-          if (KEY_RE.test(t)) return keyInList(t, prefixes);
+        find: (t) => {
+          const ref = CLICKUP_REF_RE.exec(t)?.[1];
+          if (ref !== undefined) return taskId(ref);
+          if (KEY_RE.test(t)) return keyId(t, keyOk);
           const url = parseUrl(t);
-          if (!url || !hostMatches(url, 'app.clickup.com')) return false;
-          if (CLICKUP_VIEW_PATH_RE.test(url.pathname)) return CLICKUP_ID_RE.test(url.searchParams.get('p') ?? '');
-          const id = CLICKUP_TASK_PATH_RE.exec(url.pathname)?.[1];
-          return id !== undefined && idOk(id);
+          if (!url || !hostMatches(url, 'app.clickup.com')) return undefined;
+          if (CLICKUP_VIEW_PATH_RE.test(url.pathname)) {
+            const peek = url.searchParams.get('p');
+            return peek !== null && CLICKUP_ID_RE.test(peek) ? peek : undefined;
+          }
+          return taskId(CLICKUP_TASK_PATH_RE.exec(url.pathname)?.[1]);
         },
         expected: `a ClickUp task like CU-86abc123 or ${prefixes?.[0] ?? 'DEV'}-123${describeList('prefix', prefixes)}, or a ClickUp task link`,
         example: prefixes === undefined ? 'CU-86abc123' : `${prefixes[0]}-123`,
@@ -250,12 +284,12 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
     case 'redmine': {
       const { host } = spec;
       return {
-        test: (t) => {
-          if (ISSUE_NUMBER_RE.test(t)) return true;
+        find: (t) => {
+          if (ISSUE_NUMBER_RE.test(t)) return numberOf(t);
           const url = parseUrl(t);
-          return (
-            url !== undefined && host !== undefined && hostMatches(url, host) && REDMINE_PATH_RE.test(url.pathname)
-          );
+          return url && host !== undefined && hostMatches(url, host)
+            ? REDMINE_PATH_RE.exec(url.pathname)?.[1]
+            : undefined;
         },
         expected:
           host === undefined
@@ -266,11 +300,12 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
     }
     case 'monday': {
       const { prefixes } = spec;
+      const keyOk = (key: string): boolean => keyInList(key, prefixes);
       return {
-        test: (t) => {
-          if (KEY_RE.test(t)) return keyInList(t, prefixes);
+        find: (t) => {
+          if (KEY_RE.test(t)) return keyId(t, keyOk);
           const url = parseUrl(t);
-          return url !== undefined && hostInList(url, ['*.monday.com']) && MONDAY_PATH_RE.test(url.pathname);
+          return url && hostInList(url, ['*.monday.com']) ? MONDAY_PATH_RE.exec(url.pathname)?.[1] : undefined;
         },
         expected: `a monday.com item link like https://acme.monday.com/boards/1234567890/pulses/1234567891, or a custom key like ${prefixes?.[0] ?? 'TIX'}-001${describeList('prefix', prefixes)}`,
         example: 'https://acme.monday.com/boards/1234567890/pulses/1234567891',
@@ -279,13 +314,12 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
     case 'youtrack': {
       const { projects, host } = spec;
       const hosts = host === undefined ? ['youtrack.jetbrains.com', '*.youtrack.cloud', '*.myjetbrains.com'] : [host];
+      const keyOk = (key: string): boolean => isYouTrackKey(key, projects);
       return {
-        test: (t) => {
-          if (YOUTRACK_KEY_RE.test(t)) return isYouTrackKey(t, projects);
+        find: (t) => {
+          if (YOUTRACK_KEY_RE.test(t)) return keyId(t, keyOk);
           const url = parseUrl(t);
-          if (!url || !hostInList(url, hosts)) return false;
-          const key = YOUTRACK_PATH_RE.exec(url.pathname)?.[1];
-          return key !== undefined && isYouTrackKey(key, projects);
+          return url && hostInList(url, hosts) ? keyId(YOUTRACK_PATH_RE.exec(url.pathname)?.[1], keyOk) : undefined;
         },
         expected: `a YouTrack issue like ${projects?.[0] ?? 'PROJ'}-123${describeList('project', projects)}, or a YouTrack issue link`,
         example: `${projects?.[0] ?? 'PROJ'}-123`,
@@ -293,23 +327,23 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
     }
     case 'basecamp':
       return {
-        test: (t) => {
+        find: (t) => {
           const url = parseUrl(t);
-          return url !== undefined && hostMatches(url, '3.basecamp.com') && BASECAMP_PATH_RE.test(url.pathname);
+          return url && hostMatches(url, '3.basecamp.com') ? BASECAMP_PATH_RE.exec(url.pathname)?.[1] : undefined;
         },
         expected: 'a Basecamp to-do or card link like https://3.basecamp.com/4821/buckets/4822/todos/4823',
         example: 'https://3.basecamp.com/4821/buckets/4822/todos/4823',
       };
     case 'shortcut':
       return {
-        test: (t) => {
-          if (SHORTCUT_REF_RE.test(t)) return true;
+        find: (t) => {
+          // `sc-123` fills the first group and `[sc-123]` the second.
+          const ref = SHORTCUT_REF_RE.exec(t)?.slice(1).find(Boolean);
+          if (ref !== undefined) return ref;
           const url = parseUrl(t);
-          return (
-            url !== undefined &&
-            hostInList(url, ['app.shortcut.com', 'app.clubhouse.io']) &&
-            SHORTCUT_PATH_RE.test(url.pathname)
-          );
+          return url && hostInList(url, ['app.shortcut.com', 'app.clubhouse.io'])
+            ? SHORTCUT_PATH_RE.exec(url.pathname)?.[1]
+            : undefined;
         },
         expected: 'a Shortcut story like sc-123, or a story link',
         example: 'sc-123',
@@ -321,9 +355,9 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
         throw new ConfigError('the "url" ticket preset needs `hosts`, the hosts its links may point to.');
       }
       return {
-        test: (t) => {
+        find: (t) => {
           const url = parseUrl(t);
-          return url !== undefined && hostInList(url, hosts);
+          return url && hostInList(url, hosts) ? linkId(url) : undefined;
         },
         expected: `a link to ${hosts.join(', ')}`,
         example: `https://${hosts[0].replace(/^\*\./, 'tasks.')}/4821`,
@@ -336,7 +370,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
         throw new ConfigError(`numeric ticket minLength (${min}) is greater than maxLength (${max}).`);
       }
       return {
-        test: (t) => DIGITS_RE.test(t) && t.length >= min && t.length <= max,
+        find: (t) => (DIGITS_RE.test(t) && t.length >= min && t.length <= max ? t : undefined),
         expected: min === max ? `a ${min}-digit number` : `a number with ${min} to ${max} digits`,
         example: '482173'.repeat(4).slice(0, Math.min(Math.max(4, min), max)),
       };
@@ -354,7 +388,12 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
       } catch (error) {
         throw new ConfigError(`invalid ticket pattern "${spec.pattern}": ${(error as Error).message}`);
       }
-      return { test: (t) => re.test(t), expected: `a ticket matching /${spec.pattern}/`, example: 'TICKET' };
+      // The regex is the user's, so the ID is the whole ticket; one that ends in a zero ID is a placeholder.
+      return {
+        find: (t) => (re.test(t) ? (ZERO_ID_RE.test(t) ? '0' : t) : undefined),
+        expected: `a ticket matching /${spec.pattern}/`,
+        example: 'TICKET',
+      };
     }
   }
 }
@@ -373,9 +412,10 @@ export function compileTicketSpec(specs: TicketSpec[], placeholders: string[]): 
   return {
     check(ticket) {
       const bare = ticket.replace(/^#/, '');
-      if (ZERO_ID_RE.test(ticket) || placeholderRes.some((re) => re.test(ticket) || re.test(bare)))
-        return 'placeholder';
-      return presets.some((preset) => preset.test(ticket)) ? 'ok' : 'format';
+      if (placeholderRes.some((re) => re.test(ticket) || re.test(bare))) return 'placeholder';
+      const ids = presets.flatMap((preset) => preset.find(ticket) ?? []);
+      if (ids.some((id) => !ZERO_RE.test(id))) return 'ok';
+      return ids.length > 0 || ZERO_ID_RE.test(ticket) ? 'placeholder' : 'format';
     },
     expected: presets.map((p) => p.expected).join('; or '),
     example: presets[0].example,

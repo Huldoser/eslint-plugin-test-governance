@@ -18,6 +18,12 @@ All notable changes to this project are documented here. The format follows
 - The `azure-devops` preset accepts `#123`, which Azure Repos links to work item 123 in commit messages
   and pull requests.
 
+### Fixed
+
+- A link whose title ends in `-0`, as in `https://linear.app/acme/issue/ENG-1/upgrade-to-node-0`, was
+  reported as a placeholder ticket. Only the ticket's own ID makes it a placeholder now, so
+  `https://linear.app/acme/issue/ENG-0/fix-rounding` still is.
+
 ## [0.9.0] - 2026-10-27
 
 ### Added

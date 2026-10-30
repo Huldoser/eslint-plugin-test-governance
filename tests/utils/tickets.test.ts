@@ -461,6 +461,39 @@ describe('placeholders', () => {
     });
   }
 
+  // The zero check reads the ID each preset finds, so a title slug ending in -0 is no placeholder.
+  for (const [spec, ticket] of [
+    [{ preset: 'trello' }, 'https://trello.com/c/nqPiDKmw/12-retry-count-0'],
+    [{ preset: 'youtrack' }, 'https://youtrack.jetbrains.com/issue/KT-123/Timeout-is-0'],
+    [{ preset: 'shortcut' }, 'https://app.shortcut.com/acme/story/123/retries-set-to-0'],
+    [{ preset: 'linear' }, 'https://linear.app/acme/issue/ENG-1/upgrade-to-node-0'],
+    [{ preset: 'any' }, 'https://linear.app/acme/issue/ENG-1/upgrade-to-node-0'],
+    [{ preset: 'monday' }, 'https://acme.monday.com/boards/1234567890/pulses/1234567891/posts/0'],
+  ] satisfies [TicketSpec, string][]) {
+    it(`accepts ${ticket} with the ${spec.preset} preset`, () => {
+      assert.equal(compileTicketSpec([spec], DEFAULT_PLACEHOLDERS).check(ticket), 'ok');
+    });
+  }
+  for (const [spec, ticket] of [
+    [{ preset: 'youtrack' }, 'https://acme.youtrack.cloud/issue/KT-0/fix-rounding'],
+    [{ preset: 'shortcut' }, 'https://app.shortcut.com/acme/story/0/fix-rounding'],
+    [{ preset: 'monday' }, 'https://acme.monday.com/boards/1234567890/pulses/0/updates'],
+    [{ preset: 'asana' }, 'https://app.asana.com/0/1202805690238892/0/f'],
+    [{ preset: 'asana' }, 'https://app.asana.com/1/1201234567890123/task/0/comment/5'],
+    [{ preset: 'redmine', host: 'redmine.acme.io' }, 'https://redmine.acme.io/issues/0.json'],
+    [{ preset: 'notion' }, 'https://www.notion.so/acme/db?v=1&p=00000000000000000000000000000000'],
+    [{ preset: 'notion' }, 'https://www.notion.so/Fix-00000000000000000000000000000000'],
+    [{ preset: 'clickup' }, 'https://app.clickup.com/9015210959/v/li/901500000001?p=0'],
+    [{ preset: 'linear' }, 'https://linear.app/acme/issue/ENG-0/fix-rounding'],
+    [{ preset: 'github' }, 'https://github.com/acme/trading-engine/pull/0/'],
+    [{ preset: 'basecamp' }, 'https://3.basecamp.com/4821/buckets/4822/todos/0'],
+    [{ preset: 'pattern', pattern: 'BUG-\\d+' }, 'BUG-0'],
+  ] satisfies [TicketSpec, string][]) {
+    it(`rejects ${ticket} with the ${spec.preset} preset, since its ID is 0`, () => {
+      assert.equal(compileTicketSpec([spec], DEFAULT_PLACEHOLDERS).check(ticket), 'placeholder');
+    });
+  }
+
   it('uses a custom list with regex characters taken literally', () => {
     const custom = compileTicketSpec([{ preset: 'any' }], ['N/A', 'TRADE-0*', '(none)']);
     assert.equal(custom.check('N/A'), 'placeholder');
