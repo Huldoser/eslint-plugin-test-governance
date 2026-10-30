@@ -18,6 +18,19 @@ All notable changes to this project are documented here. The format follows
 - The `azure-devops` preset accepts `#123`, which Azure Repos links to work item 123 in commit messages
   and pull requests.
 
+### Fixed
+
+- A link whose title ends in `-0`, as in `https://linear.app/acme/issue/ENG-1/upgrade-to-node-0`, was
+  reported as a placeholder ticket. Only the ticket's own ID makes it a placeholder now, which also
+  catches links where a title, suffix or query follows a zero ID, as in
+  `https://linear.app/acme/issue/ENG-0/fix-rounding`.
+- `host` takes `*.example.com` to match every subdomain, as in `{ preset: 'jira', host: '*.atlassian.net' }`.
+  Before, such a host matched no link.
+- `projects: []` (Jira) and `teams: []` (Linear) are config errors. An empty list rejected every key, and
+  the messages read "in project ,".
+- Links whose host ends in a dot, as in `https://dev.azure.com./acme/web/_workitems/edit/1`, are read like
+  the same link without it.
+
 ## [0.9.0] - 2026-10-27
 
 ### Added

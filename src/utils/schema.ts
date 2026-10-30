@@ -1,6 +1,7 @@
 import {
   BUILTIN_STATE_NAMES,
   FRAMEWORK_NAMES,
+  HOST_ENTRY_RE,
   MARKER_RE,
   TAG_RE,
   TAG_STATE_NAMES,
@@ -13,10 +14,10 @@ const TAG_HINT = 'a tag such as @needs-data';
 /** Jira project and Linear team keys, as they appear in tickets: `WEB` in `WEB-123`. */
 const KEY_PATTERN = '^[A-Z][A-Z0-9_]+$';
 const KEY_HINT = 'an uppercase key as it appears in tickets, such as WEB for WEB-123';
+/** Linear teams and the prefixes of Notion, ClickUp and monday.com keys have at least two characters. */
+const LONG_KEY_HINT = 'an uppercase key of two or more characters as it appears in tickets, such as WEB for WEB-123';
 /** YouTrack project IDs may also start with a digit, as `4DM` in `4DM-12`; `jira` checks its own in options.ts. */
 const PROJECT_PATTERN = '^(?=[A-Z0-9_]*[A-Z])[A-Z0-9_]+$';
-/** A `url` preset host: a host name, or `*.` and a domain for its subdomains. No scheme, port or path. */
-const HOST_PATTERN = '^(?:\\*\\.)?[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)*$';
 /** `['"a"', '"b"', '"c"']` as `"a", "b" or "c"`. */
 const orList = (items: string[]): string => `${items.slice(0, -1).join(', ')} or ${items.slice(-1).join('')}`;
 /** How code reads a framework's config: `configs.mocha`, or `configs['node-test']` for a name with a dash. */
@@ -27,15 +28,23 @@ const ticketSpecSchema: Schema = {
   type: 'object',
   properties: {
     preset: { type: 'string', enum: [...TICKET_PRESETS] },
-    projects: { type: 'array', items: { type: 'string', pattern: PROJECT_PATTERN, patternHint: KEY_HINT } },
-    teams: { type: 'array', items: { type: 'string', pattern: KEY_PATTERN, patternHint: KEY_HINT } },
-    prefixes: { type: 'array', items: { type: 'string', pattern: KEY_PATTERN, patternHint: KEY_HINT } },
+    projects: {
+      type: 'array',
+      items: { type: 'string', pattern: PROJECT_PATTERN, patternHint: KEY_HINT },
+      minItems: 1,
+    },
+    teams: { type: 'array', items: { type: 'string', pattern: KEY_PATTERN, patternHint: LONG_KEY_HINT }, minItems: 1 },
+    prefixes: {
+      type: 'array',
+      items: { type: 'string', pattern: KEY_PATTERN, patternHint: LONG_KEY_HINT },
+      minItems: 1,
+    },
     host: { type: 'string' },
     hosts: {
       type: 'array',
       items: {
         type: 'string',
-        pattern: HOST_PATTERN,
+        pattern: HOST_ENTRY_RE.source,
         patternHint: 'a host name such as tasks.example.com or *.example.com',
       },
       minItems: 1,

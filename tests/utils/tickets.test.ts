@@ -55,6 +55,22 @@ const tables: Record<string, Table> = {
       'https://acme.atlassian.net/xbrowse/TRADE-123',
     ],
   },
+  // A host of *.example.com matches its subdomains, for every preset that takes `host`.
+  'jira with a host written with a trailing dot': {
+    spec: { preset: 'jira', host: 'jira.acme.io.' },
+    accepts: ['https://jira.acme.io/browse/TRADE-1'],
+    rejects: ['https://other.io/browse/TRADE-1'],
+  },
+  'jira on any Atlassian site': {
+    spec: { preset: 'jira', host: '*.atlassian.net' },
+    accepts: ['https://acme.atlassian.net/browse/TRADE-1', 'https://ACME.atlassian.net/browse/TRADE-1'],
+    rejects: ['https://atlassian.net/browse/TRADE-1', 'https://acme.atlassian.net.evil.io/browse/TRADE-1'],
+  },
+  'github on any subdomain': {
+    spec: { preset: 'github', host: '*.acme.io' },
+    accepts: ['https://git.acme.io/acme/trading-engine/issues/1'],
+    rejects: ['https://acme.io/acme/trading-engine/issues/1'],
+  },
   'jira with projects and host': {
     spec: { preset: 'jira', projects: ['TRADE', 'RISK'], host: 'jira.acme.io' },
     accepts: ['TRADE-1', 'RISK-22', 'https://JIRA.acme.io/browse/RISK-2'],
@@ -127,6 +143,9 @@ const tables: Record<string, Table> = {
       '#4821',
       'https://dev.azure.com/acme/trading-engine/_workitems/edit/4821',
       'https://acme.visualstudio.com/trading-engine/_workitems/edit/4821/',
+      // Work items belong to the organization, so links may leave out the project.
+      'https://dev.azure.com/acme/_workitems/edit/4821',
+      'https://dev.azure.com./acme/trading-engine/_workitems/edit/4821',
     ],
     rejects: [
       '#4821x',
@@ -149,6 +168,7 @@ const tables: Record<string, Table> = {
       'https://trello.com/c/nqPiDKmw',
       'https://trello.com/c/nqPiDKmw/',
       'https://trello.com/c/nqPiDKmw/9-fix-stop-loss-rounding',
+      'https://trello.com./c/nqPiDKmw',
     ],
     rejects: [
       '#9',
@@ -171,6 +191,10 @@ const tables: Record<string, Table> = {
       'https://acme.notion.site/Fix-stop-loss-1429989fe8ac4effbc8f57f56486db54',
       'https://www.notion.so/acme/9a1f0c2b3d4e4f5a8b6c7d8e9f0a1b2c?v=0b1c2d3e4f5a4b6c8d7e9f0a1b2c3d4e&p=1429989fe8ac4effbc8f57f56486db54&pm=s',
       'https://www.notion.so/Fix-1429989fe8ac4effbc8f57f56486db54#0b1c2d3e4f5a4b6c8d7e9f0a1b2c3d4e',
+      'https://www.notion.so/Fix-1429989fe8ac4effbc8f57f56486db54?pvs=4',
+      // Notion's own links, since June 2026.
+      'https://app.notion.com/p/1429989fe8ac4effbc8f57f56486db54',
+      'https://app.notion.com/p/Fix-stop-loss-1429989fe8ac4effbc8f57f56486db54',
     ],
     rejects: [
       'task-123',
@@ -226,6 +250,11 @@ const tables: Record<string, Table> = {
     rejects: [
       'CU-86ABC123',
       'cu-86abc123',
+      // ClickUp task IDs always have a digit, so placeholder words aren't IDs.
+      'CU-todo',
+      '#xxx',
+      'https://app.clickup.com/t/todo',
+      'https://app.clickup.com/9015210959/v/li/901500000001?p=tbd',
       'dev-123',
       '#86abc12_',
       'https://app.clickup.com/9015210959/v/li/901500000001',
@@ -242,8 +271,18 @@ const tables: Record<string, Table> = {
   },
   redmine: {
     spec: { preset: 'redmine' },
-    accepts: ['#4821'],
-    rejects: ['issue#4821', '4821', 'https://redmine.acme.io/issues/4821', 'https://github.com/acme/x/issues/4821'],
+    // Redmine's own forms: a note of an issue, and the issue with its tracker and subject.
+    accepts: ['#4821', '#4821-6', '#4821#note-6', '##4821'],
+    rejects: [
+      'issue#4821',
+      '4821',
+      '###4821',
+      '#4821-',
+      '#4821#note-',
+      '#4821#comment-6',
+      'https://redmine.acme.io/issues/4821',
+      'https://github.com/acme/x/issues/4821',
+    ],
   },
   'redmine with host': {
     spec: { preset: 'redmine', host: 'redmine.acme.io' },
@@ -296,16 +335,26 @@ const tables: Record<string, Table> = {
       'https://youtrack.jetbrains.com/issue/KT-11468/Fix-stop-loss-rounding',
       'https://acme.youtrack.cloud/issue/TRADE-1/',
       'https://acme.myjetbrains.com/youtrack/issue/TRADE-1',
+      'https://youtrack.jetbrains.com/projects/KT/issues/KT-15984',
+      'https://youtrack.jetbrains.com/projects/IJPL/issues/IJPL-204613/Losing-comments-on-Gitlab-merge-requests',
+      'https://youtrack.jetbrains.com/issue/KT-14652/slug#focus=Comments-27-1234.0-0',
     ],
     rejects: [
       '123-4',
       'kt-1',
       'https://youtrack.jetbrains.com/issues/KT',
+      'https://youtrack.jetbrains.com/projects/KT/issues',
+      'https://youtrack.jetbrains.com/projects/KT/issues/KT-1/slug/extra',
       'https://youtrack.jetbrains.com/issue/KT-1/slug/extra',
       'https://youtrack.jetbrains.com/issue/kt-1',
       'https://youtrack.example.com/issue/KT-1',
       'https://jetbrains.com/issue/KT-1',
     ],
+  },
+  'youtrack on any subdomain': {
+    spec: { preset: 'youtrack', host: '*.acme.io' },
+    accepts: ['https://yt.acme.io/issue/KT-1'],
+    rejects: ['https://acme.youtrack.cloud/issue/KT-1'],
   },
   'youtrack on a server with projects': {
     spec: { preset: 'youtrack', host: 'yt.acme.io', projects: ['TRADE', '4DM'] },
@@ -357,11 +406,16 @@ const tables: Record<string, Table> = {
       'https://WWW.Wrike.com/open.htm?id=4821',
       'https://tracker.acme.io/tasks/4821',
       'https://a.b.acme.io/x',
+      'https://tracker.acme.io/?task=4821',
+      'https://tracker.acme.io/#/tasks/4821',
     ],
     rejects: [
       'https://wrike.com/open.htm?id=4821',
       'https://acme.io/tasks/4821',
       'https://evilacme.io/x',
+      // The site's home page is no ticket.
+      'https://www.wrike.com',
+      'https://tracker.acme.io/',
       'https://example.com/x',
       'TRADE-1',
       '#4821',
@@ -461,6 +515,115 @@ describe('placeholders', () => {
     });
   }
 
+  // The zero check reads the ID each preset finds, so a title slug ending in -0 is no placeholder.
+  for (const { spec, ticket } of [
+    { spec: { preset: 'trello' }, ticket: 'https://trello.com/c/nqPiDKmw/12-retry-count-0' },
+    { spec: { preset: 'youtrack' }, ticket: 'https://youtrack.jetbrains.com/issue/KT-123/Timeout-is-0' },
+    { spec: { preset: 'shortcut' }, ticket: 'https://app.shortcut.com/acme/story/123/retries-set-to-0' },
+    { spec: { preset: 'linear' }, ticket: 'https://linear.app/acme/issue/ENG-1/upgrade-to-node-0' },
+    { spec: { preset: 'any' }, ticket: 'https://linear.app/acme/issue/ENG-1/upgrade-to-node-0' },
+    { spec: { preset: 'monday' }, ticket: 'https://acme.monday.com/boards/1234567890/pulses/1234567891/posts/0' },
+  ] satisfies { spec: TicketSpec; ticket: string }[]) {
+    it(`accepts ${ticket} with the ${spec.preset} preset`, () => {
+      assert.equal(compileTicketSpec([spec], DEFAULT_PLACEHOLDERS).check(ticket), 'ok');
+    });
+  }
+  // Links to an unknown tracker keep their ID in the path, a `#/route` or a key in the query.
+  for (const { specs, ticket, result } of [
+    { specs: [{ preset: 'any' }], ticket: 'https://tracker.example.com/#/issues/0', result: 'placeholder' },
+    {
+      specs: [{ preset: 'any' }],
+      ticket: 'https://acme.atlassian.net/jira/software/projects/TRADE/boards/1?selectedIssue=TRADE-0',
+      result: 'placeholder',
+    },
+    { specs: [{ preset: 'any' }], ticket: 'https://tracker.example.com/search?page=0', result: 'ok' },
+    { specs: [{ preset: 'any' }], ticket: '[TRADE-0]', result: 'placeholder' },
+    {
+      specs: [{ preset: 'url', hosts: ['tracker.acme.io'] }],
+      ticket: 'https://tracker.acme.io/#/tasks/0',
+      result: 'placeholder',
+    },
+    // A tracker's own preset decides; `any` next to it only reads what that preset doesn't.
+    {
+      specs: [{ preset: 'jira' }, { preset: 'any' }],
+      ticket: 'https://acme.atlassian.net/jira/software/projects/TRADE/boards/1?selectedIssue=TRADE-0',
+      result: 'placeholder',
+    },
+    {
+      specs: [{ preset: 'linear' }, { preset: 'any' }],
+      ticket: 'https://linear.app/acme/issue/ENG-0/fix-rounding',
+      result: 'placeholder',
+    },
+    { specs: [{ preset: 'jira' }, { preset: 'any' }], ticket: 'https://wiki.example.com/pages/4821', result: 'ok' },
+    { specs: [{ preset: 'pattern', pattern: '\\S+' }], ticket: '-', result: 'ok' },
+    { specs: [{ preset: 'pattern', pattern: '\\S+' }], ticket: '--', result: 'ok' },
+    { specs: [{ preset: 'pattern', pattern: '\\S+' }], ticket: '0-', result: 'ok' },
+    { specs: [{ preset: 'any' }], ticket: 'https://linear.app/acme/issue/ENG-0/fix-rounding', result: 'placeholder' },
+    // As in 0.9.0, a zero anywhere among a link's IDs makes it a placeholder.
+    { specs: [{ preset: 'any' }], ticket: 'https://linear.app/acme/issue/ENG-5/comments/0', result: 'placeholder' },
+    { specs: [{ preset: 'any' }], ticket: 'https://tracker.example.com/TRADE-5/issues/0', result: 'placeholder' },
+    { specs: [{ preset: 'any' }], ticket: 'https://tracker.example.com/#!/issues/0', result: 'placeholder' },
+    {
+      specs: [{ preset: 'any' }],
+      ticket: 'https://acme.atlassian.net/jira/software/projects/TRADE/boards/1?selectedIssue=TRADE-0/',
+      result: 'placeholder',
+    },
+    {
+      specs: [{ preset: 'jira' }],
+      ticket: 'https://acme.atlassian.net/jira/software/projects/TRADE/boards/1?selectedIssue=TRADE-0/',
+      result: 'placeholder',
+    },
+    {
+      specs: [{ preset: 'jira' }],
+      ticket: 'https://acme.atlassian.net/jira/software/projects/TRADE/boards/1?selectedIssue=TRADE-1/',
+      result: 'ok',
+    },
+    { specs: [{ preset: 'pattern', pattern: '\\[sc-\\d+\\]' }], ticket: '[sc-0]', result: 'placeholder' },
+  ] satisfies { specs: TicketSpec[]; ticket: string; result: string }[]) {
+    it(`reads ${ticket} with ${specs.map((spec) => spec.preset).join(' and ')} as ${result}`, () => {
+      assert.equal(compileTicketSpec(specs, DEFAULT_PLACEHOLDERS).check(ticket), result);
+    });
+  }
+
+  // A link the preset doesn't read is a wrong format, not a placeholder, even when its title ends in -0.
+  for (const { spec, ticket } of [
+    { spec: { preset: 'jira' }, ticket: 'https://trello.com/c/nqPiDKmw/12-retry-count-0' },
+    { spec: { preset: 'jira' }, ticket: 'https://docs.example.com/upgrade-to-node-0' },
+    { spec: { preset: 'github' }, ticket: 'https://linear.app/acme/issue/ENG-1/upgrade-to-node-0' },
+    { spec: { preset: 'youtrack', projects: ['KT'] }, ticket: 'https://youtrack.jetbrains.com/issue/IDEA-1/v-0' },
+  ] satisfies { spec: TicketSpec; ticket: string }[]) {
+    it(`reports ${ticket} as a wrong format for the ${spec.preset} preset`, () => {
+      assert.equal(compileTicketSpec([spec], DEFAULT_PLACEHOLDERS).check(ticket), 'format');
+    });
+  }
+  for (const { spec, ticket } of [
+    { spec: { preset: 'jira' }, ticket: 'https://github.com/acme/trading-engine/issues/0' },
+    { spec: { preset: 'youtrack', projects: ['KT'] }, ticket: 'https://youtrack.jetbrains.com/issue/IDEA-0' },
+  ] satisfies { spec: TicketSpec; ticket: string }[]) {
+    it(`still reports ${ticket}, whose ID is 0, as a placeholder for the ${spec.preset} preset`, () => {
+      assert.equal(compileTicketSpec([spec], DEFAULT_PLACEHOLDERS).check(ticket), 'placeholder');
+    });
+  }
+  for (const { spec, ticket } of [
+    { spec: { preset: 'youtrack' }, ticket: 'https://acme.youtrack.cloud/issue/KT-0/fix-rounding' },
+    { spec: { preset: 'shortcut' }, ticket: 'https://app.shortcut.com/acme/story/0/fix-rounding' },
+    { spec: { preset: 'monday' }, ticket: 'https://acme.monday.com/boards/1234567890/pulses/0/updates' },
+    { spec: { preset: 'asana' }, ticket: 'https://app.asana.com/0/1202805690238892/0/f' },
+    { spec: { preset: 'asana' }, ticket: 'https://app.asana.com/1/1201234567890123/task/0/comment/5' },
+    { spec: { preset: 'redmine', host: 'redmine.acme.io' }, ticket: 'https://redmine.acme.io/issues/0.json' },
+    { spec: { preset: 'notion' }, ticket: 'https://www.notion.so/acme/db?v=1&p=00000000000000000000000000000000' },
+    { spec: { preset: 'notion' }, ticket: 'https://www.notion.so/Fix-00000000000000000000000000000000' },
+    { spec: { preset: 'clickup' }, ticket: 'https://app.clickup.com/9015210959/v/li/901500000001?p=0' },
+    { spec: { preset: 'linear' }, ticket: 'https://linear.app/acme/issue/ENG-0/fix-rounding' },
+    { spec: { preset: 'github' }, ticket: 'https://github.com/acme/trading-engine/pull/0/' },
+    { spec: { preset: 'basecamp' }, ticket: 'https://3.basecamp.com/4821/buckets/4822/todos/0' },
+    { spec: { preset: 'pattern', pattern: 'BUG-\\d+' }, ticket: 'BUG-0' },
+  ] satisfies { spec: TicketSpec; ticket: string }[]) {
+    it(`rejects ${ticket} with the ${spec.preset} preset, since its ID is 0`, () => {
+      assert.equal(compileTicketSpec([spec], DEFAULT_PLACEHOLDERS).check(ticket), 'placeholder');
+    });
+  }
+
   it('uses a custom list with regex characters taken literally', () => {
     const custom = compileTicketSpec([{ preset: 'any' }], ['N/A', 'TRADE-0*', '(none)']);
     assert.equal(custom.check('N/A'), 'placeholder');
@@ -481,7 +644,7 @@ describe('messages', () => {
     assert.equal(expectedOf({ preset: 'jira' }).expected, 'a Jira key like PROJ-123, or a Jira URL');
     assert.equal(
       expectedOf({ preset: 'jira', projects: ['TRADE', 'RISK'] }).expected,
-      'a Jira key like TRADE-123 in project TRADE, RISK, or a Jira URL',
+      'a Jira key like TRADE-123 in project TRADE or RISK, or a Jira URL',
     );
     assert.equal(
       expectedOf({ preset: 'gitlab' }).expected,
@@ -502,7 +665,7 @@ describe('messages', () => {
     assert.equal(expectedOf({ preset: 'linear' }).expected, 'a Linear issue like ENG-123, or a Linear URL');
     assert.equal(
       expectedOf({ preset: 'linear', teams: ['TRADE', 'RISK'] }).expected,
-      'a Linear issue like TRADE-123 in team TRADE, RISK, or a Linear URL',
+      'a Linear issue like TRADE-123 in team TRADE or RISK, or a Linear URL',
     );
     assert.equal(
       expectedOf({ preset: 'azure-devops' }).expected,
@@ -527,22 +690,30 @@ describe('messages', () => {
           { preset: 'basecamp' },
           { preset: 'shortcut' },
           { preset: 'url', hosts: ['www.wrike.com', '*.acme.io'] },
+          { preset: 'notion', host: 'docs.acme.io' },
+          { preset: 'jira', host: 'jira.acme.io' },
+          { preset: 'azure-devops', host: 'tfs.acme.io' },
+          { preset: 'youtrack', host: 'yt.acme.io' },
         ] satisfies TicketSpec[]
       ).map((spec) => expectedOf(spec).expected),
       [
         'a Trello card link like https://trello.com/c/nqPiDKmw',
         'a Notion ID like TASK-123, or a Notion page link',
-        'a Notion ID like DOC-123 in prefix DOC, BUG, or a Notion page link',
+        'a Notion ID like DOC-123 with prefix DOC or BUG, or a Notion page link',
         'an Asana task link like https://app.asana.com/0/0/1204821736251904',
         'a ClickUp task like CU-86abc123 or DEV-123, or a ClickUp task link',
-        'a ClickUp task like CU-86abc123 or DEV-123 in prefix DEV, or a ClickUp task link',
+        'a ClickUp task like CU-86abc123 or DEV-123 with prefix DEV, or a ClickUp task link',
         'a Redmine issue like #4821 (set host to accept issue links)',
         'a Redmine issue like #4821, or an issue URL on redmine.acme.io',
-        'a monday.com item link like https://acme.monday.com/boards/1234567890/pulses/1234567891, or a custom key like TIX-001 in prefix TIX',
+        'a monday.com item link like https://acme.monday.com/boards/1234567890/pulses/1234567891, or a custom key like TIX-001 with prefix TIX',
         'a YouTrack issue like KT-123 in project KT, or a YouTrack issue link',
         'a Basecamp to-do or card link like https://3.basecamp.com/4821/buckets/4822/todos/4823',
         'a Shortcut story like sc-123, or a story link',
-        'a link to www.wrike.com, *.acme.io',
+        'a link to www.wrike.com or *.acme.io',
+        'a Notion ID like TASK-123, or a Notion page link on docs.acme.io',
+        'a Jira key like PROJ-123, or a Jira URL on jira.acme.io',
+        'an Azure Boards work item like AB#4821 or #4821, or a work item URL on tfs.acme.io',
+        'a YouTrack issue like PROJ-123, or a YouTrack issue link on yt.acme.io',
       ],
     );
   });
@@ -568,13 +739,6 @@ describe('messages', () => {
     }
     assert.equal(expectedOf({ preset: 'clickup', prefixes: ['DEV'] }).example, 'DEV-123');
     assert.equal(expectedOf({ preset: 'url', hosts: ['*.acme.io'] }).example, 'https://tasks.acme.io/4821');
-  });
-
-  it('rejects a url preset without hosts', () => {
-    assert.throws(
-      () => compileTicketSpec([{ preset: 'url' } as TicketSpec], []),
-      /the "url" ticket preset needs `hosts`/,
-    );
   });
 
   it('gives a sample ticket for each preset', () => {
