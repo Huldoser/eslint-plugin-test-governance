@@ -551,7 +551,25 @@ describe('placeholders', () => {
     [[{ preset: 'pattern', pattern: '\\S+' }], '--', 'ok'],
     [[{ preset: 'pattern', pattern: '\\S+' }], '0-', 'ok'],
     [[{ preset: 'any' }], 'https://linear.app/acme/issue/ENG-0/fix-rounding', 'placeholder'],
-    [[{ preset: 'any' }], 'https://linear.app/acme/issue/ENG-5/comments/0', 'ok'],
+    // As in 0.9.0, a zero anywhere among a link's IDs makes it a placeholder.
+    [[{ preset: 'any' }], 'https://linear.app/acme/issue/ENG-5/comments/0', 'placeholder'],
+    [[{ preset: 'any' }], 'https://tracker.example.com/TRADE-5/issues/0', 'placeholder'],
+    [[{ preset: 'any' }], 'https://tracker.example.com/#!/issues/0', 'placeholder'],
+    [
+      [{ preset: 'any' }],
+      'https://acme.atlassian.net/jira/software/projects/TRADE/boards/1?selectedIssue=TRADE-0/',
+      'placeholder',
+    ],
+    [
+      [{ preset: 'jira' }],
+      'https://acme.atlassian.net/jira/software/projects/TRADE/boards/1?selectedIssue=TRADE-0/',
+      'placeholder',
+    ],
+    [
+      [{ preset: 'jira' }],
+      'https://acme.atlassian.net/jira/software/projects/TRADE/boards/1?selectedIssue=TRADE-1/',
+      'ok',
+    ],
     [[{ preset: 'pattern', pattern: '\\[sc-\\d+\\]' }], '[sc-0]', 'placeholder'],
   ] satisfies [TicketSpec[], string, string][]) {
     it(`reads ${ticket} with ${specs.map((spec) => spec.preset).join(' and ')} as ${result}`, () => {

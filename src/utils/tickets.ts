@@ -126,6 +126,11 @@ function keyInList(key: string, list: string[] | undefined): boolean {
   return inList(key.slice(0, key.lastIndexOf('-')), list);
 }
 
+/** `TRADE-1` for `TRADE-1/`, as a query value copied with the link's trailing slash reads. */
+function trimSlash(value: string): string {
+  return value.replace(/\/$/, '');
+}
+
 /** The number in `TRADE-123`, `#123`, `owner/repo#123` or `AB#123`. */
 function numberOf(ticket: string): string {
   return ticket.slice(Math.max(ticket.lastIndexOf('-'), ticket.lastIndexOf('#')) + 1);
@@ -138,15 +143,15 @@ function keyId(key: string | null | undefined, ok: (key: string) => boolean): st
 
 /**
  * A link's ID when the preset doesn't know the tracker: the keys in its path, `#/route` or query (Jira's
- * `?selectedIssue=TRADE-1`), else the number its path or route ends in. A zero among them makes the link
- * a placeholder; with none, the link itself stands for the ID.
+ * `?selectedIssue=TRADE-1`) and the number its path or route ends in. A zero among them makes the link a
+ * placeholder, as in 0.9.0; with none, the link itself stands for the ID.
  */
 function linkId(url: URL): string {
-  const route = url.hash.startsWith('#/') ? url.hash.slice(1) : '';
-  const parts = [...url.pathname.split('/'), ...route.split('/'), ...url.searchParams.values()];
+  const route = /^#!?\//.test(url.hash) ? url.hash.replace(/^#!?/, '') : '';
+  const parts = [...url.pathname.split('/'), ...route.split('/'), ...[...url.searchParams.values()].map(trimSlash)];
   const keys = parts.filter((part) => KEY_RE.test(part));
-  const ids = keys.length > 0 ? keys : [url.pathname, route].flatMap((path) => LINK_NUMBER_RE.exec(path)?.[1] ?? []);
-  const numbers = ids.map(numberOf);
+  const ends = [url.pathname, route].flatMap((path) => LINK_NUMBER_RE.exec(path)?.[1] ?? []);
+  const numbers = [...keys, ...ends].map(numberOf);
   return numbers.find((id) => ZERO_RE.test(id)) ?? numbers.at(0) ?? url.href;
 }
 
@@ -181,7 +186,8 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
           if (KEY_RE.test(t)) return keyId(t, keyOk);
           const url = parseUrl(t);
           if (!url || (host !== undefined && !hostMatches(url, host))) return undefined;
-          return keyId(JIRA_PATH_RE.exec(url.pathname)?.[1] ?? url.searchParams.get('selectedIssue'), keyOk);
+          const selected = url.searchParams.get('selectedIssue');
+          return keyId(JIRA_PATH_RE.exec(url.pathname)?.[1] ?? (selected === null ? null : trimSlash(selected)), keyOk);
         },
         expected: `a Jira key like ${projects?.[0] ?? 'PROJ'}-123${describeList('in project', projects)}, or a Jira URL${host === undefined ? '' : ` on ${host}`}`,
         example: `${projects?.[0] ?? 'PROJ'}-123`,

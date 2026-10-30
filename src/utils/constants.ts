@@ -6,7 +6,7 @@ export const TAG_RE = /^@[\w-]+$/;
 const HOST_LABEL = '[A-Za-z0-9]+(?:-+[A-Za-z0-9]+)*';
 /** A host with no scheme, port or path: a host name, or `*.` and a domain of two or more labels for its subdomains. */
 export const HOST_ENTRY_RE = new RegExp(
-  `^(?:${HOST_LABEL}(?:\\.${HOST_LABEL})*|\\*\\.${HOST_LABEL}(?:\\.${HOST_LABEL})+)$`,
+  `^(?:${HOST_LABEL}(?:\\.${HOST_LABEL})*|\\*\\.${HOST_LABEL}(?:\\.${HOST_LABEL})+)\\.?$`,
 );
 
 export const BUILTIN_STATE_NAMES = ['skip', 'fixme', 'fail', 'slow', 'todo', 'new', 'quarantined'] as const;

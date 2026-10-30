@@ -64,6 +64,17 @@ describe('compileOptions', () => {
     );
   });
 
+  it('accepts a host written with a trailing dot', () => {
+    assert.doesNotThrow(() =>
+      compile({
+        ticket: [
+          { preset: 'redmine', host: 'redmine.acme.io.' },
+          { preset: 'url', hosts: ['*.acme.io.'] },
+        ],
+      }),
+    );
+  });
+
   it('accepts the options of the presets for other trackers', () => {
     assert.doesNotThrow(() =>
       compile({
