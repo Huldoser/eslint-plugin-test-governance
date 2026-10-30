@@ -291,12 +291,12 @@ a `customStates` entry.
 | `youtrack`     | `KT-123`, `https://<host>/issue/KT-123/...` (also under a path, as in `/youtrack/issue/KT-123`)                                                         | `projects`; `host` for Server or a custom domain (`youtrack.jetbrains.com`, `*.youtrack.cloud` and `*.myjetbrains.com` by default) |
 | `basecamp`     | to-do and card links, `https://3.basecamp.com/<account>/buckets/<project>/todos/<id>` or `/card_tables/cards/<id>`                                      |                                                                                                                                    |
 | `shortcut`     | `sc-123`, `[sc-123]`, `https://app.shortcut.com/<workspace>/story/123/...`                                                                              |                                                                                                                                    |
-| `url`          | links to the hosts you list, and nothing else                                                                                                           | `hosts`, required; `*.example.com` matches its subdomains                                                                          |
+| `url`          | links to the hosts you list, and nothing else                                                                                                           | `hosts`, required: host names such as `tasks.example.com`, with no scheme, port or path; `*.example.com` matches its subdomains    |
 | `numeric`      | `4821`                                                                                                                                                  | `minLength` (1), `maxLength` (20)                                                                                                  |
 | `pattern`      | anything matching your regex, anchored at both ends                                                                                                     | `pattern`, `flags`                                                                                                                 |
 
 `projects` (Jira, YouTrack), `teams` (Linear) and `prefixes` (Notion, ClickUp, monday.com) are keys as
-they appear in tickets, in uppercase: `TRADE` for `TRADE-123`. Without them, any key passes. Each preset
+they appear in tickets, in uppercase: `TRADE` for `TRADE-123`. YouTrack project IDs may also start with a digit, as `4DM`. Without them, any key passes. Each preset
 takes only its own options, so `host` on the `any` preset fails with a clear message instead of being
 ignored. A `pattern` always matches the whole ticket, so the `g` and `y` flags make no difference and are
 ignored.

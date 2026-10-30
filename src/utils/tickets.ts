@@ -64,8 +64,8 @@ const YOUTRACK_PATH_RE = /\/issue\/([A-Z0-9_]+-\d+)(?:\/[^/]*)?$/;
 const BASECAMP_PATH_RE = /^\/\d+\/buckets\/\d+\/(?:todos|card_tables\/cards)\/\d+\/?$/;
 const SHORTCUT_REF_RE = /^(?:sc-[1-9]\d*|\[sc-[1-9]\d*\])$/i;
 const SHORTCUT_PATH_RE = /^\/[^/]+\/story\/\d+(?:\/[^/]*)?$/;
-// No tracker issues number 0, so PROJ-0, #0, AB#0, .../issues/0 and 000 are always placeholders.
-const ZERO_ID_RE = /(?:^|[-#/])0+\/?$/;
+// No tracker issues number 0, so PROJ-0, #0, AB#0, [sc-0], .../issues/0 and 000 are always placeholders.
+const ZERO_ID_RE = /(?:^|[-#/])0+[/\]]?$/;
 
 type Predicate = (ticket: string) => boolean;
 

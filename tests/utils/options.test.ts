@@ -149,9 +149,19 @@ describe('compileOptions', () => {
     [{ ticket: { preset: 'linear', teams: ['Eng'] } }, /ticket\.teams\[0\] must be an uppercase key/],
     [
       { ticket: { preset: 'jira', projects: ['TRADE', '4DM'] } },
-      /ticket\.projects\[1\] must start with a letter, as Jira keys do \(got "4DM"\)/,
+      /ticket\.projects\[1\] must start with a letter and have at least two characters, as Jira keys do \(got "4DM"\)/,
+    ],
+    [
+      { ticket: { preset: 'jira', projects: ['A'] } },
+      /ticket\.projects\[0\] must start with a letter and have at least two characters, as Jira keys do \(got "A"\)/,
     ],
     [{ ticket: { preset: 'youtrack', projects: ['123'] } }, /ticket\.projects\[0\] must be an uppercase key/],
+    [
+      { ticket: { preset: 'url', hosts: ['tracker.io:8080'] } },
+      /ticket\.hosts\[0\] must be a host name such as tasks\.example\.com or \*\.example\.com/,
+    ],
+    [{ ticket: { preset: 'url', hosts: ['https://tracker.io'] } }, /ticket\.hosts\[0\] must be a host name/],
+    [{ ticket: { preset: 'url', hosts: ['*'] } }, /ticket\.hosts\[0\] must be a host name/],
     [{ ticket: { preset: 'notion', prefixes: ['task'] } }, /ticket\.prefixes\[0\] must be an uppercase key/],
     [{ ticket: { preset: 'url' } }, /the "url" ticket preset needs `hosts`/],
     [{ ticket: { preset: 'url', hosts: [] } }, /ticket\.hosts must have at least 1 item/],

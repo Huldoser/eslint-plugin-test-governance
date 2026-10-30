@@ -344,7 +344,6 @@ const tables: Record<string, Table> = {
       '[sc-27971',
       'sc27971',
       'ch27971',
-      '[sc-0]',
       'https://app.shortcut.com/acme/epic/27971',
       'https://app.shortcut.com/acme/iteration/27971',
       'https://app.shortcut.com/acme/story/new',
@@ -444,6 +443,7 @@ describe('placeholders', () => {
     '000',
     'TASK-000',
     'sc-0',
+    '[sc-0]',
   ]) {
     it(`rejects ${ticket}, since no tracker issues number 0`, () => {
       assert.equal(

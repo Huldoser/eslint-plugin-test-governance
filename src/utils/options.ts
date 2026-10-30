@@ -188,7 +188,11 @@ function presetProblems(ticket: TicketSpec | TicketSpec[] | undefined, path: str
     const jiraKeys =
       spec.preset === 'jira'
         ? (spec.projects ?? []).flatMap((key, i) =>
-            /^[A-Z]/.test(key) ? [] : [`${at}.projects[${i}] must start with a letter, as Jira keys do (got "${key}")`],
+            /^[A-Z][A-Z0-9_]+$/.test(key)
+              ? []
+              : [
+                  `${at}.projects[${i}] must start with a letter and have at least two characters, as Jira keys do (got "${key}")`,
+                ],
           )
         : [];
     const misplaced = Object.keys(spec)
