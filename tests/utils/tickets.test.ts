@@ -516,101 +516,109 @@ describe('placeholders', () => {
   }
 
   // The zero check reads the ID each preset finds, so a title slug ending in -0 is no placeholder.
-  for (const [spec, ticket] of [
-    [{ preset: 'trello' }, 'https://trello.com/c/nqPiDKmw/12-retry-count-0'],
-    [{ preset: 'youtrack' }, 'https://youtrack.jetbrains.com/issue/KT-123/Timeout-is-0'],
-    [{ preset: 'shortcut' }, 'https://app.shortcut.com/acme/story/123/retries-set-to-0'],
-    [{ preset: 'linear' }, 'https://linear.app/acme/issue/ENG-1/upgrade-to-node-0'],
-    [{ preset: 'any' }, 'https://linear.app/acme/issue/ENG-1/upgrade-to-node-0'],
-    [{ preset: 'monday' }, 'https://acme.monday.com/boards/1234567890/pulses/1234567891/posts/0'],
-  ] satisfies [TicketSpec, string][]) {
+  for (const { spec, ticket } of [
+    { spec: { preset: 'trello' }, ticket: 'https://trello.com/c/nqPiDKmw/12-retry-count-0' },
+    { spec: { preset: 'youtrack' }, ticket: 'https://youtrack.jetbrains.com/issue/KT-123/Timeout-is-0' },
+    { spec: { preset: 'shortcut' }, ticket: 'https://app.shortcut.com/acme/story/123/retries-set-to-0' },
+    { spec: { preset: 'linear' }, ticket: 'https://linear.app/acme/issue/ENG-1/upgrade-to-node-0' },
+    { spec: { preset: 'any' }, ticket: 'https://linear.app/acme/issue/ENG-1/upgrade-to-node-0' },
+    { spec: { preset: 'monday' }, ticket: 'https://acme.monday.com/boards/1234567890/pulses/1234567891/posts/0' },
+  ] satisfies { spec: TicketSpec; ticket: string }[]) {
     it(`accepts ${ticket} with the ${spec.preset} preset`, () => {
       assert.equal(compileTicketSpec([spec], DEFAULT_PLACEHOLDERS).check(ticket), 'ok');
     });
   }
   // Links to an unknown tracker keep their ID in the path, a `#/route` or a key in the query.
-  for (const [specs, ticket, result] of [
-    [[{ preset: 'any' }], 'https://tracker.example.com/#/issues/0', 'placeholder'],
-    [
-      [{ preset: 'any' }],
-      'https://acme.atlassian.net/jira/software/projects/TRADE/boards/1?selectedIssue=TRADE-0',
-      'placeholder',
-    ],
-    [[{ preset: 'any' }], 'https://tracker.example.com/search?page=0', 'ok'],
-    [[{ preset: 'any' }], '[TRADE-0]', 'placeholder'],
-    [[{ preset: 'url', hosts: ['tracker.acme.io'] }], 'https://tracker.acme.io/#/tasks/0', 'placeholder'],
+  for (const { specs, ticket, result } of [
+    { specs: [{ preset: 'any' }], ticket: 'https://tracker.example.com/#/issues/0', result: 'placeholder' },
+    {
+      specs: [{ preset: 'any' }],
+      ticket: 'https://acme.atlassian.net/jira/software/projects/TRADE/boards/1?selectedIssue=TRADE-0',
+      result: 'placeholder',
+    },
+    { specs: [{ preset: 'any' }], ticket: 'https://tracker.example.com/search?page=0', result: 'ok' },
+    { specs: [{ preset: 'any' }], ticket: '[TRADE-0]', result: 'placeholder' },
+    {
+      specs: [{ preset: 'url', hosts: ['tracker.acme.io'] }],
+      ticket: 'https://tracker.acme.io/#/tasks/0',
+      result: 'placeholder',
+    },
     // A tracker's own preset decides; `any` next to it only reads what that preset doesn't.
-    [
-      [{ preset: 'jira' }, { preset: 'any' }],
-      'https://acme.atlassian.net/jira/software/projects/TRADE/boards/1?selectedIssue=TRADE-0',
-      'placeholder',
-    ],
-    [[{ preset: 'linear' }, { preset: 'any' }], 'https://linear.app/acme/issue/ENG-0/fix-rounding', 'placeholder'],
-    [[{ preset: 'jira' }, { preset: 'any' }], 'https://wiki.example.com/pages/4821', 'ok'],
-    [[{ preset: 'pattern', pattern: '\\S+' }], '-', 'ok'],
-    [[{ preset: 'pattern', pattern: '\\S+' }], '--', 'ok'],
-    [[{ preset: 'pattern', pattern: '\\S+' }], '0-', 'ok'],
-    [[{ preset: 'any' }], 'https://linear.app/acme/issue/ENG-0/fix-rounding', 'placeholder'],
+    {
+      specs: [{ preset: 'jira' }, { preset: 'any' }],
+      ticket: 'https://acme.atlassian.net/jira/software/projects/TRADE/boards/1?selectedIssue=TRADE-0',
+      result: 'placeholder',
+    },
+    {
+      specs: [{ preset: 'linear' }, { preset: 'any' }],
+      ticket: 'https://linear.app/acme/issue/ENG-0/fix-rounding',
+      result: 'placeholder',
+    },
+    { specs: [{ preset: 'jira' }, { preset: 'any' }], ticket: 'https://wiki.example.com/pages/4821', result: 'ok' },
+    { specs: [{ preset: 'pattern', pattern: '\\S+' }], ticket: '-', result: 'ok' },
+    { specs: [{ preset: 'pattern', pattern: '\\S+' }], ticket: '--', result: 'ok' },
+    { specs: [{ preset: 'pattern', pattern: '\\S+' }], ticket: '0-', result: 'ok' },
+    { specs: [{ preset: 'any' }], ticket: 'https://linear.app/acme/issue/ENG-0/fix-rounding', result: 'placeholder' },
     // As in 0.9.0, a zero anywhere among a link's IDs makes it a placeholder.
-    [[{ preset: 'any' }], 'https://linear.app/acme/issue/ENG-5/comments/0', 'placeholder'],
-    [[{ preset: 'any' }], 'https://tracker.example.com/TRADE-5/issues/0', 'placeholder'],
-    [[{ preset: 'any' }], 'https://tracker.example.com/#!/issues/0', 'placeholder'],
-    [
-      [{ preset: 'any' }],
-      'https://acme.atlassian.net/jira/software/projects/TRADE/boards/1?selectedIssue=TRADE-0/',
-      'placeholder',
-    ],
-    [
-      [{ preset: 'jira' }],
-      'https://acme.atlassian.net/jira/software/projects/TRADE/boards/1?selectedIssue=TRADE-0/',
-      'placeholder',
-    ],
-    [
-      [{ preset: 'jira' }],
-      'https://acme.atlassian.net/jira/software/projects/TRADE/boards/1?selectedIssue=TRADE-1/',
-      'ok',
-    ],
-    [[{ preset: 'pattern', pattern: '\\[sc-\\d+\\]' }], '[sc-0]', 'placeholder'],
-  ] satisfies [TicketSpec[], string, string][]) {
+    { specs: [{ preset: 'any' }], ticket: 'https://linear.app/acme/issue/ENG-5/comments/0', result: 'placeholder' },
+    { specs: [{ preset: 'any' }], ticket: 'https://tracker.example.com/TRADE-5/issues/0', result: 'placeholder' },
+    { specs: [{ preset: 'any' }], ticket: 'https://tracker.example.com/#!/issues/0', result: 'placeholder' },
+    {
+      specs: [{ preset: 'any' }],
+      ticket: 'https://acme.atlassian.net/jira/software/projects/TRADE/boards/1?selectedIssue=TRADE-0/',
+      result: 'placeholder',
+    },
+    {
+      specs: [{ preset: 'jira' }],
+      ticket: 'https://acme.atlassian.net/jira/software/projects/TRADE/boards/1?selectedIssue=TRADE-0/',
+      result: 'placeholder',
+    },
+    {
+      specs: [{ preset: 'jira' }],
+      ticket: 'https://acme.atlassian.net/jira/software/projects/TRADE/boards/1?selectedIssue=TRADE-1/',
+      result: 'ok',
+    },
+    { specs: [{ preset: 'pattern', pattern: '\\[sc-\\d+\\]' }], ticket: '[sc-0]', result: 'placeholder' },
+  ] satisfies { specs: TicketSpec[]; ticket: string; result: string }[]) {
     it(`reads ${ticket} with ${specs.map((spec) => spec.preset).join(' and ')} as ${result}`, () => {
       assert.equal(compileTicketSpec(specs, DEFAULT_PLACEHOLDERS).check(ticket), result);
     });
   }
 
   // A link the preset doesn't read is a wrong format, not a placeholder, even when its title ends in -0.
-  for (const [spec, ticket] of [
-    [{ preset: 'jira' }, 'https://trello.com/c/nqPiDKmw/12-retry-count-0'],
-    [{ preset: 'jira' }, 'https://docs.example.com/upgrade-to-node-0'],
-    [{ preset: 'github' }, 'https://linear.app/acme/issue/ENG-1/upgrade-to-node-0'],
-    [{ preset: 'youtrack', projects: ['KT'] }, 'https://youtrack.jetbrains.com/issue/IDEA-1/v-0'],
-  ] satisfies [TicketSpec, string][]) {
+  for (const { spec, ticket } of [
+    { spec: { preset: 'jira' }, ticket: 'https://trello.com/c/nqPiDKmw/12-retry-count-0' },
+    { spec: { preset: 'jira' }, ticket: 'https://docs.example.com/upgrade-to-node-0' },
+    { spec: { preset: 'github' }, ticket: 'https://linear.app/acme/issue/ENG-1/upgrade-to-node-0' },
+    { spec: { preset: 'youtrack', projects: ['KT'] }, ticket: 'https://youtrack.jetbrains.com/issue/IDEA-1/v-0' },
+  ] satisfies { spec: TicketSpec; ticket: string }[]) {
     it(`reports ${ticket} as a wrong format for the ${spec.preset} preset`, () => {
       assert.equal(compileTicketSpec([spec], DEFAULT_PLACEHOLDERS).check(ticket), 'format');
     });
   }
-  for (const [spec, ticket] of [
-    [{ preset: 'jira' }, 'https://github.com/acme/trading-engine/issues/0'],
-    [{ preset: 'youtrack', projects: ['KT'] }, 'https://youtrack.jetbrains.com/issue/IDEA-0'],
-  ] satisfies [TicketSpec, string][]) {
+  for (const { spec, ticket } of [
+    { spec: { preset: 'jira' }, ticket: 'https://github.com/acme/trading-engine/issues/0' },
+    { spec: { preset: 'youtrack', projects: ['KT'] }, ticket: 'https://youtrack.jetbrains.com/issue/IDEA-0' },
+  ] satisfies { spec: TicketSpec; ticket: string }[]) {
     it(`still reports ${ticket}, whose ID is 0, as a placeholder for the ${spec.preset} preset`, () => {
       assert.equal(compileTicketSpec([spec], DEFAULT_PLACEHOLDERS).check(ticket), 'placeholder');
     });
   }
-  for (const [spec, ticket] of [
-    [{ preset: 'youtrack' }, 'https://acme.youtrack.cloud/issue/KT-0/fix-rounding'],
-    [{ preset: 'shortcut' }, 'https://app.shortcut.com/acme/story/0/fix-rounding'],
-    [{ preset: 'monday' }, 'https://acme.monday.com/boards/1234567890/pulses/0/updates'],
-    [{ preset: 'asana' }, 'https://app.asana.com/0/1202805690238892/0/f'],
-    [{ preset: 'asana' }, 'https://app.asana.com/1/1201234567890123/task/0/comment/5'],
-    [{ preset: 'redmine', host: 'redmine.acme.io' }, 'https://redmine.acme.io/issues/0.json'],
-    [{ preset: 'notion' }, 'https://www.notion.so/acme/db?v=1&p=00000000000000000000000000000000'],
-    [{ preset: 'notion' }, 'https://www.notion.so/Fix-00000000000000000000000000000000'],
-    [{ preset: 'clickup' }, 'https://app.clickup.com/9015210959/v/li/901500000001?p=0'],
-    [{ preset: 'linear' }, 'https://linear.app/acme/issue/ENG-0/fix-rounding'],
-    [{ preset: 'github' }, 'https://github.com/acme/trading-engine/pull/0/'],
-    [{ preset: 'basecamp' }, 'https://3.basecamp.com/4821/buckets/4822/todos/0'],
-    [{ preset: 'pattern', pattern: 'BUG-\\d+' }, 'BUG-0'],
-  ] satisfies [TicketSpec, string][]) {
+  for (const { spec, ticket } of [
+    { spec: { preset: 'youtrack' }, ticket: 'https://acme.youtrack.cloud/issue/KT-0/fix-rounding' },
+    { spec: { preset: 'shortcut' }, ticket: 'https://app.shortcut.com/acme/story/0/fix-rounding' },
+    { spec: { preset: 'monday' }, ticket: 'https://acme.monday.com/boards/1234567890/pulses/0/updates' },
+    { spec: { preset: 'asana' }, ticket: 'https://app.asana.com/0/1202805690238892/0/f' },
+    { spec: { preset: 'asana' }, ticket: 'https://app.asana.com/1/1201234567890123/task/0/comment/5' },
+    { spec: { preset: 'redmine', host: 'redmine.acme.io' }, ticket: 'https://redmine.acme.io/issues/0.json' },
+    { spec: { preset: 'notion' }, ticket: 'https://www.notion.so/acme/db?v=1&p=00000000000000000000000000000000' },
+    { spec: { preset: 'notion' }, ticket: 'https://www.notion.so/Fix-00000000000000000000000000000000' },
+    { spec: { preset: 'clickup' }, ticket: 'https://app.clickup.com/9015210959/v/li/901500000001?p=0' },
+    { spec: { preset: 'linear' }, ticket: 'https://linear.app/acme/issue/ENG-0/fix-rounding' },
+    { spec: { preset: 'github' }, ticket: 'https://github.com/acme/trading-engine/pull/0/' },
+    { spec: { preset: 'basecamp' }, ticket: 'https://3.basecamp.com/4821/buckets/4822/todos/0' },
+    { spec: { preset: 'pattern', pattern: 'BUG-\\d+' }, ticket: 'BUG-0' },
+  ] satisfies { spec: TicketSpec; ticket: string }[]) {
     it(`rejects ${ticket} with the ${spec.preset} preset, since its ID is 0`, () => {
       assert.equal(compileTicketSpec([spec], DEFAULT_PLACEHOLDERS).check(ticket), 'placeholder');
     });
