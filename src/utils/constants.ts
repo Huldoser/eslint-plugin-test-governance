@@ -4,9 +4,7 @@ export const MARKER_RE = /^[A-Z][A-Z0-9_-]*$/;
 export const TAG_RE = /^@[\w-]+$/;
 /** One label of a host name: letters and digits, with hyphens only between them. */
 const HOST_LABEL = '[A-Za-z0-9]+(?:-+[A-Za-z0-9]+)*';
-/** A host name with no scheme, port or path, such as `tracker.example.com`. */
-export const HOST_NAME_RE = new RegExp(`^${HOST_LABEL}(?:\\.${HOST_LABEL})*$`);
-/** A `url` preset host: a host name, or `*.` and a domain of two or more labels for its subdomains. */
+/** A host with no scheme, port or path: a host name, or `*.` and a domain of two or more labels for its subdomains. */
 export const HOST_ENTRY_RE = new RegExp(
   `^(?:${HOST_LABEL}(?:\\.${HOST_LABEL})*|\\*\\.${HOST_LABEL}(?:\\.${HOST_LABEL})+)$`,
 );

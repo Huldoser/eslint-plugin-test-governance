@@ -296,7 +296,8 @@ a `customStates` entry.
 | `pattern`      | anything matching your regex, anchored at both ends                                                                                                                           | `pattern`, `flags`                                                                                                                 |
 
 `projects` (Jira, YouTrack), `teams` (Linear) and `prefixes` (Notion, ClickUp, monday.com) are keys as
-they appear in tickets, in uppercase: `TRADE` for `TRADE-123`. YouTrack project IDs may also start with a digit, as `4DM`. Without them, any key passes. Each preset
+they appear in tickets, in uppercase: `TRADE` for `TRADE-123`. YouTrack project IDs may also start with a digit, as `4DM`. Without them, any key passes. `host` is a host name such as `jira.example.com`, or
+`*.example.com` for every subdomain, as in `{ preset: 'jira', host: '*.atlassian.net' }`. Each preset
 takes only its own options, so `host` on the `any` preset fails with a clear message instead of being
 ignored. A `pattern` always matches the whole ticket, so the `g` and `y` flags make no difference and are
 ignored.

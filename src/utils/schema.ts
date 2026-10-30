@@ -14,6 +14,8 @@ const TAG_HINT = 'a tag such as @needs-data';
 /** Jira project and Linear team keys, as they appear in tickets: `WEB` in `WEB-123`. */
 const KEY_PATTERN = '^[A-Z][A-Z0-9_]+$';
 const KEY_HINT = 'an uppercase key as it appears in tickets, such as WEB for WEB-123';
+/** Linear teams and the prefixes of Notion, ClickUp and monday.com keys have at least two characters. */
+const LONG_KEY_HINT = 'an uppercase key of two or more characters as it appears in tickets, such as WEB for WEB-123';
 /** YouTrack project IDs may also start with a digit, as `4DM` in `4DM-12`; `jira` checks its own in options.ts. */
 const PROJECT_PATTERN = '^(?=[A-Z0-9_]*[A-Z])[A-Z0-9_]+$';
 /** `['"a"', '"b"', '"c"']` as `"a", "b" or "c"`. */
@@ -31,8 +33,12 @@ const ticketSpecSchema: Schema = {
       items: { type: 'string', pattern: PROJECT_PATTERN, patternHint: KEY_HINT },
       minItems: 1,
     },
-    teams: { type: 'array', items: { type: 'string', pattern: KEY_PATTERN, patternHint: KEY_HINT }, minItems: 1 },
-    prefixes: { type: 'array', items: { type: 'string', pattern: KEY_PATTERN, patternHint: KEY_HINT }, minItems: 1 },
+    teams: { type: 'array', items: { type: 'string', pattern: KEY_PATTERN, patternHint: LONG_KEY_HINT }, minItems: 1 },
+    prefixes: {
+      type: 'array',
+      items: { type: 'string', pattern: KEY_PATTERN, patternHint: LONG_KEY_HINT },
+      minItems: 1,
+    },
     host: { type: 'string' },
     hosts: {
       type: 'array',

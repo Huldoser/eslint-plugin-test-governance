@@ -55,6 +55,22 @@ const tables: Record<string, Table> = {
       'https://acme.atlassian.net/xbrowse/TRADE-123',
     ],
   },
+  // A host of *.example.com matches its subdomains, for every preset that takes `host`.
+  'jira with a host written with a trailing dot': {
+    spec: { preset: 'jira', host: 'jira.acme.io.' },
+    accepts: ['https://jira.acme.io/browse/TRADE-1'],
+    rejects: ['https://other.io/browse/TRADE-1'],
+  },
+  'jira on any Atlassian site': {
+    spec: { preset: 'jira', host: '*.atlassian.net' },
+    accepts: ['https://acme.atlassian.net/browse/TRADE-1', 'https://ACME.atlassian.net/browse/TRADE-1'],
+    rejects: ['https://atlassian.net/browse/TRADE-1', 'https://acme.atlassian.net.evil.io/browse/TRADE-1'],
+  },
+  'github on any subdomain': {
+    spec: { preset: 'github', host: '*.acme.io' },
+    accepts: ['https://git.acme.io/acme/trading-engine/issues/1'],
+    rejects: ['https://acme.io/acme/trading-engine/issues/1'],
+  },
   'jira with projects and host': {
     spec: { preset: 'jira', projects: ['TRADE', 'RISK'], host: 'jira.acme.io' },
     accepts: ['TRADE-1', 'RISK-22', 'https://JIRA.acme.io/browse/RISK-2'],
@@ -335,6 +351,11 @@ const tables: Record<string, Table> = {
       'https://jetbrains.com/issue/KT-1',
     ],
   },
+  'youtrack on any subdomain': {
+    spec: { preset: 'youtrack', host: '*.acme.io' },
+    accepts: ['https://yt.acme.io/issue/KT-1'],
+    rejects: ['https://acme.youtrack.cloud/issue/KT-1'],
+  },
   'youtrack on a server with projects': {
     spec: { preset: 'youtrack', host: 'yt.acme.io', projects: ['TRADE', '4DM'] },
     accepts: ['TRADE-1', '4DM-2', 'https://yt.acme.io/youtrack/issue/TRADE-1'],
@@ -507,6 +528,56 @@ describe('placeholders', () => {
       assert.equal(compileTicketSpec([spec], DEFAULT_PLACEHOLDERS).check(ticket), 'ok');
     });
   }
+  // Links to an unknown tracker keep their ID in the path, a `#/route` or a key in the query.
+  for (const [specs, ticket, result] of [
+    [[{ preset: 'any' }], 'https://tracker.example.com/#/issues/0', 'placeholder'],
+    [
+      [{ preset: 'any' }],
+      'https://acme.atlassian.net/jira/software/projects/TRADE/boards/1?selectedIssue=TRADE-0',
+      'placeholder',
+    ],
+    [[{ preset: 'any' }], 'https://tracker.example.com/search?page=0', 'ok'],
+    [[{ preset: 'any' }], '[TRADE-0]', 'placeholder'],
+    [[{ preset: 'url', hosts: ['tracker.acme.io'] }], 'https://tracker.acme.io/#/tasks/0', 'placeholder'],
+    // A tracker's own preset decides; `any` next to it only reads what that preset doesn't.
+    [
+      [{ preset: 'jira' }, { preset: 'any' }],
+      'https://acme.atlassian.net/jira/software/projects/TRADE/boards/1?selectedIssue=TRADE-0',
+      'placeholder',
+    ],
+    [[{ preset: 'linear' }, { preset: 'any' }], 'https://linear.app/acme/issue/ENG-0/fix-rounding', 'placeholder'],
+    [[{ preset: 'jira' }, { preset: 'any' }], 'https://wiki.example.com/pages/4821', 'ok'],
+    [[{ preset: 'pattern', pattern: '\\S+' }], '-', 'ok'],
+    [[{ preset: 'pattern', pattern: '\\S+' }], '--', 'ok'],
+    [[{ preset: 'pattern', pattern: '\\S+' }], '0-', 'ok'],
+    [[{ preset: 'any' }], 'https://linear.app/acme/issue/ENG-0/fix-rounding', 'placeholder'],
+    [[{ preset: 'any' }], 'https://linear.app/acme/issue/ENG-5/comments/0', 'ok'],
+    [[{ preset: 'pattern', pattern: '\\[sc-\\d+\\]' }], '[sc-0]', 'placeholder'],
+  ] satisfies [TicketSpec[], string, string][]) {
+    it(`reads ${ticket} with ${specs.map((spec) => spec.preset).join(' and ')} as ${result}`, () => {
+      assert.equal(compileTicketSpec(specs, DEFAULT_PLACEHOLDERS).check(ticket), result);
+    });
+  }
+
+  // A link the preset doesn't read is a wrong format, not a placeholder, even when its title ends in -0.
+  for (const [spec, ticket] of [
+    [{ preset: 'jira' }, 'https://trello.com/c/nqPiDKmw/12-retry-count-0'],
+    [{ preset: 'jira' }, 'https://docs.example.com/upgrade-to-node-0'],
+    [{ preset: 'github' }, 'https://linear.app/acme/issue/ENG-1/upgrade-to-node-0'],
+    [{ preset: 'youtrack', projects: ['KT'] }, 'https://youtrack.jetbrains.com/issue/IDEA-1/v-0'],
+  ] satisfies [TicketSpec, string][]) {
+    it(`reports ${ticket} as a wrong format for the ${spec.preset} preset`, () => {
+      assert.equal(compileTicketSpec([spec], DEFAULT_PLACEHOLDERS).check(ticket), 'format');
+    });
+  }
+  for (const [spec, ticket] of [
+    [{ preset: 'jira' }, 'https://github.com/acme/trading-engine/issues/0'],
+    [{ preset: 'youtrack', projects: ['KT'] }, 'https://youtrack.jetbrains.com/issue/IDEA-0'],
+  ] satisfies [TicketSpec, string][]) {
+    it(`still reports ${ticket}, whose ID is 0, as a placeholder for the ${spec.preset} preset`, () => {
+      assert.equal(compileTicketSpec([spec], DEFAULT_PLACEHOLDERS).check(ticket), 'placeholder');
+    });
+  }
   for (const [spec, ticket] of [
     [{ preset: 'youtrack' }, 'https://acme.youtrack.cloud/issue/KT-0/fix-rounding'],
     [{ preset: 'shortcut' }, 'https://app.shortcut.com/acme/story/0/fix-rounding'],
@@ -594,6 +665,8 @@ describe('messages', () => {
           { preset: 'shortcut' },
           { preset: 'url', hosts: ['www.wrike.com', '*.acme.io'] },
           { preset: 'notion', host: 'docs.acme.io' },
+          { preset: 'jira', host: 'jira.acme.io' },
+          { preset: 'azure-devops', host: 'tfs.acme.io' },
           { preset: 'youtrack', host: 'yt.acme.io' },
         ] satisfies TicketSpec[]
       ).map((spec) => expectedOf(spec).expected),
@@ -610,8 +683,10 @@ describe('messages', () => {
         'a YouTrack issue like KT-123 in project KT, or a YouTrack issue link',
         'a Basecamp to-do or card link like https://3.basecamp.com/4821/buckets/4822/todos/4823',
         'a Shortcut story like sc-123, or a story link',
-        'a link to www.wrike.com, *.acme.io',
+        'a link to www.wrike.com or *.acme.io',
         'a Notion ID like TASK-123, or a Notion page link on docs.acme.io',
+        'a Jira key like PROJ-123, or a Jira URL on jira.acme.io',
+        'an Azure Boards work item like AB#4821 or #4821, or a work item URL on tfs.acme.io',
         'a YouTrack issue like PROJ-123, or a YouTrack issue link on yt.acme.io',
       ],
     );

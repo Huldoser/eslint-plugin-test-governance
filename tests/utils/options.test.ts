@@ -175,10 +175,18 @@ describe('compileOptions', () => {
     [{ ticket: { preset: 'clickup', prefixes: [] } }, /ticket\.prefixes must have at least 1 item/],
     [
       { ticket: { preset: 'redmine', host: 'https://redmine.acme.io' } },
-      /ticket\.host must be a host name such as tracker\.example\.com, with no scheme, port or path \(got "https:\/\/redmine\.acme\.io"\)/,
+      /ticket\.host must be a host name such as tracker\.example\.com or \*\.example\.com, with no scheme, port or path \(got "https:\/\/redmine\.acme\.io"\)/,
     ],
     [{ ticket: { preset: 'notion', host: 'docs.acme.io/wiki' } }, /ticket\.host must be a host name/],
-    [{ ticket: { preset: 'youtrack', host: '*.acme.io' } }, /ticket\.host must be a host name/],
+    [{ ticket: { preset: 'youtrack', host: '*.io' } }, /ticket\.host must be a host name/],
+    [
+      { ticket: { preset: 'clickup', prefixes: ['X'] } },
+      /ticket\.prefixes\[0\] must be an uppercase key of two or more characters as it appears in tickets/,
+    ],
+    [
+      { ticket: { preset: 'linear', teams: ['Q'] } },
+      /ticket\.teams\[0\] must be an uppercase key of two or more characters/,
+    ],
     [{ ticket: { preset: 'url', hosts: [] } }, /ticket\.hosts must have at least 1 item/],
     [{ ticket: { preset: 'trello', host: 'trello.acme.io' } }, /ticket\.host is not an option of the "trello" preset/],
     [

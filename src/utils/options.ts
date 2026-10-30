@@ -1,7 +1,7 @@
 import {
   BUILTIN_STATE_NAMES,
   DEFAULT_COMMENT_KEYWORDS,
-  HOST_NAME_RE,
+  HOST_ENTRY_RE,
   type BuiltinStateName,
   type FrameworkName,
   type TagStateName,
@@ -198,9 +198,9 @@ function ownOptionProblems(spec: TicketSpec, at: string): string[] {
     }
   }
   const { host } = spec as { host?: string };
-  if (STRICT_HOST_PRESETS.has(spec.preset) && host !== undefined && !HOST_NAME_RE.test(host)) {
+  if (STRICT_HOST_PRESETS.has(spec.preset) && host !== undefined && !HOST_ENTRY_RE.test(host)) {
     problems.push(
-      `${at}.host must be a host name such as tracker.example.com, with no scheme, port or path (got "${host}")`,
+      `${at}.host must be a host name such as tracker.example.com or *.example.com, with no scheme, port or path (got "${host}")`,
     );
   }
   if (spec.preset === 'url' && (spec as { hosts?: string[] }).hosts === undefined) {

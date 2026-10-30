@@ -72,16 +72,18 @@ const SHORTCUT_PATH_RE = /^\/[^/]+\/story\/(\d+)(?:\/[^/]*)?$/;
 // No tracker issues number 0. A preset hands back the ID it finds, and an ID of zeros (0, 000, or a
 // Notion page ID of zeros) makes the ticket a placeholder. A ticket no preset reads is a placeholder
 // when it ends in a zero ID, as PROJ-0, #0, AB#0 or .../issues/0 do.
-const ZERO_RE = /^[0-]+$/;
-const ZERO_ID_RE = /(?:^|[-#/])0+\/?$/;
-// The ID in a link to an unknown tracker: its last path segment, when that is a number or a key.
-const LINK_ID_RE = /\/(\d+|[A-Z][A-Z0-9_]+-\d+)\/?$/;
+const ZERO_RE = /^(?:0+|0{8}-0{4}-0{4}-0{4}-0{12})$/;
+const ZERO_ID_RE = /(?:^|[-#/])0+[/\]]?$/;
+// The number at the end of a link to an unknown tracker, as in `/issues/123`.
+const LINK_NUMBER_RE = /\/(\d+)\/?$/;
 
 /** The ID a preset finds in a ticket, or undefined when the ticket isn't one of its forms. */
 type Finder = (ticket: string) => string | undefined;
 
 interface CompiledPreset {
   find: Finder;
+  /** `any`, `url` and `pattern` read tickets of any tracker, so a tracker's own preset decides first. */
+  generic?: true;
   expected: string;
   example: string;
 }
@@ -100,17 +102,15 @@ function hostnameOf(url: URL): string {
   return url.hostname.toLowerCase().replace(/\.$/, '');
 }
 
+/** `*.example.com` matches the subdomains of example.com; any other host matches exactly. */
 function hostMatches(url: URL, host: string): boolean {
-  return hostnameOf(url) === host.toLowerCase();
+  const hostname = hostnameOf(url);
+  const lower = host.toLowerCase().replace(/\.$/, '');
+  return lower.startsWith('*.') ? hostname.endsWith(lower.slice(1)) : hostname === lower;
 }
 
-/** `*.example.com` matches the subdomains of example.com; any other entry matches its host exactly. */
 function hostInList(url: URL, hosts: string[]): boolean {
-  const hostname = hostnameOf(url);
-  return hosts.some((host) => {
-    const lower = host.toLowerCase();
-    return lower.startsWith('*.') ? hostname.endsWith(lower.slice(1)) : hostname === lower;
-  });
+  return hosts.some((host) => hostMatches(url, host));
 }
 
 function isYouTrackKey(key: string, projects: string[] | undefined): boolean {
@@ -136,17 +136,28 @@ function keyId(key: string | null | undefined, ok: (key: string) => boolean): st
   return key !== null && key !== undefined && ok(key) ? numberOf(key) : undefined;
 }
 
-/** A link's ID: its last path segment if that is a number or key, else the link itself. */
+/**
+ * A link's ID when the preset doesn't know the tracker: the keys in its path, `#/route` or query (Jira's
+ * `?selectedIssue=TRADE-1`), else the number its path or route ends in. A zero among them makes the link
+ * a placeholder; with none, the link itself stands for the ID.
+ */
 function linkId(url: URL): string {
-  const id = LINK_ID_RE.exec(url.pathname)?.[1];
-  return id === undefined ? url.href : numberOf(id);
+  const route = url.hash.startsWith('#/') ? url.hash.slice(1) : '';
+  const parts = [...url.pathname.split('/'), ...route.split('/'), ...url.searchParams.values()];
+  const keys = parts.filter((part) => KEY_RE.test(part));
+  const ids = keys.length > 0 ? keys : [url.pathname, route].flatMap((path) => LINK_NUMBER_RE.exec(path)?.[1] ?? []);
+  const numbers = ids.map(numberOf);
+  return numbers.find((id) => ZERO_RE.test(id)) ?? numbers.at(0) ?? url.href;
+}
+
+/** `TRADE, RISK or OPS` for `['TRADE', 'RISK', 'OPS']`. */
+function orList(list: string[]): string {
+  return list.length === 1 ? list[0] : `${list.slice(0, -1).join(', ')} or ${list[list.length - 1]}`;
 }
 
 /** ` in project TRADE or RISK` for `describeList('in project', ['TRADE', 'RISK'])`. */
 function describeList(words: string, list: string[] | undefined): string {
-  if (list === undefined) return '';
-  const items = list.length === 1 ? list[0] : `${list.slice(0, -1).join(', ')} or ${list[list.length - 1]}`;
-  return ` ${words} ${items}`;
+  return list === undefined ? '' : ` ${words} ${orList(list)}`;
 }
 
 function compilePreset(spec: TicketSpec): CompiledPreset {
@@ -160,6 +171,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
         },
         expected: 'a ticket key like PROJ-123, an issue like #4821 or owner/repo#4821, or a URL',
         example: 'PROJ-123',
+        generic: true,
       };
     case 'jira': {
       const { projects, host } = spec;
@@ -171,7 +183,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
           if (!url || (host !== undefined && !hostMatches(url, host))) return undefined;
           return keyId(JIRA_PATH_RE.exec(url.pathname)?.[1] ?? url.searchParams.get('selectedIssue'), keyOk);
         },
-        expected: `a Jira key like ${projects?.[0] ?? 'PROJ'}-123${describeList('in project', projects)}, or a Jira URL`,
+        expected: `a Jira key like ${projects?.[0] ?? 'PROJ'}-123${describeList('in project', projects)}, or a Jira URL${host === undefined ? '' : ` on ${host}`}`,
         example: `${projects?.[0] ?? 'PROJ'}-123`,
       };
     }
@@ -227,7 +239,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
               : hostMatches(url, host);
           return hostOk ? AZURE_PATH_RE.exec(url.pathname)?.[1] : undefined;
         },
-        expected: 'an Azure Boards work item like AB#4821 or #4821, or a work item URL',
+        expected: `an Azure Boards work item like AB#4821 or #4821, or a work item URL${host === undefined ? '' : ` on ${host}`}`,
         example: 'AB#4821',
       };
     }
@@ -370,7 +382,8 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
           // The site's home page is no ticket; a query or a `#/route` after it can be.
           return url.pathname === '/' && url.search === '' && url.hash === '' ? undefined : linkId(url);
         },
-        expected: `a link to ${hosts.join(', ')}`,
+        expected: `a link to ${orList(hosts)}`,
+        generic: true,
         example: `https://${hosts[0].replace(/^\*\./, 'tasks.')}/4821`,
       };
     }
@@ -404,6 +417,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
         find: (t) => (re.test(t) ? (ZERO_ID_RE.test(t) ? '0' : t) : undefined),
         expected: `a ticket matching /${spec.pattern}/`,
         example: 'TICKET',
+        generic: true,
       };
     }
   }
@@ -424,9 +438,15 @@ export function compileTicketSpec(specs: TicketSpec[], placeholders: string[]): 
     check(ticket) {
       const bare = ticket.replace(/^#/, '');
       if (placeholderRes.some((re) => re.test(ticket) || re.test(bare))) return 'placeholder';
-      const ids = presets.flatMap((preset) => preset.find(ticket) ?? []);
-      if (ids.some((id) => !ZERO_RE.test(id))) return 'ok';
-      return ids.length > 0 || ZERO_ID_RE.test(ticket) ? 'placeholder' : 'format';
+      for (const generic of [false, true]) {
+        const ids = presets.flatMap((preset) =>
+          Boolean(preset.generic) === generic ? (preset.find(ticket) ?? []) : [],
+        );
+        if (ids.length > 0) return ids.some((id) => !ZERO_RE.test(id)) ? 'ok' : 'placeholder';
+      }
+      // No preset reads it. A link is a placeholder only when its own ID is 0, not its title.
+      const url = parseUrl(ticket);
+      return (url ? ZERO_RE.test(linkId(url)) : ZERO_ID_RE.test(ticket)) ? 'placeholder' : 'format';
     },
     expected: presets.map((p) => p.expected).join('; or '),
     example: presets[0].example,
