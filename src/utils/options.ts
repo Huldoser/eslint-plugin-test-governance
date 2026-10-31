@@ -188,41 +188,53 @@ const STRICT_HOST_PRESETS = new Set<TicketSpec['preset']>(['notion', 'redmine', 
 /** Option values the schema allows for every preset but this one can't use. */
 function ownOptionProblems(spec: TicketSpec, at: string): string[] {
   const problems: string[] = [];
-  if (spec.preset === 'jira') {
-    for (const [i, key] of (spec.projects ?? []).entries()) {
-      if (!/^[A-Z][A-Z0-9_]+$/.test(key)) {
+  if (spec.preset === 'jira' && Array.isArray(spec.projects)) {
+    for (const [i, key] of spec.projects.entries()) {
+      if (typeof key !== 'string' || !/^[A-Z][A-Z0-9_]+$/.test(key)) {
         problems.push(
           `${at}.projects[${i}] must start with a letter and have at least two characters, as Jira keys do (got "${key}")`,
         );
       }
     }
   }
-  const { host } = spec as { host?: string };
-  if (STRICT_HOST_PRESETS.has(spec.preset) && host !== undefined && !HOST_ENTRY_RE.test(host)) {
+  const { host } = spec as { host?: unknown };
+  if (STRICT_HOST_PRESETS.has(spec.preset) && typeof host === 'string' && !HOST_ENTRY_RE.test(host)) {
     problems.push(
       `${at}.host must be a host name such as tracker.example.com or *.example.com, with no scheme, port or path (got "${host}")`,
     );
   }
-  if (spec.preset === 'url' && (spec as { hosts?: string[] }).hosts === undefined) {
+  if (spec.preset === 'url' && (spec as { hosts?: unknown }).hosts === undefined) {
     problems.push(`${at}.hosts is required by the "url" preset: the hosts its links may point to`);
   }
   return problems;
 }
 
+/** A spec the cross-field checks can read: an object whose `preset` names one of the presets. */
+function isTicketSpec(spec: unknown): spec is TicketSpec {
+  if (typeof spec !== 'object' || spec === null || Array.isArray(spec)) return false;
+  const { preset } = spec as { preset?: unknown };
+  return typeof preset === 'string' && Object.hasOwn(PRESET_OPTIONS, preset);
+}
+
 /** Options set on a ticket spec that its preset ignores, such as `host` on the `any` preset. */
 function presetProblems(ticket: TicketSpec | TicketSpec[] | undefined, path: string): string[] {
-  if (ticket === undefined) return [];
+  if (!ticket) return [];
   const specs = Array.isArray(ticket) ? ticket : [ticket];
   return specs.flatMap((spec, index) => {
+    if (!isTicketSpec(spec)) return [];
     const at = Array.isArray(ticket) ? `${path}[${index}]` : path;
     const allowed = PRESET_OPTIONS[spec.preset];
     const misplaced = Object.keys(spec)
       .filter(
         (key) => key !== 'preset' && (spec as Record<string, unknown>)[key] !== undefined && !allowed.includes(key),
       )
-      .map((key) => {
+      .flatMap((key) => {
         const presets = Object.entries(PRESET_OPTIONS).filter(([, keys]) => keys.includes(key));
-        return `${at}.${key} is not an option of the "${spec.preset}" preset (it applies to ${presets.map(([name]) => `"${name}"`).join(', ')})`;
+        // An option no preset defines is a typo, which the schema already reports with a suggestion.
+        if (presets.length === 0) return [];
+        return [
+          `${at}.${key} is not an option of the "${spec.preset}" preset (it applies to ${presets.map(([name]) => `"${name}"`).join(', ')})`,
+        ];
       });
     return [...misplaced, ...ownOptionProblems(spec, at)];
   });
@@ -230,9 +242,15 @@ function presetProblems(ticket: TicketSpec | TicketSpec[] | undefined, path: str
 
 /** Problems the schema can't express: options that belong to another preset, and reused state names. */
 function crossFieldProblems(options: GovernanceOptions): string[] {
+  // `options` comes from user settings, so at runtime it can be anything; the schema reports a non-object.
+  const raw: unknown = options;
+  if (typeof raw !== 'object' || raw === null) return [];
   const problems = presetProblems(options.ticket, 'ticket');
   for (const [name, override] of Object.entries(options.states ?? {})) {
-    if (typeof override === 'object') problems.push(...presetProblems(override.ticket, `states.${name}.ticket`));
+    const state: unknown = override;
+    if (typeof state === 'object' && state !== null) {
+      problems.push(...presetProblems((state as StateOverride).ticket, `states.${name}.ticket`));
+    }
   }
   for (const [name, custom] of Object.entries(options.customStates ?? {})) {
     if ((BUILTIN_STATE_NAMES as readonly string[]).includes(name)) {
@@ -240,14 +258,16 @@ function crossFieldProblems(options: GovernanceOptions): string[] {
         `customStates.${name} reuses the name of the built-in "${name}" state; give it another name, or use states.${name} to change the built-in`,
       );
     }
-    problems.push(...presetProblems(custom.ticket, `customStates.${name}.ticket`));
+    problems.push(...presetProblems((custom as CustomState | undefined)?.ticket, `customStates.${name}.ticket`));
   }
   return problems;
 }
 
 export function compileOptions(options: GovernanceOptions): ResolvedOptions {
   const schemaProblems = validate(options, optionsSchema);
-  const problems = schemaProblems.length > 0 ? schemaProblems : crossFieldProblems(options);
+  // The cross-field problems come first: a misplaced option is worth knowing even when a value next to it is
+  // malformed, and both are about the same setting.
+  const problems = [...crossFieldProblems(options), ...schemaProblems];
   if (problems.length > 0) {
     throw new ConfigError(`invalid options:\n${problems.map((problem) => `  - ${problem}`).join('\n')}`);
   }

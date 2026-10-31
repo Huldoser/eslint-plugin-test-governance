@@ -429,21 +429,43 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
   }
 }
 
-function globToRegExp(glob: string): RegExp {
-  const body = glob
-    .split('*')
-    .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
-    .join('.*');
-  return new RegExp(`^${body}$`, 'i');
+/**
+ * Matches a `*` wildcard placeholder against a ticket, case-insensitively, in one pass. A regex with `.*` per
+ * star backtracks on a placeholder like `*a*a*a*a*b`, which a user can write by hand.
+ */
+function matchesGlob(glob: string, value: string): boolean {
+  const pattern = glob.toLowerCase();
+  const text = value.toLowerCase();
+  let p = 0;
+  let t = 0;
+  let star = -1;
+  let mark = 0;
+  while (t < text.length) {
+    if (p < pattern.length && pattern[p] === text[t]) {
+      p += 1;
+      t += 1;
+    } else if (p < pattern.length && pattern[p] === '*') {
+      star = p;
+      p += 1;
+      mark = t;
+    } else if (star !== -1) {
+      mark += 1;
+      t = mark;
+      p = star + 1;
+    } else {
+      return false;
+    }
+  }
+  while (p < pattern.length && pattern[p] === '*') p += 1;
+  return p === pattern.length;
 }
 
 export function compileTicketSpec(specs: TicketSpec[], placeholders: string[]): TicketMatcher {
   const presets = specs.map(compilePreset);
-  const placeholderRes = placeholders.map(globToRegExp);
   return {
     check(ticket) {
       const bare = ticket.replace(/^#/, '');
-      if (placeholderRes.some((re) => re.test(ticket) || re.test(bare))) return 'placeholder';
+      if (placeholders.some((glob) => matchesGlob(glob, ticket) || matchesGlob(glob, bare))) return 'placeholder';
       for (const generic of [false, true]) {
         const ids = presets.flatMap((preset) =>
           Boolean(preset.generic) === generic ? (preset.find(ticket) ?? []) : [],
