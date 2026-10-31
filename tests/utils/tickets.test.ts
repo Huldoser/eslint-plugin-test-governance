@@ -486,6 +486,29 @@ describe('placeholders', () => {
     assert.equal(custom.check('#1234'), 'ok');
   });
 
+  it('matches a wildcard placeholder without backtracking', () => {
+    const matcher = compileTicketSpec([{ preset: 'any' }], ['*a*a*a*a*b']);
+    assert.equal(matcher.check(`${'a'.repeat(50)}b`), 'placeholder');
+    const started = performance.now();
+    assert.equal(matcher.check('a'.repeat(200)), 'format');
+    const elapsed = performance.now() - started;
+    assert.ok(elapsed < 1000, `unmatched wildcard placeholder took ${elapsed.toFixed(0)} ms, so it backtracks`);
+  });
+
+  it('matches a wildcard placeholder whatever the shape', () => {
+    const check = (glob: string, ticket: string) => compileTicketSpec([{ preset: 'any' }], [glob]).check(ticket);
+    // A star at the end, in the middle and at the start.
+    assert.equal(check('TRADE-*', 'TRADE-1'), 'placeholder');
+    assert.equal(check('TRADE-*-1', 'TRADE-X-1'), 'placeholder');
+    assert.equal(check('*1', 'TRADE-1'), 'placeholder');
+    // No match: the same length, a star that finds nothing, and a placeholder longer than the ticket.
+    assert.equal(check('TRADE-1', 'TRADE-2'), 'ok');
+    assert.equal(check('TRADE-*', 'OTHER-1'), 'ok');
+    assert.equal(check('TRADE-123', 'TRADE-1'), 'ok');
+    // A trailing star that consumes nothing, as in the default `XXX-*` against `XXX-`.
+    assert.equal(check('TRADE-*', 'TRADE-'), 'placeholder');
+  });
+
   for (const ticket of [
     'TRADE-0',
     'TRADE-000',

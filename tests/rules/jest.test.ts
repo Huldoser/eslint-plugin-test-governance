@@ -178,6 +178,10 @@ runRule('require-ticket (Jest)', requireTicket, {
       errors: [missing('skip', 'SKIP')],
     },
     {
+      code: "const s = it.skip;\ns('fills a limit order', () => {});\nconst { skip } = it;\nskip('fills a limit order', () => {});",
+      errors: [missing('skip', 'SKIP'), missing('skip', 'SKIP')],
+    },
+    {
       code: "(process.env.CI ? describe.skip : describe)('order book', () => {\n  it('shows the best bid', () => {});\n});",
       settings: settings({ requireTicketForConditional: true }),
       errors: [missing('skip', 'SKIP', 'This describe block')],

@@ -230,6 +230,51 @@ describe('compileOptions', () => {
       assert.throws(() => compile(options as never), message);
     });
   }
+
+  it('reports a misplaced option together with a malformed value', () => {
+    assert.throws(
+      () => compile({ ticket: { preset: 'trello', prefixes: ['X'] } as never }),
+      (error: unknown) => {
+        assert.ok(error instanceof ConfigError);
+        assert.match(error.message, /ticket\.prefixes\[0\] must be an uppercase key/);
+        assert.match(error.message, /ticket\.prefixes is not an option of the "trello" preset/);
+        return true;
+      },
+    );
+  });
+
+  it('does not read a ticket spec the schema already rejects as a preset', () => {
+    for (const ticket of [
+      { preset: 'bogus' },
+      'trello',
+      null,
+      [null],
+      [[]],
+      { preset: 5 },
+      { preset: 'jira', projects: 'TRADE' },
+      { preset: 'jira', projects: [123] },
+      { preset: 'redmine', host: 123 },
+    ]) {
+      assert.throws(() => compile({ ticket: ticket as never }), ConfigError);
+    }
+  });
+
+  it('does not report an unknown option as misplaced', () => {
+    assert.throws(
+      () => compile({ ticket: { preset: 'jira', project: ['TRADE'] } as never }),
+      /ticket\.project is not a known option; did you mean "projects"\?/,
+    );
+  });
+
+  it('does not read malformed states as states', () => {
+    assert.throws(() => compile({ states: { skip: null } as never }), ConfigError);
+    assert.throws(() => compile({ customStates: { x: null } as never }), ConfigError);
+  });
+
+  it('reports settings that are not an object', () => {
+    assert.throws(() => compileOptions(null as never), /invalid options/);
+    assert.throws(() => compileOptions('jira' as never), /invalid options/);
+  });
 });
 
 describe('framework', () => {
