@@ -12,12 +12,17 @@ All notable changes to this project are documented here. The format follows
   to them is malformed, so one run shows both the misplaced option and the bad value.
 - A placeholder with several `*` characters, such as `*a*a*a*a*b`, matches in one pass instead of
   backtracking on a long ticket.
-- `node:test`'s `test.describe` and `test.it` are read after `import { test } from 'node:test'`, as they were
-  after `require()` or a default import. A state member kept in a variable, `const s = it.skip` or
-  `const { skip } = it`, is checked like `it.skip(...)` in every framework.
 - A details object written as a literal with a spread or a computed key, `{ ...base, tag: '@new' }` or
   `{ ['tag']: '@new' }`, keeps its tags and options; a key or spread that can't be read, such as an object
   imported from another file, is reported with `reportUnreadableTags` instead of being ignored.
+- A tag read from an array element, `TAGS[1]`, or from a constant inside a template, `` `${TAG}` ``, is
+  checked like the constant itself.
+- A runtime skip method kept in a local variable, `const { skip } = t`, `const s = testInfo.skip` or
+  `const p = pending`, is checked like the method called on the context, in every framework.
+- `node:test`'s `test.describe` and `test.it` are read after `import { test } from 'node:test'`, as they were
+  after `require()` or a default import. A state member kept in a variable, `const s = it.skip` or
+  `const { skip } = it`, is checked like `it.skip(...)` in every framework. The same holds for a skip called
+  on a required module used inline, `require('node:test').test.skip(...)`.
 
 ## [0.10.0] - 2026-10-30
 

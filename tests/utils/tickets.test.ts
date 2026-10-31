@@ -159,7 +159,11 @@ const tables: Record<string, Table> = {
   },
   'azure-devops on a server': {
     spec: { preset: 'azure-devops', host: 'tfs.acme.io' },
-    accepts: ['https://tfs.acme.io/acme/trading-engine/_workitems/edit/1'],
+    accepts: [
+      'https://tfs.acme.io/acme/trading-engine/_workitems/edit/1',
+      // Server collections and projects can sit under a path.
+      'https://tfs.acme.io/tfs/acme/Project/_workitems/edit/1',
+    ],
     rejects: ['https://dev.azure.com/acme/trading-engine/_workitems/edit/1'],
   },
   trello: {

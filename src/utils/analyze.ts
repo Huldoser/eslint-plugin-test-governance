@@ -108,7 +108,7 @@ export type Evaluation =
   | { kind: 'bad-ticket'; marker: Marker; ticket: MarkerTicket };
 
 interface Chain {
-  root: TSESTree.Identifier;
+  root: TSESTree.Identifier | TSESTree.CallExpression;
   path: string[];
   /** The first argument of each member called to build the function: `isMobile` in `test.skipIf(isMobile)`. */
   args: Map<string, Node | undefined>;
@@ -144,6 +144,12 @@ function memberName(node: TSESTree.MemberExpression): string | undefined {
   return undefined;
 }
 
+/** The key a member expression reads, including an array index as in `TAGS[1]`. */
+function memberKey(node: TSESTree.MemberExpression): string | undefined {
+  if (node.property.type === 'Literal' && typeof node.property.value === 'number') return String(node.property.value);
+  return memberName(node);
+}
+
 /**
  * The name a callee starts from and the members after it: `['describe', 'skip']` for
  * `test.describe.skip`. A member called to build the function, as `each` in `test.each(table)` or
@@ -174,7 +180,7 @@ function chainOf(node: Node, factories: ReadonlySet<string>): Chain | undefined 
     if (current.type === 'CallExpression') args.set(`${name}()`, current.arguments.at(0));
     current = factory.object;
   }
-  return current.type === 'Identifier' ? { root: current, path, args } : undefined;
+  return current.type === 'Identifier' || current.type === 'CallExpression' ? { root: current, path, args } : undefined;
 }
 
 function unwrap(node: Node): Node {
@@ -380,6 +386,15 @@ function declaredWhere(sourceCode: SourceCode, id: TSESTree.Identifier): 'inside
   return 'global';
 }
 
+/** The variable a name resolves to, walking out through the enclosing scopes. */
+function declaredVariable(sourceCode: SourceCode, id: TSESTree.Identifier): TSESLint.Scope.Variable | undefined {
+  for (let scope: TSESLint.Scope.Scope | null = sourceCode.getScope(id); scope; scope = scope.upper) {
+    const variable = scope.set.get(id.name);
+    if (variable) return variable;
+  }
+  return undefined;
+}
+
 /**
  * Whether `id` refers to a variable or function declared inside a function or block, such as a local
  * helper that happens to be called `test`. Top-level variables, imports, parameters and globals still count.
@@ -571,11 +586,17 @@ function propertyValue(object: TSESTree.ObjectExpression, key: string): Node | u
 function constantValue(sourceCode: SourceCode, node: Node): Node | undefined {
   if (node.type === 'Identifier') return declaredValue(sourceCode, node);
   if (node.type !== 'MemberExpression') return undefined;
-  const key = memberName(node);
+  const key = memberKey(node);
   const value = constantValue(sourceCode, unwrap(node.object));
   const owner = value && unwrap(value);
   if (key === undefined || owner === undefined) return undefined;
   if (owner.type === 'ObjectExpression') return propertyValue(owner, key);
+  if (owner.type === 'ArrayExpression') {
+    const index = Number(key);
+    if (!Number.isInteger(index)) return undefined;
+    const element = owner.elements[index];
+    return element !== null && element.type !== 'SpreadElement' ? element : undefined;
+  }
   if (owner.type !== 'TSEnumDeclaration') return undefined;
   const member = owner.body.members.find((m) => (m.id.type === 'Identifier' ? m.id.name : m.id.value) === key);
   return member?.initializer;
@@ -596,6 +617,14 @@ function readTexts(
   const target = unwrap(node);
   if (isStaticText(target)) {
     out.texts.push({ text: target, via });
+    // A template that holds a constant, as in `` `${TAG}` ``, reads the constant's text too.
+    if (target.type === 'TemplateLiteral') {
+      for (const expression of target.expressions) {
+        const value = constantValue(sourceCode, unwrap(expression));
+        const resolved = value && unwrap(value);
+        if (resolved !== undefined && isStaticText(resolved)) out.texts.push({ text: resolved, via });
+      }
+    }
     return;
   }
   if (target.type === 'ArrayExpression') {
@@ -900,6 +929,13 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   const target = (chain: Chain | undefined): { root: Root; path: string[]; args: Chain['args'] } | undefined => {
     if (chain === undefined) return undefined;
     const { root, path, args } = chain;
+    // `require('node:test').test.skip(...)`: the require call stands for the module, with its exports.
+    if (root.type !== 'Identifier') {
+      const source = requireSource(root);
+      if (source === undefined || !framework.ownsModule(source) || path.length === 0) return undefined;
+      const exported = framework.exports.get(path[0]);
+      return exported === undefined ? undefined : { root: exported, path: path.slice(1), args };
+    }
     let base = testNames.roots.get(root.name);
     let rest = path;
     // `pw.test.skip`, or node:test's `test.describe`, whose module is also its `test` even when
@@ -1201,8 +1237,52 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const { callee } = call;
     // The innermost parameter with a name is the one the call uses.
     const innermost = (name: string): InfoName | undefined => infos.findLast((info) => info.name === name);
+    /**
+     * What a name stands for: a context in scope, or a local constant that keeps one of its methods, as
+     * `const skip = testInfo.skip`, `const { skip } = t` or `const p = pending`.
+     */
+    const resolveInfo = (id: TSESTree.Identifier): InfoName | undefined => {
+      const direct = innermost(id.name);
+      if (direct !== undefined) return direct;
+      const definition = declaredVariable(sourceCode, id)?.defs.find((def) => def.type === 'Variable');
+      const declarator = definition?.node;
+      if (declarator?.type !== 'VariableDeclarator' || declarator.init === null) return undefined;
+      const init = unwrap(declarator.init);
+      if (declarator.id.type === 'Identifier') {
+        if (init.type === 'MemberExpression') {
+          const name = memberName(init);
+          if (name === undefined) return undefined;
+          if (init.object.type === 'ThisExpression') {
+            const owner = thisFunction(declarator);
+            return owner !== undefined && thisBodies.has(owner) && framework.thisMethods.has(name)
+              ? { name: id.name, method: name }
+              : undefined;
+          }
+          const object = init.object.type === 'Identifier' ? innermost(init.object.name) : undefined;
+          return object?.methods?.has(name) ? { name: id.name, method: name, step: object.step } : undefined;
+        }
+        if (init.type !== 'Identifier') return undefined;
+        const source = innermost(init.name);
+        if (source === undefined) return undefined;
+        const fn = source.runtimeFunction;
+        if (fn && declaredWhere(sourceCode, init) !== (fn.imported ? 'top' : 'global')) return undefined;
+        if (source.method !== undefined) return { name: id.name, method: source.method, step: source.step };
+        return { name: id.name, methods: source.methods, step: source.step };
+      }
+      if (declarator.id.type !== 'ObjectPattern' || init.type !== 'Identifier') return undefined;
+      const source = innermost(init.name);
+      if (source?.methods === undefined) return undefined;
+      const property = declarator.id.properties.find(
+        (prop) => prop.type === 'Property' && prop.value.type === 'Identifier' && prop.value.name === id.name,
+      );
+      if (property?.type !== 'Property') return undefined;
+      const name = propertyName(property);
+      return name !== undefined && source.methods.has(name)
+        ? { name: id.name, method: name, step: source.step }
+        : undefined;
+    };
     if (callee.type === 'Identifier') {
-      const info = innermost(callee.name);
+      const info = resolveInfo(callee);
       if (info?.method === undefined) return undefined;
       // A global such as Jasmine's `pending` counts unless the file declares the name itself; an import of
       // one counts unless a function or block declares the name again.
@@ -1223,7 +1303,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       return owner !== undefined && thisBodies.has(owner) ? runtimeSubject(call, name) : undefined;
     }
     if (object.type === 'Identifier') {
-      const info = innermost(object.name);
+      const info = resolveInfo(object);
       return info?.methods?.has(name) ? runtimeSubject(call, name, info.step) : undefined;
     }
     const isTestInfo =
