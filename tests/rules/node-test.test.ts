@@ -197,6 +197,10 @@ runRule('require-ticket (node:test)', requireTicket, {
       errors: [{ ...missing('skip', 'SKIP'), line: 3 }],
     },
     {
+      code: "import { test } from 'node:test';\ntest('places a limit order', { ['skip']: true }, () => {});",
+      errors: [{ ...missing('skip', 'SKIP'), line: 2 }],
+    },
+    {
       code: "const test = require('node:test');\ntest.skip('fills', () => {});\ntest.describe.skip('order book', () => {});\ntest('cancels', { skip: true }, () => {});",
       errors: [
         { ...missing('skip', 'SKIP'), line: 2 },

@@ -618,6 +618,24 @@ interface Details {
 }
 
 /**
+ * The key of a details property, following a computed string key declared in this file. A computed key that
+ * can't be read, as in `{ [key]: '@new' }`, goes in `unread`, since it may be the tag or an option.
+ */
+function detailKey(sourceCode: SourceCode, prop: TSESTree.Property, unread: Node[]): string | undefined {
+  const key = unwrap(prop.key);
+  if (!prop.computed) {
+    return key.type === 'Identifier' ? key.name : String((key as TSESTree.Literal).value);
+  }
+  if (key.type === 'Literal' && typeof key.value === 'string') return key.value;
+  if (key.type === 'TemplateLiteral' && key.expressions.length === 0) return key.quasis[0]?.value.cooked ?? undefined;
+  const value = constantValue(sourceCode, key);
+  const resolved = value && unwrap(value);
+  if (resolved?.type === 'Literal' && typeof resolved.value === 'string') return resolved.value;
+  unread.push(prop.key);
+  return undefined;
+}
+
+/**
  * The plain-keyed properties of a details object, following spread objects declared in this file and
  * collecting the ones that can't be read.
  */
@@ -631,9 +649,8 @@ function objectDetails(sourceCode: SourceCode, object: TSESTree.ObjectExpression
       unread.push(prop.argument);
       return [];
     }
-    if (prop.computed) return [];
-    const key = prop.key.type === 'Identifier' ? prop.key.name : String((prop.key as TSESTree.Literal).value);
-    return [[key, prop.value]];
+    const key = detailKey(sourceCode, prop, unread);
+    return key === undefined ? [] : [[key, prop.value]];
   });
 }
 

@@ -159,6 +159,14 @@ runRule('require-ticket', rule, {
       settings: lifecycle,
     },
     {
+      code: "// NEW: TRADE-1\ntest('places an order', { ['tag']: '@new' }, async () => {});",
+      settings: lifecycle,
+    },
+    {
+      code: "// NEW: TRADE-1\ntest('places an order', { [`tag`]: '@new' }, async () => {});",
+      settings: lifecycle,
+    },
+    {
       code: "const TITLE = 'places an order @new';\n// NEW: TRADE-1\ntest(TITLE, async () => {});",
       settings: dynamic,
     },
@@ -762,6 +770,17 @@ runRule('require-ticket', rule, {
       settings: lifecycle,
       errors: [missing('new', 'NEW')],
     },
+    // A computed key written out, or held in a constant, is the option it spells.
+    {
+      code: "test('places an order', { ['tag']: '@new' }, async () => {});",
+      settings: lifecycle,
+      errors: [missing('new', 'NEW')],
+    },
+    {
+      code: "const key = 'tag';\ntest('places an order', { [key]: '@new' }, async () => {});",
+      settings: lifecycle,
+      errors: [missing('new', 'NEW')],
+    },
     {
       code: "// QUARANTINED: TRADE-1\ntest('places an order', { tag: '@flaky' }, async () => {});",
       settings: flaky,
@@ -1014,6 +1033,11 @@ runRule('require-ticket', rule, {
     // A details object spread from another file can't be read either.
     {
       code: "import { base } from './tags';\ntest('places an order', { ...base }, async () => {});",
+      settings: dynamic,
+      errors: [{ messageId: 'dynamicTags', line: 2 }],
+    },
+    {
+      code: "function f(key) {\n  test('places an order', { [key]: '@new' }, async () => {});\n}",
       settings: dynamic,
       errors: [{ messageId: 'dynamicTags', line: 2 }],
     },
