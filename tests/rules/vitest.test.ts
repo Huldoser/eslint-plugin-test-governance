@@ -188,6 +188,10 @@ runRule('require-ticket (Vitest)', requireTicket, {
       errors: [{ ...missing('skip', 'SKIP', 'This skip call'), line: 2 }],
     },
     {
+      code: "test('fills a limit order', (context) => {\n  const { skip } = context;\n  skip();\n});",
+      errors: [{ ...missing('skip', 'SKIP', 'This skip call'), line: 3 }],
+    },
+    {
       code: "test('fills a limit order', (context) => {\n  context.skip('Broker sandbox is down');\n});",
       errors: [{ ...missing('skip', 'SKIP', 'This skip call'), line: 2 }],
     },

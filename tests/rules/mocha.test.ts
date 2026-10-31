@@ -128,6 +128,10 @@ runRule('require-ticket (Mocha)', requireTicket, {
       errors: [{ ...missing('skip', 'SKIP', 'This skip call'), line: 2 }],
     },
     {
+      code: "it('fills a limit order', function () {\n  const s = this.skip;\n  s();\n});",
+      errors: [{ ...missing('skip', 'SKIP', 'This skip call'), line: 3 }],
+    },
+    {
       code: "specify('fills a limit order', async function fill() {\n  await connect();\n  this.skip();\n});",
       errors: [{ ...missing('skip', 'SKIP', 'This skip call'), line: 3 }],
     },

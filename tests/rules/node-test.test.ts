@@ -68,6 +68,8 @@ runRule('require-ticket (node:test)', requireTicket, {
     "import test from 'ava';\ntest.skip('fills a limit order', () => {});",
     // node:test has no globals besides `testFunctions`.
     "describe.skip('order book', () => {});\nsuite.skip('quotes', () => {});",
+    "require('node:test')('fills a limit order', () => {});",
+    "require('node:test').bogus('fills a limit order', () => {});",
   ]),
   invalid: withOptions(nodeTest, [
     {
@@ -241,6 +243,17 @@ runRule('require-ticket (node:test)', requireTicket, {
         { ...missing('skip', 'SKIP', 'This describe block'), line: 5 },
         { ...missing('skip', 'SKIP'), line: 7 },
         { ...missing('skip', 'SKIP', 'This describe block'), line: 9 },
+      ],
+    },
+    {
+      code: "require('node:test').test.skip('fills', () => {});",
+      errors: [{ ...missing('skip', 'SKIP'), line: 1 }],
+    },
+    {
+      code: "import { test } from 'node:test';\ntest('fills', (t) => {\n  const { skip } = t;\n  skip();\n});\ntest('cancels', (t) => {\n  const s = t.skip;\n  s();\n});",
+      errors: [
+        { ...missing('skip', 'SKIP', 'This skip call'), line: 4 },
+        { ...missing('skip', 'SKIP', 'This skip call'), line: 8 },
       ],
     },
     {

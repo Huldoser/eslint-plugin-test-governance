@@ -134,6 +134,25 @@ runRule('require-ticket', rule, {
     { code: "// FLAKY: TRADE-1\ntest('places an order @flaky', async () => {});", settings: flaky },
     { code: "test('places an order @quarantined', async () => {});", settings: flaky },
     { code: "test('places an order', { tag: [someTag, ...more] }, async () => {});", settings: lifecycle },
+    // A local alias counts only when it keeps a context method; anything else is not a skip.
+    "test('places an order', async ({ page }, testInfo) => {\n  const s = other.skip;\n  s();\n});",
+    "test('places an order', async ({ page }, testInfo) => {\n  const { nope } = testInfo;\n  nope();\n});",
+    "test('places an order', async ({ page }, testInfo) => {\n  const { skip } = getInfo();\n  skip();\n});",
+    "test('places an order', async () => {\n  const x = 1;\n  x();\n});",
+    "import { skip } from './helpers';\ntest('places an order', async () => {\n  skip();\n});",
+    "test('places an order', async ({ page }, testInfo) => {\n  const s = testInfo.unknown;\n  s();\n});",
+    "test('places an order', async () => {\n  const s = unknownName;\n  s();\n});",
+    "test('places an order', async ({ page }, testInfo) => {\n  const s = obj.nested.skip;\n  s();\n});",
+    "test('places an order', async ({ page }, testInfo) => {\n  const { info: { skip } } = testInfo;\n  skip();\n});",
+    "test('places an order', async ({ page }, testInfo) => {\n  const { [key]: skip } = testInfo;\n  skip();\n});",
+    "let s;\ntest('places an order', async () => {\n  s();\n});",
+    "const [first] = [1];\ntest('places an order', async () => {\n  first();\n});",
+    "const TAGS = ['@new'];\ntest('places an order', { tag: TAGS.unknown }, async () => {});",
+    "const TAGS = [...others];\ntest('places an order', { tag: TAGS[0] }, async () => {});",
+    "const TAGS = [, '@new'];\ntest('places an order', { tag: TAGS[0] }, async () => {});",
+    "test('places an order', { tag: `\u0024{symbol}` }, async () => {});",
+    "test('places an order', { tag: `\u0024{count + 1}` }, async () => {});",
+    "test('places an order', async ({ page }, testInfo) => {\n  const s = testInfo[0];\n  s();\n});",
     { code: "test('places an order', { [key]: '@new', ...rest }, async () => {});", settings: lifecycle },
     // Playwright tags start with `@`, so a bare name isn't one.
     { code: "test('places an order', { tag: ['new', 'quarantined'] }, async () => {});", settings: lifecycle },
@@ -164,6 +183,15 @@ runRule('require-ticket', rule, {
     },
     {
       code: "// NEW: TRADE-1\ntest('places an order', { [`tag`]: '@new' }, async () => {});",
+      settings: lifecycle,
+    },
+    // An array element by index, and a template that holds a constant, read like the constant.
+    {
+      code: "const TAGS = ['@smoke', '@new'];\n// NEW: TRADE-1\ntest('places an order', { tag: TAGS[1] }, async () => {});",
+      settings: lifecycle,
+    },
+    {
+      code: "const TAG = '@new';\n// NEW: TRADE-1\ntest('places an order', { tag: `${TAG}` }, async () => {});",
       settings: lifecycle,
     },
     {
@@ -730,6 +758,22 @@ runRule('require-ticket', rule, {
       errors: [missing('skip', 'SKIP', 'This skip call')],
     },
     {
+      code: "test('fills a partial order', async ({ page }, testInfo) => {\n  const { skip } = testInfo;\n  skip();\n});",
+      errors: [missing('skip', 'SKIP', 'This skip call')],
+    },
+    {
+      code: "test('fills a partial order', async ({ page }, testInfo) => {\n  const s = testInfo.skip;\n  s();\n});",
+      errors: [missing('skip', 'SKIP', 'This skip call')],
+    },
+    {
+      code: "test('fills a partial order', async ({ page }, testInfo) => {\n  const info = testInfo;\n  info.skip();\n});",
+      errors: [missing('skip', 'SKIP', 'This skip call')],
+    },
+    {
+      code: "require('@playwright/test').test.skip('fills a partial order', async () => {});",
+      errors: [missing('skip', 'SKIP')],
+    },
+    {
       code: "test('rejects an order over the position limit', async () => { test.fail(); });",
       settings: settings({ states: { fail: true } }),
       errors: [missing('fail', 'FAIL', 'This fail call')],
@@ -778,6 +822,16 @@ runRule('require-ticket', rule, {
     },
     {
       code: "const key = 'tag';\ntest('places an order', { [key]: '@new' }, async () => {});",
+      settings: lifecycle,
+      errors: [missing('new', 'NEW')],
+    },
+    {
+      code: "const TAGS = ['@smoke', '@new'];\ntest('places an order', { tag: TAGS[1] }, async () => {});",
+      settings: lifecycle,
+      errors: [missing('new', 'NEW')],
+    },
+    {
+      code: "const TAG = '@new';\ntest('places an order', { tag: `${TAG}` }, async () => {});",
       settings: lifecycle,
       errors: [missing('new', 'NEW')],
     },

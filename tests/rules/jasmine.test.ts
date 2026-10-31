@@ -30,6 +30,10 @@ runRule('require-ticket (Jasmine)', requireTicket, {
     "describe('order book', () => {\n  beforeAll(() => pending());\n  afterAll(() => {\n    pending('flaky');\n  });\n  pending();\n});\npending();",
     // A helper the file declares under the same name is not Jasmine's.
     "function pending() {}\nit('fills a limit order', () => {\n  pending();\n});",
+    "function pending() {}\nit('fills a limit order', () => {\n  const p = pending;\n  p();\n});",
+    "const { skip } = pending;\nit('fills a limit order', () => {\n  skip();\n});",
+    "it('fills a limit order', () => {\n  const s = pending.skip;\n  s();\n});",
+    "it('fills a limit order', () => {\n  const p = pending;\n  p.skip();\n});",
     "import { pending } from './orders';\nconst { notApplicable } = helpers;\nit('fills a limit order', () => {\n  pending();\n  notApplicable();\n});",
     "it('fills a limit order', (pending) => {\n  const notApplicable = () => {};\n  pending();\n  notApplicable();\n});",
     "const [pending] = queue;\nlet notApplicable;\nit('fills a limit order', () => {\n  pending();\n  notApplicable();\n});",
@@ -47,6 +51,10 @@ runRule('require-ticket (Jasmine)', requireTicket, {
     "const { xdescribe } = require('mocha');\nxdescribe('order book', () => {});",
   ]),
   invalid: withOptions(jasmine, [
+    {
+      code: "it('fills a limit order', () => {\n  const p = pending;\n  p();\n});",
+      errors: [{ ...missing('skip', 'SKIP', 'This skip call'), line: 3 }],
+    },
     {
       code: "xit('fills a limit order', () => {});\nxdescribe('order book', () => {});\nxit('cancels an order');",
       errors: [
