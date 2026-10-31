@@ -155,6 +155,10 @@ runRule('require-ticket', rule, {
       settings: lifecycle,
     },
     {
+      code: "const base = { tag: '@new' };\n// NEW: TRADE-1\ntest('places an order', { ...base }, async () => {});",
+      settings: lifecycle,
+    },
+    {
       code: "const TITLE = 'places an order @new';\n// NEW: TRADE-1\ntest(TITLE, async () => {});",
       settings: dynamic,
     },
@@ -747,6 +751,17 @@ runRule('require-ticket', rule, {
       settings: lifecycle,
       errors: [missing('new', 'NEW')],
     },
+    // A details object spread into a literal keeps its tags, written out or in a constant.
+    {
+      code: "const base = { tag: '@new' };\ntest('places an order', { ...base }, async () => {});",
+      settings: lifecycle,
+      errors: [missing('new', 'NEW')],
+    },
+    {
+      code: "test('places an order', { ...{ tag: '@new' } }, async () => {});",
+      settings: lifecycle,
+      errors: [missing('new', 'NEW')],
+    },
     {
       code: "// QUARANTINED: TRADE-1\ntest('places an order', { tag: '@flaky' }, async () => {});",
       settings: flaky,
@@ -995,6 +1010,12 @@ runRule('require-ticket', rule, {
       code: "const details = detailsFor('AAPL');\ntest.describe('order entry', details, () => {});",
       settings: dynamic,
       errors: [{ messageId: 'dynamicTags', line: 2, column: 30 }],
+    },
+    // A details object spread from another file can't be read either.
+    {
+      code: "import { base } from './tags';\ntest('places an order', { ...base }, async () => {});",
+      settings: dynamic,
+      errors: [{ messageId: 'dynamicTags', line: 2 }],
     },
     {
       code: [

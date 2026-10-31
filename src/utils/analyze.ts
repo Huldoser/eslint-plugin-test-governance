@@ -611,10 +611,30 @@ function readTexts(
 }
 
 interface Details {
-  /** The plain-keyed properties. */
+  /** The plain-keyed properties, with spread objects that can be read folded in. */
   entries: [string, Node][];
-  /** The details argument, when it can't be read. */
-  unread?: Node;
+  /** Values spread into the object that can't be read, such as an object imported from another file. */
+  unread: Node[];
+}
+
+/**
+ * The plain-keyed properties of a details object, following spread objects declared in this file and
+ * collecting the ones that can't be read.
+ */
+function objectDetails(sourceCode: SourceCode, object: TSESTree.ObjectExpression, unread: Node[]): [string, Node][] {
+  return object.properties.flatMap((prop): [string, Node][] => {
+    if (prop.type === 'SpreadElement') {
+      const argument = unwrap(prop.argument);
+      const value = argument.type === 'ObjectExpression' ? argument : constantValue(sourceCode, argument);
+      const spread = value && unwrap(value);
+      if (spread?.type === 'ObjectExpression') return objectDetails(sourceCode, spread, unread);
+      unread.push(prop.argument);
+      return [];
+    }
+    if (prop.computed) return [];
+    const key = prop.key.type === 'Identifier' ? prop.key.name : String((prop.key as TSESTree.Literal).value);
+    return [[key, prop.value]];
+  });
 }
 
 /**
@@ -624,7 +644,7 @@ interface Details {
  */
 function detailsOf(sourceCode: SourceCode, call: TSESTree.CallExpression, optionsFirst: boolean): Details {
   const details = call.arguments.at(optionsFirst ? 0 : 1);
-  if (details === undefined || isFunction(details)) return { entries: [] };
+  if (details === undefined || isFunction(details)) return { entries: [], unread: [] };
   const target = unwrap(details);
   const value = target.type === 'ObjectExpression' ? target : constantValue(sourceCode, target);
   const object = value && unwrap(value);
@@ -632,15 +652,11 @@ function detailsOf(sourceCode: SourceCode, call: TSESTree.CallExpression, option
     // A name that can't be read is the details object only when a body comes after it:
     // `test.skip('places an order', placeOrder)` has a body defined elsewhere and no details.
     return call.arguments.slice(optionsFirst ? 1 : 2).some(isFunction)
-      ? { entries: [], unread: details }
-      : { entries: [] };
+      ? { entries: [], unread: [details] }
+      : { entries: [], unread: [] };
   }
-  const entries = object.properties.flatMap((prop): [string, Node][] => {
-    if (prop.type !== 'Property' || prop.computed) return [];
-    const key = prop.key.type === 'Identifier' ? prop.key.name : String((prop.key as TSESTree.Literal).value);
-    return [[key, prop.value]];
-  });
-  return { entries };
+  const unread: Node[] = [];
+  return { entries: objectDetails(sourceCode, object, unread), unread };
 }
 
 interface TagInfo {
@@ -678,8 +694,8 @@ function collectTags(
     else scanTags(source, found, tags);
   }
   const unread = [...values.unread];
-  if (details.unread && framework.tagKey !== undefined) unread.push(details.unread);
-  return { tags, dynamic: title.unread.size > 0, unread, opaqueDetails: details.unread !== undefined };
+  if (details.unread.length > 0 && framework.tagKey !== undefined) unread.push(...details.unread);
+  return { tags, dynamic: title.unread.size > 0, unread, opaqueDetails: details.unread.length > 0 };
 }
 
 /** Whether `node` is an object written out or held in a constant declared in this file. */

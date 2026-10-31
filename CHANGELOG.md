@@ -15,6 +15,9 @@ All notable changes to this project are documented here. The format follows
 - `node:test`'s `test.describe` and `test.it` are read after `import { test } from 'node:test'`, as they were
   after `require()` or a default import. A state member kept in a variable, `const s = it.skip` or
   `const { skip } = it`, is checked like `it.skip(...)` in every framework.
+- A details object written as a literal with a spread, `{ ...base, tag: '@new' }`, keeps its tags and
+  options; a spread that can't be read, such as an object imported from another file, is reported with
+  `reportUnreadableTags` instead of being ignored.
 
 ## [0.10.0] - 2026-10-30
 
