@@ -30,6 +30,10 @@ runRule('require-ticket (Mocha)', requireTicket, {
     "import { describe as block, it as check } from 'mocha';\n// SKIP: TRADE-1\ncheck.skip('fills', () => {});\n// SKIP: TRADE-2\nblock.skip('order book', () => {});",
     "const { it, suite } = require('mocha');\n// SKIP: TRADE-1\nit.skip('fills', () => {});\n// SKIP: TRADE-2\nsuite.skip('order book', () => {});",
     "import * as mocha from 'mocha';\n// SKIP: TRADE-1\nmocha.it.skip('fills', () => {});",
+    // A member kept in a variable, as `const s = it.skip`, skips like the member itself.
+    "const s = it.skip;\n// SKIP: TRADE-1\ns('fills a limit order', () => {});",
+    "const { skip } = it;\n// SKIP: TRADE-1\nskip('fills a limit order', () => {});",
+    "const d = describe.skip;\n// SKIP: TRADE-1\nd('order book', () => {});",
     // The default import is the module, as `require('mocha')` is.
     "import mocha from 'mocha';\n// SKIP: TRADE-1\nmocha.it.skip('fills', () => {});\nnew mocha({ ui: 'bdd' }).run();",
     // `this.skip()` in a test, with the marker above the call or above the test.
@@ -88,6 +92,12 @@ runRule('require-ticket (Mocha)', requireTicket, {
     // A skipped test with no body is a skip, not a todo: `.skip` says what the author meant.
     { code: "xspecify('fills a limit order');", errors: [missing('skip', 'SKIP')] },
     { code: "it.skip('fills a limit order');", errors: [missing('skip', 'SKIP')] },
+    { code: "const s = it.skip;\ns('fills a limit order', () => {});", errors: [missing('skip', 'SKIP')] },
+    { code: "const { skip } = it;\nskip('fills a limit order', () => {});", errors: [missing('skip', 'SKIP')] },
+    {
+      code: "const d = describe.skip;\nd('order book', () => {});",
+      errors: [missing('skip', 'SKIP', 'This describe block')],
+    },
     {
       code: "describe.skip('order book', () => {});\ncontext.skip('when the market is closed', () => {});\nxdescribe('quotes', () => {});\nxcontext('when halted', () => {});",
       errors: [

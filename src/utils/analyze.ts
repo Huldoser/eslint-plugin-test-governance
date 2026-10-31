@@ -209,8 +209,10 @@ interface TestNames {
 
 /** Collects the top-level names that refer to the framework's test functions or to its module. */
 function collectTestNames(program: TSESTree.Program, framework: Framework, configured: Set<string>): TestNames {
+  /** The framework's `test` function, which is also its module when `moduleIsDefault`. */
+  const testRoot = framework.defaultExport ?? TEST;
   const roots = new Map(framework.globals);
-  for (const name of configured) roots.set(name, TEST);
+  for (const name of configured) roots.set(name, testRoot);
   const runtime = new Map<string, RuntimeFunction>();
   const modules = new Set<string>();
   const mergeTests = new Set<string>();
@@ -221,17 +223,37 @@ function collectTestNames(program: TSESTree.Program, framework: Framework, confi
     node.type === 'MemberExpression' && node.object.type === 'Identifier' && modules.has(node.object.name)
       ? memberName(node)
       : undefined;
-  /** The test function an expression is, such as `base.extend({...})` or `mergeTests(a, b)`. */
+  /**
+   * What a member of a test function is: `it.skip` is `it` in the skip state, and node:test's
+   * `test.describe` is the `describe` export, since its module is also its `test`.
+   */
+  const memberRoot = (object: Root, name: string): Root | undefined => {
+    if (framework.defaultExport !== undefined && object === framework.defaultExport) {
+      const exported = framework.exports.get(name);
+      if (exported !== undefined) return exported;
+    }
+    const effect = framework.effects.get(name);
+    if (effect !== undefined && effect.when === undefined) {
+      return { kind: object.kind, modifiers: [...object.modifiers, effect.modifier] };
+    }
+    return undefined;
+  };
+  /** The test function an expression is, such as `base.extend({...})`, `mergeTests(a, b)` or `it.skip`. */
   const resolve = (node: Node): Root | undefined => {
     const target = unwrap(node);
     if (target.type === 'Identifier') return roots.get(target.name);
     const member = moduleMember(target);
     if (member !== undefined) return framework.exports.get(member);
+    if (target.type === 'MemberExpression') {
+      const object = resolve(target.object);
+      const name = memberName(target);
+      return object === undefined || name === undefined ? undefined : memberRoot(object, name);
+    }
     if (target.type !== 'CallExpression') return undefined;
     // mergeTests(dbTest, a11yTest) or pw.mergeTests(dbTest, a11yTest)
-    if (target.callee.type === 'Identifier') return mergeTests.has(target.callee.name) ? TEST : undefined;
+    if (target.callee.type === 'Identifier') return mergeTests.has(target.callee.name) ? testRoot : undefined;
     if (target.callee.type !== 'MemberExpression') return undefined;
-    if (moduleMember(target.callee) === 'mergeTests') return TEST;
+    if (moduleMember(target.callee) === 'mergeTests') return testRoot;
     return memberName(target.callee) === 'extend' ? resolve(target.callee.object) : undefined;
   };
   // require('node:test'), ava, ava.serial or `ava as TestFn<Context>`
@@ -297,12 +319,15 @@ function collectTestNames(program: TSESTree.Program, framework: Framework, confi
           }
         }
       } else if (declarator.id.type === 'ObjectPattern') {
-        // Playwright's `const { describe } = test`, used as `describe.skip(...)`.
-        if (framework.playwright && resolve(init)) {
+        // `const { describe } = test` and `const { skip } = it`, used as `describe.skip(...)`.
+        const base = resolve(init);
+        if (base !== undefined) {
           for (const prop of declarator.id.properties) {
-            if (prop.type === 'Property' && prop.value.type === 'Identifier' && propertyName(prop) === 'describe') {
-              roots.set(prop.value.name, DESCRIBE);
-            }
+            if (prop.type !== 'Property' || prop.value.type !== 'Identifier') continue;
+            const name = propertyName(prop);
+            if (name === undefined) continue;
+            const root = name === 'describe' && framework.playwright ? DESCRIBE : memberRoot(base, name);
+            if (root) roots.set(prop.value.name, root);
           }
           continue;
         }
@@ -844,8 +869,11 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const { root, path, args } = chain;
     let base = testNames.roots.get(root.name);
     let rest = path;
-    // `pw.test.skip`, or node:test's `test.describe`, whose module is also its `test`.
-    const member = testNames.modules.has(root.name) ? framework.exports.get(path[0]) : undefined;
+    // `pw.test.skip`, or node:test's `test.describe`, whose module is also its `test` even when
+    // `test` was imported by name.
+    const moduleLike =
+      testNames.modules.has(root.name) || (framework.defaultExport !== undefined && base === framework.defaultExport);
+    const member = moduleLike ? framework.exports.get(path[0]) : undefined;
     if (member !== undefined || base === undefined) {
       base = member;
       rest = path.slice(1);

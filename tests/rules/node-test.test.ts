@@ -53,9 +53,14 @@ runRule('require-ticket (node:test)', requireTicket, {
     "import { test } from 'node:test';\ntest.only('fills a limit order', { only: true, timeout: 1_000, concurrency: 2, plan: 1 }, (t) => {\n  t.plan(1);\n  t.runOnly(true);\n  t.diagnostic('filled');\n});",
     // `fail` is off by default.
     "import { test } from 'node:test';\ntest.expectFailure('rejects a short sale', () => {});\ntest('rejects a margin call', { expectFailure: /margin/ }, () => {});",
-    // The module is `test` itself, with the other functions as its members.
+    // The module is `test` itself, with the other functions as its members, however `test` was bound.
     "const test = require('node:test');\n// SKIP: TRADE-1\ntest.skip('fills a limit order', () => {});\n// SKIP: TRADE-2\ntest.describe.skip('order book', () => {});",
     "import test from 'node:test';\n// SKIP: TRADE-1\ntest.suite.skip('order book', () => {});",
+    "import { test } from 'node:test';\n// SKIP: TRADE-1\ntest.describe.skip('order book', () => {});\n// SKIP: TRADE-2\ntest.it.skip('cancels an order', () => {});",
+    "import { test } from 'node:test';\nconst { describe } = test;\n// SKIP: TRADE-1\ndescribe.skip('order book', () => {});",
+    // A member kept in a variable, as `const s = test.skip`, skips like the member itself.
+    "import { test } from 'node:test';\nconst s = test.skip;\n// SKIP: TRADE-1\ns('fills a limit order', () => {});",
+    "import { test } from 'node:test';\nconst d = test.describe;\n// SKIP: TRADE-1\nd.skip('order book', () => {});",
     "const { test: check, describe } = require('node:test');\n// SKIP: TRADE-1\ncheck.skip('fills', () => {});\n// SKIP: TRADE-2\ndescribe.skip('order book', () => {});",
     // Names from other runners.
     "import { test } from 'vitest';\ntest.skip('fills a limit order', () => {});",
@@ -223,6 +228,16 @@ runRule('require-ticket (node:test)', requireTicket, {
     {
       code: "import * as nodeTest from 'node:test';\nnodeTest.test.skip('fills', () => {});",
       errors: [{ ...missing('skip', 'SKIP'), line: 2 }],
+    },
+    {
+      code: "import { test } from 'node:test';\ntest.describe.skip('order book', () => {});\ntest.it.skip('cancels', () => {});\nconst { describe } = test;\ndescribe.skip('quotes', () => {});\nconst s = test.skip;\ns('fills', () => {});\nconst d = test.describe;\nd.skip('limits', () => {});",
+      errors: [
+        { ...missing('skip', 'SKIP', 'This describe block'), line: 2 },
+        { ...missing('skip', 'SKIP'), line: 3 },
+        { ...missing('skip', 'SKIP', 'This describe block'), line: 5 },
+        { ...missing('skip', 'SKIP'), line: 7 },
+        { ...missing('skip', 'SKIP', 'This describe block'), line: 9 },
+      ],
     },
     {
       code: "import { test, describe, expectFailure } from 'node:test';\ntest.expectFailure('rejects a short sale', () => {});\ntest('rejects a margin call', { expectFailure: /margin/ }, () => {});\ndescribe('limits', { expectFailure: { label: 'not built', match: /limit/ } }, () => {});\nexpectFailure('rejects a stop order', () => {});",
