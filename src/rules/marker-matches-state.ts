@@ -24,7 +24,7 @@ export default createRule({
   create(context, analysis, options) {
     const { sourceCode } = context;
     for (const subject of analysis.subjects) {
-      const missing = missingStates(subject);
+      const missing = missingStates(subject, options);
       if (missing.length === 0) continue;
       const stray = strayMarkers(subject, options);
       const subjectName = describeSubject(subject);

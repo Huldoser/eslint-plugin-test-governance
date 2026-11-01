@@ -30,7 +30,7 @@ export default createRule({
     }
     for (const subject of analysis.subjects) {
       // A stray marker next to a missing one is a mismatch, reported by marker-matches-state.
-      if (missingStates(subject).length > 0) continue;
+      if (missingStates(subject, options).length > 0) continue;
       const name = describeSubject(subject).replace(/^This/, 'this');
       for (const marker of strayMarkers(subject, options)) {
         // TODO is the everyday work-comment keyword, so `// TODO: TRADE-12` above a test that isn't a todo

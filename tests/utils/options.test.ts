@@ -22,6 +22,12 @@ describe('compileOptions', () => {
     assert.equal(resolved.reportUnreadableTags, false);
   });
 
+  it('resolves the annotation type', () => {
+    assert.deepEqual(compile({}).annotations, { type: 'issue' });
+    assert.equal(compile({ annotations: false }).annotations, undefined);
+    assert.deepEqual(compile({ annotations: { type: 'defect' } }).annotations, { type: 'defect' });
+  });
+
   it('turns on @new and @quarantined with lifecycleTags', () => {
     assert.deepEqual(stateNames({ lifecycleTags: true }), ['skip', 'fixme', 'new', 'quarantined']);
     assert.deepEqual(stateNames({ lifecycleTags: false }), ['skip', 'fixme']);
@@ -138,6 +144,7 @@ describe('compileOptions', () => {
     ],
     [{ states: { skip: { marker: 'Skip' } } }, /states\.skip\.marker must be an uppercase keyword/],
     [{ lifecycleTag: true }, /lifecycleTag is not a known option; did you mean "lifecycleTags"\?/],
+    [{ annotations: 'yes' }, /annotations/],
     [{ ticket: { preset: 'numeric', minLength: 5, maxLength: 3 } }, /minLength \(5\) is greater than maxLength \(3\)/],
     [{ ticket: { preset: 'pattern' } }, /"pattern" ticket preset needs a `pattern` regex string/],
     [{ customStates: { x: { when: '@x', marker: 'SKIP' } } }, /two states use the marker "SKIP"/],

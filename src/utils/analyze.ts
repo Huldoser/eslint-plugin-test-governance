@@ -87,6 +87,10 @@ export interface Subject {
   skipped: boolean;
   ownSkip: boolean;
   markers: Marker[];
+  /** Tickets read from annotations of the configured type on this call, with the node to report at. */
+  annotationTickets: { text: string; node: Node }[];
+  /** Annotation values of the configured type on this call whose ticket can't be read. */
+  unreadTickets: Node[];
   dynamicTitle: boolean;
   /** For a runtime function such as Jasmine's `pending()`, its name; messages call the others by their state. */
   functionName?: string;
@@ -705,6 +709,115 @@ function detailsOf(sourceCode: SourceCode, call: TSESTree.CallExpression, option
   return { entries: objectDetails(sourceCode, object, unread), unread };
 }
 
+/** The static text a value gives: a string literal, a template with no expressions, or one of those held in a constant declared in this file. */
+function staticText(sourceCode: SourceCode, node: Node): string | undefined {
+  const read = (value: Node): string | undefined => {
+    if (value.type === 'Literal') return typeof value.value === 'string' ? value.value : undefined;
+    if (value.type !== 'TemplateLiteral' || value.expressions.length !== 0) return undefined;
+    // `cooked` is only null in tagged templates, which no annotation value is.
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
+    return value.quasis[0].value.cooked!;
+  };
+  const target = unwrap(node);
+  const own = read(target);
+  if (own !== undefined) return own;
+  const constant = constantValue(sourceCode, target);
+  return constant === undefined ? undefined : read(unwrap(constant));
+}
+
+/**
+ * The object or array a details value is, following a constant declared in this file: a carrier for
+ * annotations. Undefined for a value that plainly can't hold one, `'unread'` for one that can't be read.
+ */
+function annotationCarrier(
+  sourceCode: SourceCode,
+  node: Node,
+): TSESTree.ObjectExpression | TSESTree.ArrayExpression | 'unread' | undefined {
+  const target = unwrap(node);
+  if (target.type === 'ObjectExpression' || target.type === 'ArrayExpression') return target;
+  const constant = constantValue(sourceCode, target);
+  const resolved = constant === undefined ? undefined : unwrap(constant);
+  if (resolved?.type === 'ObjectExpression' || resolved?.type === 'ArrayExpression') return resolved;
+  // A scalar that can be read holds no annotation; a value that can't be read might.
+  return target.type === 'Literal' || resolved !== undefined ? undefined : 'unread';
+}
+
+/**
+ * Tickets from annotations of the configured type in a declaration's details: Playwright's `annotation`
+ * option, whose value is one `{ type, description }` or an array of them, and Vitest's `meta` object,
+ * with the ticket under the key named by the type. Only literal text is read; a value of the right
+ * type whose ticket can't be read is returned as unread, since it may carry the ticket.
+ */
+function collectAnnotations(
+  sourceCode: SourceCode,
+  details: Details,
+  source: { key: string; shape: 'annotation' | 'meta' },
+  annotations: { type: string },
+): Pick<TagInfo, 'annotations' | 'unreadAnnotations'> {
+  const tickets: { text: string; node: Node }[] = [];
+  const unread: Node[] = [];
+  const readPlaywright = (object: TSESTree.ObjectExpression): void => {
+    const unreadKeys: Node[] = [];
+    const entries = objectDetails(sourceCode, object, unreadKeys);
+    const type = entries.find(([key]) => key === 'type');
+    if (type === undefined) return;
+    const written = staticText(sourceCode, type[1]);
+    if (written === undefined) {
+      // The type might be the configured one, so the whole annotation may carry the ticket.
+      unread.push(type[1], ...unreadKeys);
+      return;
+    }
+    if (written !== annotations.type) return;
+    const description = entries.find(([key]) => key === 'description');
+    if (description === undefined) {
+      // A key that can't be read may be the description.
+      unread.push(...unreadKeys);
+      return;
+    }
+    const text = staticText(sourceCode, description[1]);
+    if (text === undefined) {
+      unread.push(...unreadKeys, description[1]);
+      return;
+    }
+    tickets.push({ text, node: description[1] });
+  };
+  const readValue = (value: Node): void => {
+    const carrier = annotationCarrier(sourceCode, value);
+    if (carrier === 'unread') {
+      unread.push(value);
+      return;
+    }
+    if (carrier === undefined) return;
+    if (source.shape === 'meta') {
+      if (carrier.type === 'ObjectExpression') {
+        const unreadKeys: Node[] = [];
+        const entries = objectDetails(sourceCode, carrier, unreadKeys);
+        const entry = entries.find(([key]) => key === annotations.type);
+        if (entry === undefined) unread.push(...unreadKeys);
+        else {
+          const text = staticText(sourceCode, entry[1]);
+          if (text !== undefined) tickets.push({ text, node: entry[1] });
+          else unread.push(...unreadKeys, entry[1]);
+        }
+      }
+      return;
+    }
+    if (carrier.type === 'ObjectExpression') readPlaywright(carrier);
+    else {
+      for (const element of carrier.elements) {
+        if (element === null || element.type === 'SpreadElement') continue;
+        const inner = annotationCarrier(sourceCode, element);
+        if (inner === 'unread') unread.push(element);
+        else if (inner?.type === 'ObjectExpression') readPlaywright(inner);
+      }
+    }
+  };
+  for (const [key, value] of details.entries) {
+    if (key === source.key) readValue(value);
+  }
+  return { annotations: tickets, unreadAnnotations: unread };
+}
+
 interface TagInfo {
   tags: TagOccurrence[];
   /** Whether the title isn't text, so its tags can't be read. */
@@ -713,9 +826,20 @@ interface TagInfo {
   unread: Node[];
   /** Whether the details or options object can't be read, so it may hold Vitest's `{ skip: true }`. */
   opaqueDetails: boolean;
+  /** Tickets read from annotations of the configured type, with the node to report at. */
+  annotations: { text: string; node: Node }[];
+  /** Annotation values of the configured type whose ticket can't be read. */
+  unreadAnnotations: Node[];
 }
 
-const NO_TAGS: TagInfo = { tags: [], dynamic: false, unread: [], opaqueDetails: false };
+const NO_TAGS: TagInfo = {
+  tags: [],
+  dynamic: false,
+  unread: [],
+  opaqueDetails: false,
+  annotations: [],
+  unreadAnnotations: [],
+};
 
 function collectTags(
   sourceCode: SourceCode,
@@ -741,7 +865,15 @@ function collectTags(
   }
   const unread = [...values.unread];
   if (details.unread.length > 0 && framework.tagKey !== undefined) unread.push(...details.unread);
-  return { tags, dynamic: title.unread.size > 0, unread, opaqueDetails: details.unread.length > 0 };
+  // headOf replaces these with the annotations it reads, since collectTags has no options.
+  return {
+    tags,
+    dynamic: title.unread.size > 0,
+    unread,
+    opaqueDetails: details.unread.length > 0,
+    annotations: [],
+    unreadAnnotations: [],
+  };
 }
 
 /** Whether `node` is an object written out or held in a constant declared in this file. */
@@ -1026,6 +1158,8 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       skipped: ownSkip || (kind !== 'runtime' && parent?.skipped === true),
       ownSkip,
       markers: block.flatMap((comment) => parseMarkers(comment, states)),
+      annotationTickets: tagInfo.annotations,
+      unreadTickets: tagInfo.unreadAnnotations,
       dynamicTitle: tagInfo.dynamic,
     };
     subjects.push(subject);
@@ -1160,12 +1294,19 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     return { subject: makeSubject(yes.kind, call, modifiers, tagInfo), infos };
   };
 
-  /** The details and tags of a declaration; node:test lets it leave out its title. */
+  /** The details, tags and annotations of a declaration; node:test lets it leave out its title. */
   const headOf = (call: TSESTree.CallExpression): { details: Details; tagInfo: TagInfo } => {
     const args = call.arguments;
     const untitled = leavesOutTitle(sourceCode, framework, args);
     const details = detailsOf(sourceCode, call, untitled && !isFunction(args[0]));
-    return { details, tagInfo: collectTags(sourceCode, call, !untitled, framework, details) };
+    const annotations =
+      options.annotations === undefined || framework.annotations === undefined
+        ? { annotations: [], unreadAnnotations: [] }
+        : collectAnnotations(sourceCode, details, framework.annotations, options.annotations);
+    return {
+      details,
+      tagInfo: { ...collectTags(sourceCode, call, !untitled, framework, details), ...annotations },
+    };
   };
 
   const declare = (
@@ -1404,9 +1545,45 @@ export function evaluate(subject: Subject, state: StateDef): Evaluation {
   return bad ? { kind: 'bad-ticket', marker, ticket: bad } : { kind: 'no-ticket', marker };
 }
 
-/** Required states on `subject` that have no marker at all (not even a broken one). */
-export function missingStates(subject: Subject): StateDef[] {
-  return subject.states.filter((s) => s.required && evaluate(subject, s.state).kind === 'missing').map((s) => s.state);
+/** Annotation tickets that can cover `subject`: its own and those of enclosing describes and tests. */
+export function annotationTicketsOf(subject: Subject): { text: string; node: Node }[] {
+  const found = [...subject.annotationTickets];
+  let current = subject.parent;
+  while (current) {
+    found.push(...current.annotationTickets);
+    current = current.parent;
+  }
+  return found;
+}
+
+/** Annotation values whose ticket can't be read, `subject`'s own and those of enclosing describes and tests. */
+export function unreadAnnotationsOf(subject: Subject): Node[] {
+  const found = [...subject.unreadTickets];
+  let current = subject.parent;
+  while (current) {
+    found.push(...current.unreadTickets);
+    current = current.parent;
+  }
+  return found;
+}
+
+/** Whether a valid annotation ticket covers `state` for `subject`. */
+export function hasAnnotationTicket(subject: Subject, state: StateDef, options: ResolvedOptions): boolean {
+  if (options.annotations === undefined) return false;
+  return annotationTicketsOf(subject).some((ticket) => state.ticket.check(ticket.text) === 'ok');
+}
+
+/**
+ * Required states on `subject` that have no ticket at all: no marker, not even a broken one, and no
+ * valid annotation.
+ */
+export function missingStates(subject: Subject, options: ResolvedOptions): StateDef[] {
+  return subject.states
+    .filter(
+      (s) =>
+        s.required && evaluate(subject, s.state).kind === 'missing' && !hasAnnotationTicket(subject, s.state, options),
+    )
+    .map((s) => s.state);
 }
 
 /**

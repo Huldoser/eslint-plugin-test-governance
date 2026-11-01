@@ -74,6 +74,12 @@ export interface Framework {
   /** Whether that key holds names without their `@`, as Vitest's `tags: ['flaky']`, which stand for `@flaky`. */
   plainTags: boolean;
   /**
+   * How a ticket is read from an annotation: the details key it sits under and how the ticket is reached
+   * in its value, as Playwright's `annotation` or Vitest's `meta`. Unset for frameworks without
+   * annotations.
+   */
+  annotations?: { key: string; shape: 'annotation' | 'meta' };
+  /**
    * The parameter of a test's body that can change its state at runtime, such as Playwright's
    * `testInfo` or Vitest's test context, and the methods it has for that.
    */
@@ -156,6 +162,7 @@ const playwright: Framework = {
   optionalTitle: false,
   tagKey: 'tag',
   plainTags: false,
+  annotations: { key: 'annotation', shape: 'annotation' },
   info: { param: 1, methods: RUNTIME_MODIFIERS },
   subtests: false,
   skipWithoutBody: false,
@@ -247,6 +254,7 @@ const vitest: Framework = {
   optionalTitle: false,
   tagKey: 'tags',
   plainTags: true,
+  annotations: { key: 'meta', shape: 'meta' },
   info: { param: 0, methods: new Set(['skip']) },
   subtests: false,
   skipWithoutBody: true,

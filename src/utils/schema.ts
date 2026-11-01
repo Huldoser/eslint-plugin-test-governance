@@ -124,6 +124,12 @@ export const optionsSchema: Schema = {
         },
       ],
     },
+    annotations: {
+      anyOf: [
+        { type: 'boolean', enum: [false] },
+        { type: 'object', properties: { type: { type: 'string' } }, additionalProperties: false },
+      ],
+    },
     requireTicketForConditional: { type: 'boolean' },
     allowBlankLine: { type: 'boolean' },
     allowNotes: { type: 'boolean' },

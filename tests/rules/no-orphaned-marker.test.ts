@@ -58,6 +58,23 @@ runRule('no-orphaned-marker', rule, {
     "// Skip:\ntest('places an order', async () => {});",
   ],
   invalid: [
+    // An annotation that satisfies the state leaves the wrong marker a leftover, not a hint.
+    {
+      code: "// FIXME: TRADE-1\ntest.skip('places a limit order', { annotation: { type: 'issue', description: 'TRADE-123' } }, async () => {});",
+      errors: [
+        {
+          messageId: 'orphaned',
+          data: { marker: 'FIXME', state: 'fixme', subject: 'this test' },
+          suggestions: [
+            {
+              messageId: 'removeMarker',
+              output:
+                "test.skip('places a limit order', { annotation: { type: 'issue', description: 'TRADE-123' } }, async () => {});",
+            },
+          ],
+        },
+      ],
+    },
     // A marker in the wrong case is left over too once it has a ticket.
     {
       code: "// skip: TRADE-1\ntest('places an order', async () => {});",
