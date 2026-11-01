@@ -36,6 +36,24 @@ runRule('require-ticket', rule, {
     'const onMobile = true;\ntest.skip(onMobile, reason);',
     // `describe` taken out of `test`.
     "const { beforeEach, describe } = test;\n// SKIP: TRADE-123\ndescribe.skip('order entry', () => {});",
+    // Shapes the analyzer reads without acting on them: a rest element and a computed key when test
+    // functions are taken out of `test`, a template as a computed details key, an unreadable details
+    // object with no body after it, a `this` member that is no skip method, and a global runtime
+    // function shadowed by a local name. They keep the single-process coverage run at 100%.
+    "const { ...rest } = test;\nconst { [key]: helper } = test;\ntest('places an order', async () => {});",
+    "test('places an order', { [`tag`]: '@smoke' }, async () => {});",
+    {
+      code: "import { options } from './options.js';\n// SKIP: TRADE-1\ntest.skip('places an order', options);",
+      settings: settings({ framework: 'jest' }),
+    },
+    {
+      code: "it('settles at T+1', function () {\n  const settle = this.timeout;\n  settle(1000);\n});",
+      settings: settings({ framework: 'mocha' }),
+    },
+    {
+      code: "it('places an order', () => {\n  const pending = onHold;\n  const hold = pending;\n  hold();\n});",
+      settings: settings({ framework: 'jasmine' }),
+    },
     "/* SKIP: TRADE-123 */\ntest.skip('places a market order', async () => {});",
     "//SKIP: TRADE-123\ntest.skip('places a market order', async () => {});",
     // Only code before a comment on the same line takes it out of the block, not another comment.
