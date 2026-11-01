@@ -10,6 +10,8 @@ runRule('marker-matches-state', rule, {
     "// NOTE: TRADE-1\ntest.skip('shows prices', async () => {});",
     // A stray marker on a test with nothing missing is no-orphaned-marker's job.
     "// FIXME: TRADE-1\ntest('places a limit order', async () => {});",
+    // An annotation that satisfies the state leaves nothing missing, so no marker is renamed.
+    "// FIXME: TRADE-1\ntest.skip('places a limit order', { annotation: { type: 'issue', description: 'TRADE-123' } }, async () => {});",
     {
       code: "// SKIP: TRADE-1\n// NEW: TRADE-2\ntest.skip('places a market order @new', async () => {});",
       settings: lifecycle,

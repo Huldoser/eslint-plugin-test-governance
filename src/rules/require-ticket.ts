@@ -1,4 +1,12 @@
-import { appliesTo, describeSubject, evaluate, headLoc } from '../utils/analyze.ts';
+import {
+  annotationTicketsOf,
+  appliesTo,
+  describeSubject,
+  evaluate,
+  hasAnnotationTicket,
+  headLoc,
+  unreadAnnotationsOf,
+} from '../utils/analyze.ts';
 import { createRule } from '../utils/create-rule.ts';
 
 export default createRule({
@@ -24,6 +32,9 @@ export default createRule({
       dynamicTitle: "This title isn't static text, so its tags can't be checked. Use a string or template literal.",
       dynamicTags:
         "These tags can't be read in this file, so they can't be checked. Use strings, or constants declared in this file.",
+      invalidAnnotation: "'{{ticket}}' is not a valid ticket for the '{{state}}' state. Expected {{expected}}.",
+      unreadAnnotation:
+        "This annotation's ticket isn't static text, so it can't be checked. Use a string, or a constant declared in this file.",
     },
   },
   create(context, analysis, options) {
@@ -32,13 +43,33 @@ export default createRule({
     const reported = new Set<string>();
     const reportOnce = (key: string): boolean => !reported.has(key) && Boolean(reported.add(key));
     for (const subject of analysis.subjects) {
+      const needsTicket = subject.states.some((s) => s.required);
       if (options.reportUnreadableTags && hasTagStates) {
         if (subject.dynamicTitle) context.report({ node: subject.node.arguments[0], messageId: 'dynamicTitle' });
         for (const node of subject.unreadTags) context.report({ node, messageId: 'dynamicTags' });
       }
+      // An annotation whose ticket can't be read may be the one that was supposed to cover the test.
+      if (options.reportUnreadableTags && needsTicket) {
+        for (const node of unreadAnnotationsOf(subject)) {
+          if (reportOnce(`annotation-unread:${node.range[0]}`)) {
+            context.report({ node, messageId: 'unreadAnnotation' });
+          }
+        }
+      }
       for (const { state, required } of subject.states) {
         if (!required) continue;
         const result = evaluate(subject, state);
+        // Annotations are checked whenever a ticket is needed, whatever the markers say.
+        for (const ticket of annotationTicketsOf(subject)) {
+          if (state.ticket.check(ticket.text) !== 'ok' && reportOnce(`annotation:${ticket.node.range[0]}`)) {
+            context.report({
+              node: ticket.node,
+              messageId: 'invalidAnnotation',
+              data: { ticket: ticket.text, state: state.name, expected: state.ticket.expected },
+            });
+          }
+        }
+        if (result.kind === 'missing' && hasAnnotationTicket(subject, state, options)) continue;
         if (
           result.kind !== 'ok' &&
           result.kind !== 'missing' &&

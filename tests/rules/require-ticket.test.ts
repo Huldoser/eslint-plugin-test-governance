@@ -12,6 +12,11 @@ const missing = (state: string, marker: string, subject = 'This test', example =
   data: { subject, state, marker, example },
 });
 
+const invalidAnnotation = (ticket: string, state = 'skip', expected = ANY) => ({
+  messageId: 'invalidAnnotation' as const,
+  data: { ticket, state, expected },
+});
+
 runRule('require-ticket', rule, {
   valid: [
     // A test in an arrow function's expression body takes its marker above the call or the statement.
@@ -381,9 +386,102 @@ runRule('require-ticket', rule, {
       code: `// SKIP: ${marker}\ntest.skip('places an order', async () => {});`,
       settings: settings({ ticket }),
     })),
+    // The ticket can come from an annotation instead of a comment.
+    "test.skip('places a limit order', { annotation: { type: 'issue', description: 'TRADE-123' } }, async () => {});",
+    "test.skip('places a limit order', { annotation: [{ type: 'docs', description: 'docs' }, { type: 'issue', description: 'TRADE-123' }] }, async () => {});",
+    "test('shows prices', { annotation: { type: 'issue', description: 'not a ticket' } }, async () => {});",
+    "test.describe.skip('order entry', { annotation: { type: 'issue', description: 'TRADE-123' } }, () => {\n  test('places an order', async () => {});\n  test.skip('cancels an order', async () => {});\n});",
+    "// SKIP: TRADE-1\ntest.skip('places a limit order', { annotation: { type: 'issue', description: 'TRADE-2' } }, async () => {});",
+    "const ticket = 'TRADE-1';\ntest.skip('places a limit order', { annotation: { type: 'issue', description: ticket } }, async () => {});",
+    "const kind = 'issue';\ntest.skip('places a limit order', { annotation: { type: kind, description: 'TRADE-1' } }, async () => {});",
+    "const note = { type: 'issue', description: 'TRADE-1' };\ntest.skip('places a limit order', { annotation: note }, async () => {});",
+    "const notes = [{ type: 'issue', description: 'TRADE-1' }];\ntest.skip('places a limit order', { annotation: notes }, async () => {});",
+    "test.skip('places a limit order', { annotation: { type: 'issue', description: `TRADE-1` } }, async () => {});",
+    "test.skip('places a limit order', { annotation: [...notes, importedNote, 'plain', , { type: 'issue', description: 'TRADE-1' }] }, async () => {});",
+    "test('places an order', { annotation: { type: 'issue', description: 'TRADE-1' } }, async () => { test.skip(); });",
+    {
+      code: "test.skip('places a limit order', { annotation: { type: 'defect', description: 'TRADE-123' } }, async () => {});",
+      settings: settings({ annotations: { type: 'defect' } }),
+    },
   ],
   invalid: [
     { code: "test.skip('places an order', async () => {});", errors: [missing('skip', 'SKIP')] },
+    // An annotation of the configured type is checked like the tickets in a marker.
+    {
+      code: "test.skip('places a limit order', { annotation: { type: 'issue', description: 'not-a-ticket' } }, async () => {});",
+      errors: [missing('skip', 'SKIP'), invalidAnnotation('not-a-ticket')],
+    },
+    {
+      code: "// SKIP: TRADE-1\ntest.skip('places a limit order', { annotation: { type: 'issue', description: 'nope' } }, async () => {});",
+      errors: [invalidAnnotation('nope')],
+    },
+    {
+      code: "test.skip('places a limit order', { annotation: { type: 'docs', description: 'docs' } }, async () => {});",
+      errors: [missing('skip', 'SKIP')],
+    },
+    // Values that can't be an annotation are left alone.
+    {
+      code: "test.skip('places a limit order', { annotation: 'docs' }, async () => {});",
+      errors: [missing('skip', 'SKIP')],
+    },
+    {
+      code: "const note = 'docs';\ntest.skip('places a limit order', { annotation: note }, async () => {});",
+      errors: [missing('skip', 'SKIP')],
+    },
+    // An annotation without a type names no state, so it holds no ticket.
+    {
+      code: "test.skip('places a limit order', { annotation: { description: 'TRADE-1' } }, async () => {});",
+      errors: [missing('skip', 'SKIP')],
+    },
+    {
+      code: "test.skip('places a limit order', { annotation: { type: 'issue', description: `TRADE-${id}` } }, async () => {});",
+      settings: settings({ reportUnreadableTags: true }),
+      errors: [missing('skip', 'SKIP'), { messageId: 'unreadAnnotation' }],
+    },
+    {
+      code: "test.skip('places a limit order', { annotation: { type: 'issue', description: 42 } }, async () => {});",
+      settings: settings({ reportUnreadableTags: true }),
+      errors: [missing('skip', 'SKIP'), { messageId: 'unreadAnnotation' }],
+    },
+    {
+      code: "test.skip('places a limit order', { annotation: { type: 'issue' } }, async () => {});",
+      errors: [missing('skip', 'SKIP')],
+    },
+    {
+      code: "test.skip('places a limit order', { annotation: { type: 'issue', description: ticket() } }, async () => {});",
+      settings: settings({ reportUnreadableTags: true }),
+      errors: [missing('skip', 'SKIP'), { messageId: 'unreadAnnotation' }],
+    },
+    {
+      code: "test.skip('places a limit order', { annotation: { type: 'issue', description: ticket() } }, async () => {});",
+      errors: [missing('skip', 'SKIP')],
+    },
+    {
+      code: "test.skip('places a limit order', { annotation: issueAnnotation }, async () => {});",
+      settings: settings({ reportUnreadableTags: true }),
+      errors: [missing('skip', 'SKIP'), { messageId: 'unreadAnnotation' }],
+    },
+    // A type that can't be read may be the configured one, so the whole annotation is unread.
+    {
+      code: "test.skip('places a limit order', { annotation: { type: type(), description: 'TRADE-1' } }, async () => {});",
+      settings: settings({ reportUnreadableTags: true }),
+      errors: [missing('skip', 'SKIP'), { messageId: 'unreadAnnotation' }],
+    },
+    // A describe's unread annotation may hold the ticket of a test inside it.
+    {
+      code: "test.describe('order entry', { annotation: { type: 'issue', description: ticket() } }, () => {\n  test.skip('places an order', async () => {});\n});",
+      settings: settings({ reportUnreadableTags: true }),
+      errors: [{ messageId: 'unreadAnnotation' }, missing('skip', 'SKIP')],
+    },
+    {
+      code: "test.skip('places a limit order', { annotation: { type: 'issue', description: 'TRADE-1' } }, async () => {});",
+      settings: settings({ annotations: false }),
+      errors: [missing('skip', 'SKIP')],
+    },
+    {
+      code: "test.describe('order entry', { annotation: { type: 'issue', description: 'zzz' } }, () => {\n  test.skip('places an order', async () => {});\n});",
+      errors: [invalidAnnotation('zzz'), missing('skip', 'SKIP')],
+    },
     // A variable called `test` that isn't bound to another test runner is still Playwright's.
     {
       code: "const test = require('@playwright/test').test;\ntest.skip('places an order', async () => {});",

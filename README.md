@@ -242,6 +242,7 @@ and markers. To turn a rule off, set it to `'off'` as usual.
 | `allowBlankLine`              | `boolean`                                                                                                 | `false`                           | Let blank lines separate a marker from its test.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `allowNotes`                  | `boolean`                                                                                                 | `false`                           | Allow free text after the tickets, e.g. `// SKIP: TRADE-123 flaky on CI`. Applies to markers and to `FIXME` / `TODO` comments.                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `comments`                    | `false \| { keywords?: string[] }`                                                                        | `{ keywords: ['FIXME', 'TODO'] }` | Comment keywords that must start with a ticket anywhere in a test file, e.g. `// TODO: TRADE-123`. Your keywords replace the default ones. `false` allows free-form comments.                                                                                                                                                                                                                                                                                                                                                                |
+| `annotations`                 | `false \| { type?: string }`                                                                              | `{ type: 'issue' }`               | Accept the ticket from a test annotation as well: Playwright's `annotation` of the given type or Vitest's `meta` key of that name. One valid annotation covers every state the test is in, and a describe's covers its tests. See [Tickets from annotations](#tickets-from-annotations).                                                                                                                                                                                                                                                     |
 | `testFunctions`               | `string[]`                                                                                                | `['test']`                        | Names treated as the framework's `test`. Jest and Vitest default to `['test', 'it']`, Mocha, Cypress and WebdriverIO to `['it', 'specify', 'test']`, and Jasmine to `['it']`. Your list replaces the default one, so include those names if you still need them. See below.                                                                                                                                                                                                                                                                  |
 | `reportUnreadableTags`        | `boolean`                                                                                                 | `false`                           | When a tag state is on, report titles that aren't static text, and tags or details that can't be read in the file, such as ones imported from another module, since their tags can't be checked.                                                                                                                                                                                                                                                                                                                                             |
 
@@ -339,6 +340,34 @@ testGovernance.configure({
 
 The built-in presets are written to run in linear time. A `pattern` preset runs your regex as given,
 so keep it free of nested quantifiers.
+
+### Tickets from annotations
+
+A comment never reaches a test report. Playwright and Vitest can carry the ticket in data that does, so
+`annotations` accepts it from there as well:
+
+```js
+test.skip(
+  'rejects a margin order above the buying power',
+  {
+    annotation: { type: 'issue', description: 'TRADE-123' },
+  },
+  async () => {},
+);
+```
+
+```js
+// Vitest: the ticket is the `issue` key of `meta`.
+test.skip('rejects a margin order above the buying power', { meta: { issue: 'TRADE-123' } }, () => {});
+```
+
+The `type` names Playwright's annotation type and Vitest's `meta` key; `'issue'` by default, matched
+exactly. The value must be the ticket and nothing else, as in a marker. One valid annotation covers every
+state the test is in, and a describe's annotation covers its tests. An annotation of another type is
+left alone, and an annotation whose ticket isn't static text is reported with `reportUnreadableTags`.
+`annotations: false` turns it off. A marker comment still works everywhere, and when both are written,
+both must be valid. Jest, Mocha, Jasmine, node:test and Cypress have no annotations, so for them it is
+comments only.
 
 ### Which functions count as `test`
 

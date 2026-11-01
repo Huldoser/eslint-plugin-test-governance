@@ -73,6 +73,14 @@ export interface GovernanceOptions {
    * comments.
    */
   comments?: false | { keywords?: string[] };
+  /**
+   * Accept the ticket from a test annotation as well: Playwright's `annotation` of the given type or
+   * Vitest's `meta` key of that name, as in
+   * `test.skip('title', { annotation: { type: 'issue', description: 'TRADE-123' } }, fn)`. One valid
+   * annotation covers every state the test is in, and a describe's covers its tests. Defaults to
+   * `{ type: 'issue' }`; `false` turns it off. Comments stay the form that works everywhere.
+   */
+  annotations?: false | { type?: string };
   /** Allow free text after the tickets, e.g. `// SKIP: TRADE-1 flaky on CI`. Off by default: details belong in the ticket. */
   allowNotes?: boolean;
   /**
@@ -105,6 +113,11 @@ export interface ResolvedOptions {
   allowBlankLine: boolean;
   allowNotes: boolean;
   reportUnreadableTags: boolean;
+  /**
+   * How annotation tickets are accepted, for frameworks that have annotations: the type Playwright's
+   * `annotation` must have and the Vitest `meta` key that holds the ticket.
+   */
+  annotations?: { type: string };
   /** Keywords checked by `require-ticket-in-comments`; empty when `comments: false`. */
   commentKeywords: string[];
   /**
@@ -349,6 +362,7 @@ export function compileOptions(options: GovernanceOptions): ResolvedOptions {
     allowBlankLine: options.allowBlankLine ?? false,
     allowNotes: options.allowNotes ?? false,
     reportUnreadableTags: options.reportUnreadableTags ?? false,
+    annotations: options.annotations === false ? undefined : { type: options.annotations?.type ?? 'issue' },
     commentKeywords,
     workCommentKeywords: new Set([...DEFAULT_COMMENT_KEYWORDS, ...commentKeywords]),
     commentTicket: defaultMatcher,

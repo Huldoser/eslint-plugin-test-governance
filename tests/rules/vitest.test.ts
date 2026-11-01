@@ -11,8 +11,28 @@ const missing = (state: string, marker: string, subject = 'This test') => ({
   data: { subject, state, marker, example: 'PROJ-123' },
 });
 
+const invalidAnnotation = (
+  ticket: string,
+  state = 'skip',
+  expected = 'a ticket key like PROJ-123, an issue like #4821 or owner/repo#4821, or a URL',
+) => ({
+  messageId: 'invalidAnnotation' as const,
+  data: { ticket, state, expected },
+});
+
 runRule('require-ticket (Vitest)', requireTicket, {
   valid: withOptions(vitest, [
+    // The ticket can come from the `meta` key of the configured type instead of a comment.
+    "test.skip('fills a limit order', { meta: { issue: 'TRADE-1' } }, () => {});",
+    "test.skip('fills a limit order', { meta: { issue: 'TRADE-1', owner: 'alice' } }, () => {});",
+    "describe.skip('order book', { meta: { issue: 'TRADE-1' } }, () => {});",
+    "const ticket = 'TRADE-1';\ntest.skip('fills a limit order', { meta: { issue: ticket } }, () => {});",
+    "test('fills a limit order', { meta: { issue: 'not a ticket' } }, () => {});",
+    "test('fills a limit order', { meta: { owner: 'alice' } }, () => {});",
+    {
+      code: "test.skip('fills a limit order', { meta: { ticket: 'TRADE-1' } }, () => {});",
+      settings: settings({ annotations: { type: 'ticket' } }),
+    },
     "// SKIP: TRADE-1\ntest.skip('fills a limit order', () => {});",
     "// SKIP: TRADE-1\nit.skip('fills a limit order', () => {});",
     "// SKIP: TRADE-1\nsuite.skip('order book', () => {});",
@@ -109,7 +129,36 @@ runRule('require-ticket (Vitest)', requireTicket, {
     "import vitestDefault from 'vitest';\nvitestDefault.skip('fills a limit order', () => {});",
   ]),
   invalid: withOptions(vitest, [
-    // The options object skips the test whichever function the condition picks.
+    // An annotation ticket under `meta` is checked like the tickets in a marker.
+    {
+      code: "test.skip('fills a limit order', { meta: { issue: 'nope' } }, () => {});",
+      errors: [missing('skip', 'SKIP'), invalidAnnotation('nope')],
+    },
+    {
+      code: "test.skip('fills a limit order', { meta: { issue: ticket() } }, () => {});",
+      settings: settings({ reportUnreadableTags: true }),
+      errors: [missing('skip', 'SKIP'), { messageId: 'unreadAnnotation' }],
+    },
+    {
+      code: "import { meta } from './meta.js';\ntest.skip('fills a limit order', { meta }, () => {});",
+      settings: settings({ reportUnreadableTags: true }),
+      errors: [missing('skip', 'SKIP'), { messageId: 'unreadAnnotation' }],
+    },
+    {
+      code: "test.skip('fills a limit order', { meta: { [key]: 'TRADE-1' } }, () => {});",
+      settings: settings({ reportUnreadableTags: true }),
+      errors: [missing('skip', 'SKIP'), { messageId: 'unreadAnnotation' }],
+    },
+    // `meta` holds keyed values, so an array can't hold the ticket.
+    {
+      code: "test.skip('fills a limit order', { meta: ['TRADE-1'] }, () => {});",
+      errors: [missing('skip', 'SKIP')],
+    },
+    {
+      code: "test.skip('fills a limit order', { meta: { issue: 'TRADE-1' } }, () => {});",
+      settings: settings({ annotations: false }),
+      errors: [missing('skip', 'SKIP')],
+    },
     {
       code: "(process.env.CI ? it : it.concurrent)('fills a limit order', { skip: true }, () => {});",
       errors: [missing('skip', 'SKIP')],
