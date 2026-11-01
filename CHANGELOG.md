@@ -13,7 +13,8 @@ All notable changes to this project are documented here. The format follows
   `show_bug.cgi?id=4821` links once `host` is set), `phabricator` (task monograms such as `T4821`, and
   `/T4821` links once `host` is set; Phorge shares the format), `rally` (formatted IDs `US4821`, `DE4821`,
   `TA4821`, `TC4821`), `servicenow` (record numbers such as `STRY0010001` for the `prefixes` you list) and
-  `plane` (work-item IDs such as `WEB-142`, and work-item links on `app.plane.so` or a `host`).
+  `plane` (work-item IDs such as `WEB-142`, and work-item links on `app.plane.so` or a `host`). The
+  `rally` preset rejects zero-padded IDs, which is how MITRE ATT&CK writes its technique IDs (`TA0006`).
 - Tickets from test annotations: with `annotations` (default `{ type: 'issue' }`), a valid ticket in
   Playwright's `annotation` of that type or Vitest's `meta` key of that name satisfies the ticket
   requirement, on tests and describes; an invalid one is reported, and `annotations: false` turns it
