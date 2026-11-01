@@ -16,6 +16,12 @@ export type TicketSpec =
   | { preset: 'youtrack'; projects?: string[]; host?: string }
   | { preset: 'basecamp' }
   | { preset: 'shortcut' }
+  | { preset: 'openproject'; host?: string }
+  | { preset: 'bugzilla'; host?: string }
+  | { preset: 'phabricator'; host?: string }
+  | { preset: 'rally' }
+  | { preset: 'servicenow'; prefixes: string[] }
+  | { preset: 'plane'; projects?: string[]; host?: string }
   | { preset: 'url'; hosts: string[] }
   | { preset: 'numeric'; minLength?: number; maxLength?: number }
   | { preset: 'pattern'; pattern: string; flags?: string };
@@ -69,6 +75,20 @@ const YOUTRACK_PATH_RE = /\/(?:issue|projects\/[^/]+\/issues)\/([A-Z0-9_]+-\d+)(
 const BASECAMP_PATH_RE = /^\/\d+\/buckets\/\d+\/(?:todos|card_tables\/cards)\/(\d+)\/?$/;
 const SHORTCUT_REF_RE = /^(?:sc-(\d+)|\[sc-(\d+)\])$/i;
 const SHORTCUT_PATH_RE = /^\/[^/]+\/story\/(\d+)(?:\/[^/]*)?$/;
+// OpenProject work packages: the canonical `/projects/<identifier>/work_packages/<id or AGILE-1>` with any
+// tab path after it, and the `/wp/<id>` short form its changelog links use.
+const OPENPROJECT_PATH_RE = /\/projects\/[^/]+\/work_packages\/([A-Z][A-Z0-9_]+-\d+|\d+)(?:\/.*)?\/?$/;
+const OPENPROJECT_SHORT_RE = /^\/(?:work_packages|wp)\/(\d+)(?:\/.*)?\/?$/;
+// Bugzilla runs under any path, as `/bugzilla/show_bug.cgi`; the bug is in the `id` query value.
+const BUGZILLA_CGI_RE = /\/show_bug\.cgi\/?$/;
+// Phabricator tasks: the `T4821` monogram, and the `/T4821` path its instances use.
+const PHABRICATOR_REF_RE = /^T(\d+)$/;
+const PHABRICATOR_PATH_RE = /^\/T(\d+)\/?$/;
+// Rally's Formatted IDs: a user story, defect, task or test case.
+const RALLY_REF_RE = /^(?:US|DE|TA|TC)(\d+)$/;
+// Plane work items: `/<workspace>/<project>/issues/<WEB-142 or uuid>`, unanchored for a self-hosted path.
+const PLANE_PATH_RE =
+  /\/[^/]+\/[^/]+\/issues\/([A-Z][A-Z0-9_]+-\d+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/;
 // No tracker issues number 0. A preset hands back the ID it finds, and an ID of zeros (0, 000, or a
 // Notion page ID of zeros) makes the ticket a placeholder. A ticket no preset reads is a placeholder
 // when it ends in a zero ID, as PROJ-0, #0, AB#0 or .../issues/0 do.
@@ -379,6 +399,100 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
         expected: 'a Shortcut story like sc-123, or a story link',
         example: 'sc-123',
       };
+    case 'openproject': {
+      const { host } = spec;
+      return {
+        find: (t) => {
+          if (ISSUE_NUMBER_RE.test(t) || KEY_RE.test(t)) return numberOf(t);
+          const url = parseUrl(t);
+          if (!url || host === undefined || !hostMatches(url, host)) return undefined;
+          return OPENPROJECT_PATH_RE.exec(url.pathname)?.[1] ?? OPENPROJECT_SHORT_RE.exec(url.pathname)?.[1];
+        },
+        expected:
+          host === undefined
+            ? 'an OpenProject work package like #4821 or AGILE-1 (set host to accept work package links)'
+            : `an OpenProject work package like #4821 or AGILE-1, or a work package URL on ${host}`,
+        example: '#4821',
+      };
+    }
+    case 'bugzilla': {
+      const { host } = spec;
+      return {
+        find: (t) => {
+          if (DIGITS_RE.test(t)) return t;
+          const url = parseUrl(t);
+          if (!url || host === undefined || !hostMatches(url, host)) return undefined;
+          if (!BUGZILLA_CGI_RE.test(url.pathname)) return undefined;
+          const id = url.searchParams.get('id');
+          return id !== null && DIGITS_RE.test(id) ? id : undefined;
+        },
+        expected:
+          host === undefined
+            ? 'a Bugzilla bug number like 4821 (set host to accept bug links)'
+            : `a Bugzilla bug number like 4821, or a bug URL on ${host}`,
+        example: '4821',
+      };
+    }
+    case 'phabricator': {
+      const { host } = spec;
+      return {
+        find: (t) => {
+          const ref = PHABRICATOR_REF_RE.exec(t)?.[1];
+          if (ref !== undefined) return ref;
+          const url = parseUrl(t);
+          return url && host !== undefined && hostMatches(url, host)
+            ? PHABRICATOR_PATH_RE.exec(url.pathname)?.[1]
+            : undefined;
+        },
+        expected:
+          host === undefined
+            ? 'a Phabricator task like T4821 (set host to accept task links)'
+            : `a Phabricator task like T4821, or a task URL on ${host}`,
+        example: 'T4821',
+      };
+    }
+    case 'rally':
+      return {
+        find: (t) => RALLY_REF_RE.exec(t)?.[1],
+        expected: 'a Rally formatted ID like US4821, DE4821, TA4821 or TC4821',
+        example: 'US4821',
+      };
+    case 'servicenow': {
+      // The schema checks `prefixes` when options come from settings; direct use of compileTicketSpec checks it here.
+      const prefixes = (spec as { prefixes?: string[] }).prefixes;
+      if (
+        prefixes === undefined ||
+        prefixes.length === 0 ||
+        !prefixes.every((prefix) => /^[A-Z][A-Z0-9_]+$/.test(prefix))
+      ) {
+        throw new ConfigError(
+          'the "servicenow" ticket preset needs a `prefixes` array of uppercase record-number prefixes, such as ["STRY"].',
+        );
+      }
+      const re = new RegExp(`^(?:${prefixes.join('|')})(\\d+)$`);
+      return {
+        find: (t) => re.exec(t)?.[1],
+        expected: `a ServiceNow record number like ${prefixes[0]}0010001${describeList('with prefix', prefixes)}`,
+        example: `${prefixes[0]}0010001`,
+      };
+    }
+    case 'plane': {
+      const { projects, host } = spec;
+      const hosts = host === undefined ? ['app.plane.so'] : [host];
+      const keyOk = (key: string): boolean => KEY_RE.test(key) && keyInList(key, projects);
+      return {
+        find: (t) => {
+          if (KEY_RE.test(t)) return keyId(t, keyOk);
+          const url = parseUrl(t);
+          if (!url || !hostInList(url, hosts)) return undefined;
+          const found = PLANE_PATH_RE.exec(url.pathname)?.[1];
+          // A key link honors `projects` too; a UUID link stands on its own.
+          return found === undefined ? undefined : KEY_RE.test(found) ? keyId(found, keyOk) : found;
+        },
+        expected: `a Plane work item like ${projects?.[0] ?? 'WEB'}-142${describeList('in project', projects)}, or a Plane work item link${host === undefined ? '' : ` on ${host}`}`,
+        example: `${projects?.[0] ?? 'WEB'}-142`,
+      };
+    }
     case 'url': {
       const { hosts } = spec;
       return {

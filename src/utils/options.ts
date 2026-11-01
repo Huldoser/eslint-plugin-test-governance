@@ -174,16 +174,34 @@ const PRESET_OPTIONS: Record<TicketSpec['preset'], string[]> = {
   youtrack: ['projects', 'host'],
   basecamp: [],
   shortcut: [],
+  openproject: ['host'],
+  bugzilla: ['host'],
+  phabricator: ['host'],
+  rally: [],
+  servicenow: ['prefixes'],
+  plane: ['projects', 'host'],
   url: ['hosts'],
   numeric: ['minLength', 'maxLength'],
   pattern: ['pattern', 'flags'],
 };
 
 /**
- * Presets whose `host` must be a plain host name. The older presets still take any string, since
- * rejecting one now would break configs whose short forms, such as `#123`, already work.
+ * Every preset that takes `host` requires a plain host name: a value with a scheme, port or path can never
+ * match a URL hostname, so before 0.11.0 it silently rejected every link.
  */
-const STRICT_HOST_PRESETS = new Set<TicketSpec['preset']>(['notion', 'redmine', 'youtrack']);
+const STRICT_HOST_PRESETS = new Set<TicketSpec['preset']>([
+  'jira',
+  'github',
+  'gitlab',
+  'azure-devops',
+  'notion',
+  'redmine',
+  'youtrack',
+  'openproject',
+  'bugzilla',
+  'phabricator',
+  'plane',
+]);
 
 /** Option values the schema allows for every preset but this one can't use. */
 function ownOptionProblems(spec: TicketSpec, at: string): string[] {
@@ -205,6 +223,11 @@ function ownOptionProblems(spec: TicketSpec, at: string): string[] {
   }
   if (spec.preset === 'url' && (spec as { hosts?: unknown }).hosts === undefined) {
     problems.push(`${at}.hosts is required by the "url" preset: the hosts its links may point to`);
+  }
+  if (spec.preset === 'servicenow' && (spec as { prefixes?: unknown }).prefixes === undefined) {
+    problems.push(
+      `${at}.prefixes is required by the "servicenow" preset: the record-number prefixes it accepts, such as STRY`,
+    );
   }
   return problems;
 }
