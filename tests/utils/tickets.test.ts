@@ -467,8 +467,13 @@ const tables: Record<string, Table> = {
   },
   rally: {
     spec: { preset: 'rally' },
-    accepts: ['US4821', 'DE4821', 'TA4821', 'TC4821', 'US42'],
+    accepts: ['US4821', 'DE4821', 'TA4821', 'TC4821', 'US42', 'TC10'],
     rejects: [
+      // MITRE ATT&CK technique IDs are zero-padded and Rally's are not; security suites put them in comments.
+      'TA0006',
+      'TA0001',
+      'US0042',
+      'TC0001',
       'us4821',
       'US-4821',
       'TS4821',
@@ -898,7 +903,7 @@ describe('messages', () => {
         'a Bugzilla bug number like 4821, or a bug URL on bugzilla.acme.io',
         'a Phabricator task like T4821 (set host to accept task links)',
         'a Phabricator task like T4821, or a task URL on phabricator.acme.io',
-        'a Rally formatted ID like US4821, DE4821, TA4821 or TC4821',
+        'a Rally formatted ID like US4821, DE4821, TA4821 or TC4821, without a leading zero',
         'a ServiceNow record number like STRY0010001 with prefix STRY or DFCT',
         'a Plane work item like WEB-142, or a Plane work item link',
         'a Plane work item like WEB-142 in project WEB, or a Plane work item link',

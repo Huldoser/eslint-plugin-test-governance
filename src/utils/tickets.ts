@@ -85,7 +85,10 @@ const BUGZILLA_CGI_RE = /\/show_bug\.cgi\/?$/;
 const PHABRICATOR_REF_RE = /^T(\d+)$/;
 const PHABRICATOR_PATH_RE = /^\/T(\d+)\/?$/;
 // Rally's Formatted IDs: a user story, defect, task or test case.
-const RALLY_REF_RE = /^(?:US|DE|TA|TC)(\d+)$/;
+// Rally numbers its work items per workspace from 1 without padding (US42, US41048), so a zero-padded ID is
+// no Rally ticket: it is how MITRE ATT&CK writes its technique IDs (TA0001 to TA0043), which security suites
+// put above tests. An all-zero ID such as TA0000 is a placeholder, as in every preset.
+const RALLY_REF_RE = /^(?:US|DE|TA|TC)([1-9]\d*|0*)$/;
 // Plane work items: `/<workspace>/<project>/issues/<WEB-142 or uuid>`, unanchored for a self-hosted path.
 const PLANE_PATH_RE =
   /\/[^/]+\/[^/]+\/issues\/([A-Z][A-Z0-9_]+-\d+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/;
@@ -454,7 +457,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
     case 'rally':
       return {
         find: (t) => RALLY_REF_RE.exec(t)?.[1],
-        expected: 'a Rally formatted ID like US4821, DE4821, TA4821 or TC4821',
+        expected: 'a Rally formatted ID like US4821, DE4821, TA4821 or TC4821, without a leading zero',
         example: 'US4821',
       };
     case 'servicenow': {
