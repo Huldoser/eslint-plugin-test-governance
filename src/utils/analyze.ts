@@ -418,6 +418,48 @@ function isLocalVariable(sourceCode: SourceCode, id: TSESTree.Identifier): boole
 const STATEMENT_CONTAINERS = new Set(['Program', 'BlockStatement', 'StaticBlock', 'SwitchCase', 'TSModuleBlock']);
 
 /** The statement a call belongs to; its marker block sits above that statement. */
+/**
+ * The declaration a call makes through `Function.prototype.call`, `apply` or `bind`, read as if it were
+ * written plainly: `it.skip.call(null, 'title', fn)`, `it.skip.apply(null, ['title', fn])` and
+ * `it.skip.bind(null)('title', fn)` all declare the test that `it.skip('title', fn)` declares. A call that
+ * isn't read this way, such as an `apply` with a list this file can't see, comes back unchanged.
+ */
+function throughFunctionMethods(original: TSESTree.CallExpression): TSESTree.CallExpression {
+  let call = original;
+  // `it.skip.bind(null).call(null, 'title', fn)` unwraps twice; two more steps cost nothing and end the loop.
+  for (let step = 0; step < 4; step += 1) {
+    const callee = unwrap(call.callee);
+    // `it.skip.call(null, ...)`: the first argument is the receiver the method is called on.
+    if (callee.type === 'MemberExpression' && memberName(callee) === 'call') {
+      call = { ...call, callee: callee.object, arguments: call.arguments.slice(1) };
+      continue;
+    }
+    // `it.skip.apply(null, ['title', fn])`: the arguments are the elements of an array written here.
+    if (callee.type === 'MemberExpression' && memberName(callee) === 'apply') {
+      const list = call.arguments.at(1);
+      const elements = list === undefined ? undefined : unwrap(list);
+      if (
+        elements?.type !== 'ArrayExpression' ||
+        elements.elements.some((e) => e === null || e.type === 'SpreadElement')
+      ) {
+        return call;
+      }
+      call = { ...call, callee: callee.object, arguments: elements.elements.filter((e) => e !== null) };
+      continue;
+    }
+    // `it.skip.bind(null, 'title', fn)()` and `it.skip.bind(null)('title', fn)`: `bind` returns the test
+    // function with the arguments it was given already in place.
+    if (callee.type === 'CallExpression') {
+      const bind = unwrap(callee.callee);
+      if (bind.type !== 'MemberExpression' || memberName(bind) !== 'bind') return call;
+      call = { ...call, callee: bind.object, arguments: [...callee.arguments.slice(1), ...call.arguments] };
+      continue;
+    }
+    return call;
+  }
+  return call;
+}
+
 function anchorOf(call: TSESTree.CallExpression): Node {
   let node: Node = call;
   // A call always sits inside a statement container, so the walk stops before it runs out of parents.
@@ -1333,7 +1375,8 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       : undefined;
   };
 
-  const visitCall = (call: TSESTree.CallExpression): { subject?: Subject; infos?: InfoName[] } => {
+  const visitCall = (original: TSESTree.CallExpression): { subject?: Subject; infos?: InfoName[] } => {
+    const call = throughFunctionMethods(original);
     const callee = target(chainOf(call.callee, framework.factories));
     if (callee === undefined) return subtestOf(call) ?? pickedDeclaration(call) ?? { subject: runtimeCall(call) };
     usesTest = true;

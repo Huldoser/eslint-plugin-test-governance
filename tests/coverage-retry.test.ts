@@ -2,17 +2,22 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { shouldRetry } from '../scripts/coverage.mjs';
 
-/** The tail of a Node coverage run with `failed` failing tests and `percent` branch coverage. */
-const run = (percent: string, failed: number): string =>
+/** The tail of a coverage run that failed `failed` tests, with branch coverage `percent`. */
+const run = (percent: string, failed: number, prefix = 'ℹ '): string =>
   [
-    'ℹ tests 2846',
-    `ℹ fail ${failed}`,
-    ...(percent === '100.00' ? [] : [`ℹ Error: ${percent}% branch coverage does not meet threshold of 100%.`]),
+    `${prefix}tests 2846`,
+    `${prefix}fail ${failed}`,
+    ...(percent === '100.00' ? [] : [`${prefix}Error: ${percent}% branch coverage does not meet threshold of 100%.`]),
   ].join('\n');
 
 describe('shouldRetry', () => {
   it('retries when every test passed and only the branch threshold failed', () => {
     assert.equal(shouldRetry(run('99.89', 0)), true);
+  });
+
+  it('reads the summary of a TAP report, as a CI log gets it', () => {
+    assert.equal(shouldRetry(run('99.90', 0, '# ')), true);
+    assert.equal(shouldRetry(run('99.90', 1, '# ')), false);
   });
 
   it('does not retry when a test failed, even below the threshold', () => {
