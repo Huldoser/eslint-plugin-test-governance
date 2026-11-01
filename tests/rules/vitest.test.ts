@@ -95,6 +95,10 @@ runRule('require-ticket (Vitest)', requireTicket, {
     // A skip with only a note always skips.
     "test('fills a limit order', (context) => {\n  // SKIP: TRADE-1\n  context.skip('Broker sandbox is down');\n});",
     "test.for([1, 2])('buys %i shares', (shares, context) => {\n  // SKIP: TRADE-1\n  context.skip();\n});",
+    // A context method kept in a local, in each of its shapes, reads as the method itself.
+    "test('fills a limit order', (context) => {\n  const s = context.skip;\n  // SKIP: TRADE-1\n  s();\n});",
+    "test('fills a limit order', (context) => {\n  const { skip: skipTest } = context;\n  // SKIP: TRADE-1\n  skipTest();\n});",
+    "test('fills a limit order', ({ task }) => {\n  const s = task.skip;\n  if (isMobile) s();\n});",
     // A table row is not the test context.
     "test.each([{ skip: () => {} }])('buys shares', (row) => {\n  row.skip();\n});",
     "test('fills a limit order', ({ task, expect }) => {\n  task.skip();\n  expect.skip();\n});",

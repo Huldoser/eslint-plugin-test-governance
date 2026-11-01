@@ -61,6 +61,10 @@ runRule('require-ticket (node:test)', requireTicket, {
     // A member kept in a variable, as `const s = test.skip`, skips like the member itself.
     "import { test } from 'node:test';\nconst s = test.skip;\n// SKIP: TRADE-1\ns('fills a limit order', () => {});",
     "import { test } from 'node:test';\nconst d = test.describe;\n// SKIP: TRADE-1\nd.skip('order book', () => {});",
+    // A context method kept in a local, in each of its shapes, reads as the method itself.
+    "import { test } from 'node:test';\ntest('fills a limit order', (t) => {\n  const s = t.skip;\n  // SKIP: TRADE-1\n  s('broker sandbox is down');\n});",
+    "import { test } from 'node:test';\ntest('fills a limit order', (t) => {\n  const { skip: skipTest } = t;\n  // SKIP: TRADE-1\n  skipTest();\n});",
+    "import { test } from 'node:test';\ntest('fills a limit order', (t) => {\n  const { todo } = t;\n  if (!isReady) todo('waiting for the broker');\n});",
     "const { test: check, describe } = require('node:test');\n// SKIP: TRADE-1\ncheck.skip('fills', () => {});\n// SKIP: TRADE-2\ndescribe.skip('order book', () => {});",
     // Names from other runners.
     "import { test } from 'vitest';\ntest.skip('fills a limit order', () => {});",
