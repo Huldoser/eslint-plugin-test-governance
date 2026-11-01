@@ -81,6 +81,13 @@ runRule('require-ticket', rule, {
       "// SKIP: TRADE-1, TRADE-2 both needed\ntest.skip('streams price updates', async () => {});",
       "// SKIP: TRADE-1: flaky\ntest.skip('streams price updates', async () => {});",
     ].map((code) => ({ code, settings: settings({ allowNotes: true }) })),
+    // A skip declared through `call`, `apply` or `bind` is read like the plain call.
+    "// SKIP: TRADE-1\ntest.skip.call(null, 'places an order', async () => {});",
+    "// SKIP: TRADE-1\ntest.skip.apply(null, ['places an order', async () => {}]);",
+    "// SKIP: TRADE-1\ntest.skip.bind(null)('places an order', async () => {});",
+    "// SKIP: TRADE-1\ntest.skip.bind(null, 'places an order', async () => {})();",
+    "test.call(null, 'places an order', async () => {});",
+    'test.skip.apply(null, [title, fn]);',
     // A note on a marker that doesn't belong here is no-orphaned-marker's job.
     "// SKIP: TRADE-1 left over\ntest('shows prices', async () => {});",
     "// FIXME: TRADE-1\ntest.fixme('places an order', async ({ isMobile }) => {\n  // FIXME: TRADE-2 left over\n  test.skip(isMobile);\n});",
@@ -424,6 +431,12 @@ runRule('require-ticket', rule, {
   ],
   invalid: [
     { code: "test.skip('places an order', async () => {});", errors: [missing('skip', 'SKIP')] },
+    // Through `call`, `apply` and `bind`, with the arguments in each position.
+    { code: "test.skip.call(null, 'places an order', async () => {});", errors: [missing('skip', 'SKIP')] },
+    { code: "test.skip.apply(null, ['places an order', async () => {}]);", errors: [missing('skip', 'SKIP')] },
+    { code: "test.skip.bind(null)('places an order', async () => {});", errors: [missing('skip', 'SKIP')] },
+    { code: "test.skip.bind(null, 'places an order', async () => {})();", errors: [missing('skip', 'SKIP')] },
+    { code: "test.fixme.call(null, 'places an order', async () => {});", errors: [missing('fixme', 'FIXME')] },
     // An annotation of the configured type is checked like the tickets in a marker.
     {
       code: "test.skip('places a limit order', { annotation: { type: 'issue', description: 'not-a-ticket' } }, async () => {});",

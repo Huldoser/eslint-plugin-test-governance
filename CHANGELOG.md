@@ -23,6 +23,12 @@ All notable changes to this project are documented here. The format follows
   off. Comments stay the form that works everywhere; Jest, Mocha, Jasmine, node:test and Cypress have
   no annotations.
 
+### Fixed
+
+- A skip declared through `Function.prototype.call`, `apply` or `bind`, such as
+  `test.skip.call(null, 'places an order', fn)` or `test.skip.bind(null)('places an order', fn)`, is
+  checked like the plain call, so it needs its ticket.
+
 ### Changed
 
 - A `host` value with a scheme, port or path, such as `https://jira.example.com` or `tracker.io:8080`, is
