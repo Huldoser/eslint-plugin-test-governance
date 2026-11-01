@@ -175,6 +175,15 @@ describe('compileOptions', () => {
     [{ ticket: { preset: 'url', hosts: ['*'] } }, /ticket\.hosts\[0\] must be a host name/],
     [{ ticket: { preset: 'notion', prefixes: ['task'] } }, /ticket\.prefixes\[0\] must be an uppercase key/],
     [{ ticket: { preset: 'url' } }, /ticket\.hosts is required by the "url" preset/],
+    [{ ticket: { preset: 'servicenow' } }, /ticket\.prefixes is required by the "servicenow" preset/],
+    [
+      { ticket: [{ preset: 'jira' }, { preset: 'servicenow' }] },
+      /ticket\[1\]\.prefixes is required by the "servicenow" preset/,
+    ],
+    [
+      { states: { skip: { ticket: { preset: 'servicenow' } } } },
+      /states\.skip\.ticket\.prefixes is required by the "servicenow" preset/,
+    ],
     [{ ticket: [{ preset: 'jira' }, { preset: 'url' }] }, /ticket\[1\]\.hosts is required by the "url" preset/],
     // A state that is off still has its options checked, so the mistake shows before someone turns it on.
     [{ states: { new: { ticket: { preset: 'url' } } } }, /states\.new\.ticket\.hosts is required by the "url" preset/],
@@ -190,6 +199,15 @@ describe('compileOptions', () => {
     ],
     [{ ticket: { preset: 'notion', host: 'docs.acme.io/wiki' } }, /ticket\.host must be a host name/],
     [{ ticket: { preset: 'youtrack', host: '*.io' } }, /ticket\.host must be a host name/],
+    [{ ticket: { preset: 'jira', host: 'https://jira.acme.io' } }, /ticket\.host must be a host name/],
+    [{ ticket: { preset: 'github', host: 'git.acme.io:8080' } }, /ticket\.host must be a host name/],
+    [{ ticket: { preset: 'gitlab', host: 'gitlab.acme.io/' } }, /ticket\.host must be a host name/],
+    [{ ticket: { preset: 'azure-devops', host: 'tfs.acme.io/tfs' } }, /ticket\.host must be a host name/],
+    [{ ticket: { preset: 'openproject', host: 'op.acme.io:8443' } }, /ticket\.host must be a host name/],
+    [{ ticket: { preset: 'bugzilla', host: 'https://bugs.acme.io' } }, /ticket\.host must be a host name/],
+    [{ ticket: { preset: 'phabricator', host: 'phab.acme.io/x' } }, /ticket\.host must be a host name/],
+    [{ ticket: { preset: 'plane', host: 'plane.acme.io:8443' } }, /ticket\.host must be a host name/],
+    [{ ticket: { preset: 'rally', host: 'rally.acme.io' } }, /ticket\.host is not an option of the "rally" preset/],
     [
       { ticket: { preset: 'clickup', prefixes: ['X'] } },
       /ticket\.prefixes\[0\] must be an uppercase key of two or more characters as it appears in tickets/,
@@ -202,15 +220,15 @@ describe('compileOptions', () => {
     [{ ticket: { preset: 'trello', host: 'trello.acme.io' } }, /ticket\.host is not an option of the "trello" preset/],
     [
       { ticket: { preset: 'clickup', projects: ['DEV'] } },
-      /ticket\.projects is not an option of the "clickup" preset \(it applies to "jira", "youtrack"\)/,
+      /ticket\.projects is not an option of the "clickup" preset \(it applies to "jira", "youtrack", "plane"\)/,
     ],
     [
       { ticket: { preset: 'any', host: 'jira.acme.com' } },
-      /ticket\.host is not an option of the "any" preset \(it applies to "jira", "github", "gitlab", "azure-devops", "notion", "redmine", "youtrack"\)/,
+      /ticket\.host is not an option of the "any" preset \(it applies to "jira", "github", "gitlab", "azure-devops", "notion", "redmine", "youtrack", "openproject", "bugzilla", "phabricator", "plane"\)/,
     ],
     [
       { ticket: [{ preset: 'jira' }, { preset: 'numeric', projects: ['TRADE'] }] },
-      /ticket\[1\]\.projects is not an option of the "numeric" preset \(it applies to "jira", "youtrack"\)/,
+      /ticket\[1\]\.projects is not an option of the "numeric" preset \(it applies to "jira", "youtrack", "plane"\)/,
     ],
     [
       { states: { fixme: { ticket: { preset: 'github', teams: ['ENG'] } } } },

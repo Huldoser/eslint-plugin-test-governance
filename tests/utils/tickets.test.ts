@@ -403,6 +403,127 @@ const tables: Record<string, Table> = {
       'https://example.com/acme/story/27971',
     ],
   },
+  openproject: {
+    spec: { preset: 'openproject' },
+    accepts: ['#24971', 'AGILE-1', 'OPS-42'],
+    rejects: ['24971', 'agile-1', 'https://community.openproject.org/projects/AGILE/work_packages/AGILE-1'],
+  },
+  'openproject with host': {
+    spec: { preset: 'openproject', host: 'community.openproject.org' },
+    accepts: [
+      'https://community.openproject.org/projects/AGILE/work_packages/AGILE-1',
+      'https://community.openproject.org/projects/AGILE/work_packages/AGILE-1/activity',
+      'https://community.openproject.org/projects/openproject/work_packages/24971',
+      'https://community.openproject.org/projects/AGILE/work_packages/24971/',
+      'https://community.openproject.org/work_packages/24971',
+      'https://community.openproject.org/wp/80962',
+    ],
+    rejects: [
+      'https://community.openproject.org/projects/AGILE',
+      'https://community.openproject.org/projects/AGILE/work_packages',
+      'https://community.openproject.org/work_packages/AGILE-1',
+      'https://community.openproject.org/wp/AGILE-1',
+      'https://community.openproject.org/news',
+      'https://tracker.example.org/projects/AGILE/work_packages/AGILE-1',
+    ],
+  },
+  bugzilla: {
+    spec: { preset: 'bugzilla' },
+    accepts: ['4821', '4821736'],
+    rejects: ['#4821', '4821x', 'T4821', 'https://bugzilla.mozilla.org/show_bug.cgi?id=4821'],
+  },
+  'bugzilla with host': {
+    spec: { preset: 'bugzilla', host: 'bugzilla.acme.io' },
+    accepts: [
+      'https://bugzilla.acme.io/show_bug.cgi?id=4821',
+      'https://bugzilla.acme.io/show_bug.cgi?id=4821#c0',
+      'https://bugzilla.acme.io/bugzilla/show_bug.cgi?id=4821',
+    ],
+    rejects: [
+      'https://bugzilla.acme.io/buglist.cgi?id=4821',
+      'https://bugzilla.acme.io/show_bug.cgi',
+      'https://bugzilla.acme.io/show_bug.cgi?id=abc',
+      'https://bugzilla.acme.io/4821',
+      'https://bugs.example.io/show_bug.cgi?id=4821',
+    ],
+  },
+  phabricator: {
+    spec: { preset: 'phabricator' },
+    accepts: ['T4821'],
+    rejects: ['t4821', 'D4821', '4821', 'T4821x', 'https://phabricator.wikimedia.org/T4821'],
+  },
+  'phabricator with host': {
+    spec: { preset: 'phabricator', host: 'phabricator.acme.io' },
+    accepts: [
+      'https://phabricator.acme.io/T4821',
+      'https://phabricator.acme.io/T4821/',
+      'https://phabricator.acme.io/T4821#c123',
+    ],
+    rejects: [
+      'https://phabricator.acme.io/D4821',
+      'https://phabricator.acme.io/maniphest',
+      'https://phabricator.example.org/T4821',
+    ],
+  },
+  rally: {
+    spec: { preset: 'rally' },
+    accepts: ['US4821', 'DE4821', 'TA4821', 'TC4821', 'US42'],
+    rejects: [
+      'us4821',
+      'US-4821',
+      'TS4821',
+      'TR4821',
+      '4821',
+      'US4821x',
+      'https://rally1.rallydev.com/#/22527801475d/detail/userstory/47470635305',
+    ],
+  },
+  servicenow: {
+    spec: { preset: 'servicenow', prefixes: ['STRY', 'DFCT', 'KB'] },
+    accepts: ['STRY0010001', 'DFCT0010002', 'KB0010001', 'STRY14', 'STRY0001234'],
+    rejects: [
+      'INC0010001',
+      'stry0010001',
+      'STRY-0010001',
+      '0010001',
+      'STRY0010001x',
+      'https://acme.service-now.com/nav_to.do?uri=task.do%3Fsys_id%3Dabc',
+    ],
+  },
+  'servicenow with one prefix': {
+    spec: { preset: 'servicenow', prefixes: ['STRY'] },
+    accepts: ['STRY0010001'],
+    rejects: ['DFCT0010001'],
+  },
+  plane: {
+    spec: { preset: 'plane' },
+    accepts: [
+      'WEB-142',
+      'RAY-341',
+      'https://app.plane.so/acme/web-platform/issues/WEB-142',
+      'https://app.plane.so/acme/web-platform/issues/48217363-6a5b-4b1e-9f8a-0123456789ab',
+    ],
+    rejects: ['web-142', '142', 'W-1', 'WEB-12x', 'https://app.plane.so/acme/web-platform/issues'],
+  },
+  'plane with projects': {
+    spec: { preset: 'plane', projects: ['WEB'] },
+    accepts: ['WEB-142', 'https://app.plane.so/acme/web-platform/issues/WEB-142'],
+    rejects: ['RAY-341', 'https://app.plane.so/acme/web-platform/issues/RAY-341'],
+  },
+  'plane with host': {
+    spec: { preset: 'plane', host: 'plane.acme.io' },
+    accepts: [
+      'https://plane.acme.io/acme/web-platform/issues/WEB-142',
+      'https://plane.acme.io/acme/web-platform/issues/WEB-142/',
+      'https://plane.acme.io/base/acme/web-platform/issues/WEB-142',
+      'https://plane.acme.io/acme/web-platform/issues/48217363-6a5b-4b1e-9f8a-0123456789ab',
+    ],
+    rejects: [
+      'https://app.plane.so/acme/web-platform/issues/WEB-142',
+      'https://plane.acme.io/acme/web-platform/epics/WEB-142',
+      'https://plane.acme.io/acme/web-platform/issues/WEB-142x',
+    ],
+  },
   url: {
     spec: { preset: 'url', hosts: ['www.wrike.com', '*.acme.io'] },
     accepts: [
@@ -530,6 +651,25 @@ describe('placeholders', () => {
       assert.equal(
         compileTicketSpec(
           [{ preset: 'any' }, { preset: 'azure-devops' }, { preset: 'numeric' }, { preset: 'shortcut' }],
+          [],
+        ).check(ticket),
+        'placeholder',
+      );
+    });
+  }
+  // The 0.11.0 presets find their IDs the same way.
+  for (const ticket of ['#0', 'AGILE-0', '0', 'T0', 'US0', 'STRY0000000', 'WEB-0']) {
+    it(`rejects ${ticket}, since no tracker issues number 0`, () => {
+      assert.equal(
+        compileTicketSpec(
+          [
+            { preset: 'openproject' },
+            { preset: 'bugzilla' },
+            { preset: 'phabricator' },
+            { preset: 'rally' },
+            { preset: 'servicenow', prefixes: ['STRY'] },
+            { preset: 'plane' },
+          ],
           [],
         ).check(ticket),
         'placeholder',
@@ -721,6 +861,17 @@ describe('messages', () => {
           { preset: 'jira', host: 'jira.acme.io' },
           { preset: 'azure-devops', host: 'tfs.acme.io' },
           { preset: 'youtrack', host: 'yt.acme.io' },
+          { preset: 'openproject' },
+          { preset: 'openproject', host: 'community.openproject.org' },
+          { preset: 'bugzilla' },
+          { preset: 'bugzilla', host: 'bugzilla.acme.io' },
+          { preset: 'phabricator' },
+          { preset: 'phabricator', host: 'phabricator.acme.io' },
+          { preset: 'rally' },
+          { preset: 'servicenow', prefixes: ['STRY', 'DFCT'] },
+          { preset: 'plane' },
+          { preset: 'plane', projects: ['WEB'] },
+          { preset: 'plane', host: 'plane.acme.io' },
         ] satisfies TicketSpec[]
       ).map((spec) => expectedOf(spec).expected),
       [
@@ -741,6 +892,17 @@ describe('messages', () => {
         'a Jira key like PROJ-123, or a Jira URL on jira.acme.io',
         'an Azure Boards work item like AB#4821 or #4821, or a work item URL on tfs.acme.io',
         'a YouTrack issue like PROJ-123, or a YouTrack issue link on yt.acme.io',
+        'an OpenProject work package like #4821 or AGILE-1 (set host to accept work package links)',
+        'an OpenProject work package like #4821 or AGILE-1, or a work package URL on community.openproject.org',
+        'a Bugzilla bug number like 4821 (set host to accept bug links)',
+        'a Bugzilla bug number like 4821, or a bug URL on bugzilla.acme.io',
+        'a Phabricator task like T4821 (set host to accept task links)',
+        'a Phabricator task like T4821, or a task URL on phabricator.acme.io',
+        'a Rally formatted ID like US4821, DE4821, TA4821 or TC4821',
+        'a ServiceNow record number like STRY0010001 with prefix STRY or DFCT',
+        'a Plane work item like WEB-142, or a Plane work item link',
+        'a Plane work item like WEB-142 in project WEB, or a Plane work item link',
+        'a Plane work item like WEB-142, or a Plane work item link on plane.acme.io',
       ],
     );
   });
@@ -757,6 +919,12 @@ describe('messages', () => {
       { preset: 'youtrack' },
       { preset: 'basecamp' },
       { preset: 'shortcut' },
+      { preset: 'openproject' },
+      { preset: 'bugzilla' },
+      { preset: 'phabricator' },
+      { preset: 'rally' },
+      { preset: 'servicenow', prefixes: ['STRY'] },
+      { preset: 'plane' },
       { preset: 'url', hosts: ['*.acme.io'] },
       { preset: 'azure-devops' },
     ];
@@ -803,6 +971,18 @@ describe('messages', () => {
   it('rejects an invalid custom pattern', () => {
     assert.throws(() => compileTicketSpec([{ preset: 'pattern', pattern: '(' }], []), /invalid ticket pattern "\("/);
   });
+
+  it('rejects a servicenow preset without usable prefixes', () => {
+    assert.throws(
+      () => compileTicketSpec([{ preset: 'servicenow' } as unknown as TicketSpec], []),
+      /needs a `prefixes` array/,
+    );
+    assert.throws(() => compileTicketSpec([{ preset: 'servicenow', prefixes: [] }], []), /needs a `prefixes` array/);
+    assert.throws(
+      () => compileTicketSpec([{ preset: 'servicenow', prefixes: ['stry'] } as unknown as TicketSpec], []),
+      /needs a `prefixes` array/,
+    );
+  });
 });
 
 describe('backtracking', () => {
@@ -822,6 +1002,12 @@ describe('backtracking', () => {
     { preset: 'youtrack', host: 'x.io' },
     { preset: 'basecamp' },
     { preset: 'shortcut' },
+    { preset: 'openproject', host: 'x.io' },
+    { preset: 'bugzilla', host: 'x.io' },
+    { preset: 'phabricator', host: 'x.io' },
+    { preset: 'rally' },
+    { preset: 'servicenow', prefixes: ['STRY'] },
+    { preset: 'plane', host: 'x.io' },
     { preset: 'url', hosts: ['*.x.io'] },
     { preset: 'numeric' },
   ];
@@ -845,6 +1031,14 @@ describe('backtracking', () => {
     'https://x.io' + '/issue/A-1'.repeat(n / 10) + '/x/',
     'https://app.clickup.com/t/' + '1'.repeat(n) + '/x/',
     '[sc-' + '1'.repeat(n),
+    'https://x.io/projects/a/work_packages/' + 'A'.repeat(n) + '-',
+    'https://x.io/wp/' + '1'.repeat(n) + 'x',
+    'T' + '1'.repeat(n) + 'x',
+    'US' + '1'.repeat(n) + 'x',
+    'STRY' + '1'.repeat(n) + 'x',
+    'https://x.io/show_bug.cgi?id=' + '1'.repeat(n) + 'x',
+    'https://app.plane.so/a/b/issues/' + 'A'.repeat(n) + '-',
+    'https://app.plane.so/a/b/issues/' + '0'.repeat(n) + 'x',
   ];
 
   for (const preset of presets) {

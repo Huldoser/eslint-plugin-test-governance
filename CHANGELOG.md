@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Ticket presets for six more trackers: `openproject` (classic `#4821` work package IDs, per-project IDs
+  such as `AGILE-1`, and work package links once `host` is set), `bugzilla` (bug numbers, and
+  `show_bug.cgi?id=4821` links once `host` is set), `phabricator` (task monograms such as `T4821`, and
+  `/T4821` links once `host` is set; Phorge shares the format), `rally` (formatted IDs `US4821`, `DE4821`,
+  `TA4821`, `TC4821`), `servicenow` (record numbers such as `STRY0010001` for the `prefixes` you list) and
+  `plane` (work-item IDs such as `WEB-142`, and work-item links on `app.plane.so` or a `host`).
+
+### Changed
+
+- A `host` value with a scheme, port or path, such as `https://jira.example.com` or `tracker.io:8080`, is
+  now a configuration error on every preset that takes `host`, not only on `notion`, `redmine` and
+  `youtrack`. Such a value never matched a URL hostname, so it already rejected every link silently.
+
 ## [0.10.1] - 2026-10-31
 
 ### Fixed

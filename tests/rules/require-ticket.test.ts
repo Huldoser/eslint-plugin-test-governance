@@ -367,6 +367,15 @@ runRule('require-ticket', rule, {
         [{ preset: 'shortcut' }, '[sc-27971]'],
         [{ preset: 'azure-devops' }, '#4821'],
         [{ preset: 'url', hosts: ['www.wrike.com'] }, 'https://www.wrike.com/open.htm?id=4821'],
+        [
+          { preset: 'openproject', host: 'community.openproject.org' },
+          'https://community.openproject.org/projects/AGILE/work_packages/AGILE-1',
+        ],
+        [{ preset: 'bugzilla', host: 'bugzilla.acme.io' }, 'https://bugzilla.acme.io/show_bug.cgi?id=4821'],
+        [{ preset: 'phabricator', host: 'phabricator.wikimedia.org' }, 'https://phabricator.wikimedia.org/T4821'],
+        [{ preset: 'rally' }, 'US4821'],
+        [{ preset: 'servicenow', prefixes: ['STRY'] }, 'STRY0010001'],
+        [{ preset: 'plane' }, 'WEB-142'],
       ] satisfies [TicketSpec, string][]
     ).map(([ticket, marker]) => ({
       code: `// SKIP: ${marker}\ntest.skip('places an order', async () => {});`,

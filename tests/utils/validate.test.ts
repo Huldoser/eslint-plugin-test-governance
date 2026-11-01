@@ -24,14 +24,14 @@ describe('options validation', () => {
     [{ lifecycleTags: 'yes' }, 'lifecycleTags must be a boolean (got "yes")'],
     [
       { ticket: { preset: 'jria' } },
-      'ticket.preset must be one of "any", "jira", "github", "gitlab", "linear", "azure-devops", "trello", "notion", "asana", "clickup", "redmine", "monday", "youtrack", "basecamp", "shortcut", "url", "numeric", "pattern" (got "jria")',
+      'ticket.preset must be one of "any", "jira", "github", "gitlab", "linear", "azure-devops", "trello", "notion", "asana", "clickup", "redmine", "monday", "youtrack", "basecamp", "shortcut", "openproject", "bugzilla", "phabricator", "rally", "servicenow", "plane", "url", "numeric", "pattern" (got "jria")',
     ],
     [{ ticket: { preset: 'jira', projects: 'TRADE' } }, 'ticket.projects must be an array (got "TRADE")'],
     [{ ticket: [] }, 'ticket must have at least 1 item'],
     [{ ticket: 'jira' }, 'ticket must be an object or an array (got "jira")'],
     [
       { ticket: [{ preset: 'jira' }, { preset: 'githb' }] },
-      'ticket[1].preset must be one of "any", "jira", "github", "gitlab", "linear", "azure-devops", "trello", "notion", "asana", "clickup", "redmine", "monday", "youtrack", "basecamp", "shortcut", "url", "numeric", "pattern" (got "githb")',
+      'ticket[1].preset must be one of "any", "jira", "github", "gitlab", "linear", "azure-devops", "trello", "notion", "asana", "clickup", "redmine", "monday", "youtrack", "basecamp", "shortcut", "openproject", "bugzilla", "phabricator", "rally", "servicenow", "plane", "url", "numeric", "pattern" (got "githb")',
     ],
     [
       { ticket: { preset: 'jira', project: ['TRADE'] } },
