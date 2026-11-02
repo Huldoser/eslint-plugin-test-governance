@@ -38,6 +38,8 @@ runRule('require-ticket (Jasmine)', requireTicket, {
     "it('fills a limit order', (pending) => {\n  const notApplicable = () => {};\n  pending();\n  notApplicable();\n});",
     "const [pending] = queue;\nlet notApplicable;\nit('fills a limit order', () => {\n  pending();\n  notApplicable();\n});",
     "import { pending } from 'jasmine-core';\nit('fills a limit order', () => {\n  const pending = () => {};\n  pending();\n});",
+    // An imported `pending` kept in a variable, as `const p = pending`.
+    "import { pending } from 'jasmine-core';\nconst p = pending;\n// SKIP: TRADE-1\nit('fills a limit order', () => {\n  p();\n});",
     // Focus, failure and the timeout change no state, nor does WebdriverIO's `retries` argument.
     "fit('fills a limit order', () => {\n  fail('rejected');\n}, 5_000);\nfdescribe('order book', () => {});\nit('cancels an order', async () => {}, 10_000, 2);",
     // Jasmine has no `it.skip`, `describe.skip`, `this.skip()` or `test`.
