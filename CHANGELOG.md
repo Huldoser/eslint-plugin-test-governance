@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-11-03
+
 ### Fixed
 
 - A skip declared through `Function.prototype.call`, `apply` or `bind`, such as
@@ -445,7 +447,8 @@ First release.
 - Support for ESLint 9 and 10 flat config, JavaScript and TypeScript test files, `.extend()`
   fixtures, describe blocks, runtime skips and tags in titles or the `tag` option.
 
-[Unreleased]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.11.1...HEAD
+[0.11.1]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.9.0...v0.10.0
