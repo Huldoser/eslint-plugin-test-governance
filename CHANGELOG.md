@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A skip declared through `Function.prototype.call`, `apply` or `bind`, such as
+  `test.skip.call(null, 'places an order', fn)` or `test.skip.bind(null)('places an order', fn)`, is
+  checked like the plain call, so it needs its ticket.
+
 ## [0.11.0] - 2026-11-01
 
 ### Added
@@ -22,12 +28,6 @@ All notable changes to this project are documented here. The format follows
   requirement, on tests and describes; an invalid one is reported, and `annotations: false` turns it
   off. Comments stay the form that works everywhere; Jest, Mocha, Jasmine, node:test and Cypress have
   no annotations.
-
-### Fixed
-
-- A skip declared through `Function.prototype.call`, `apply` or `bind`, such as
-  `test.skip.call(null, 'places an order', fn)` or `test.skip.bind(null)('places an order', fn)`, is
-  checked like the plain call, so it needs its ticket.
 
 ### Changed
 
