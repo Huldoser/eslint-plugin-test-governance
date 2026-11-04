@@ -1,7 +1,7 @@
 import type { BuiltinStateName, FrameworkName } from './constants.ts';
 
 /** A state a test enters through its own code, as opposed to a tag. */
-export type Modifier = 'skip' | 'fixme' | 'fail' | 'slow' | 'todo';
+export type Modifier = 'skip' | 'fixme' | 'fail' | 'slow' | 'todo' | 'retry';
 
 /**
  * What a name from a framework stands for: `xit` is a test with `skip`, `suite` a describe block, and
@@ -105,6 +105,13 @@ export interface Framework {
    * whose `beforeEach` or `afterEach` does, as Jasmine's `pending()`, with the state each puts it in.
    */
   runtimeFunctions: ReadonlyMap<string, Modifier>;
+  /** The options key that gives a test or describe retries, as Vitest's `{ retry: 3 }` or Cypress's `{ retries: 2 }`. */
+  retryOption?: string;
+  /**
+   * The call that gives the tests around it retries: Mocha's `this.retries(2)` in a describe, test or hook
+   * written as a `function`, Jest's `jest.retryTimes(3)` or Playwright's `test.describe.configure({ retries: 2 })`.
+   */
+  retryCall?: 'this.retries' | 'jest.retryTimes' | 'describe.configure';
   /** Built-in states a test can be put in with this framework. */
   states: ReadonlySet<BuiltinStateName>;
   /** Playwright's own API on `test`: `test.describe`, `test.step`, `test.info()` and runtime `test.skip()`. */
@@ -170,7 +177,8 @@ const playwright: Framework = {
   thisMethods: new Set(),
   todoWithoutBody: false,
   runtimeFunctions: new Map(),
-  states: new Set(['skip', 'fixme', 'fail', 'slow', 'new', 'quarantined']),
+  retryCall: 'describe.configure',
+  states: new Set(['skip', 'fixme', 'fail', 'slow', 'retry', 'new', 'quarantined']),
   playwright: true,
 };
 
@@ -211,7 +219,8 @@ const jest: Framework = {
   thisMethods: new Set(),
   todoWithoutBody: false,
   runtimeFunctions: new Map(),
-  states: new Set(['skip', 'todo', 'fail', 'new', 'quarantined']),
+  retryCall: 'jest.retryTimes',
+  states: new Set(['skip', 'todo', 'fail', 'retry', 'new', 'quarantined']),
   playwright: false,
 };
 
@@ -262,7 +271,8 @@ const vitest: Framework = {
   thisMethods: new Set(),
   todoWithoutBody: false,
   runtimeFunctions: new Map(),
-  states: new Set(['skip', 'todo', 'fail', 'new', 'quarantined']),
+  retryOption: 'retry',
+  states: new Set(['skip', 'todo', 'fail', 'retry', 'new', 'quarantined']),
   playwright: false,
 };
 
@@ -312,7 +322,10 @@ const mocha: Omit<Framework, 'name'> = {
   thisMethods: new Set(['skip']),
   todoWithoutBody: true,
   runtimeFunctions: new Map(),
-  states: new Set(['skip', 'todo', 'new', 'quarantined']),
+  // Cypress's `{ retries: 2 }` or `{ retries: { runMode: 2, openMode: 0 } }`; Mocha itself takes no options.
+  retryOption: 'retries',
+  retryCall: 'this.retries',
+  states: new Set(['skip', 'todo', 'retry', 'new', 'quarantined']),
   playwright: false,
 };
 
