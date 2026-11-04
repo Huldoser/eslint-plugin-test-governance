@@ -59,10 +59,11 @@ const NOTION_PAGE_RE = new RegExp(`(?:^|-)(${NOTION_ID})$`);
 const NOTION_ID_RE = new RegExp(`^(?:${NOTION_ID})$`);
 const ASANA_PATH_RE =
   /^\/(?:0\/\d+\/(\d+)(?:\/f)?|1\/\d+(?:\/project\/\d+|\/home)?\/task\/(\d+)(?:\/comment\/\d+)?)\/?$/;
-// ClickUp task IDs are lowercase letters and digits, with at least one digit.
+// ClickUp task IDs are lowercase letters and digits, with at least one digit. Every published one also has a
+// letter, but ClickUp doesn't promise it, so digits alone pass only where the form says it's a task.
 const CLICKUP_ID_RE = /^(?=[a-z]*\d)[a-z0-9]+$/;
 const CLICKUP_REF_RE = /^(?:CU-|#)([a-z0-9]+)$/;
-const CLICKUP_TASK_PATH_RE = /^\/t\/(?:\d+\/)?([^/]+)\/?$/;
+const CLICKUP_TASK_PATH_RE = /^\/t\/(?:(\d+)\/)?([^/]+)\/?$/;
 const CLICKUP_VIEW_PATH_RE = /^\/\d+\/v\//;
 // `#123`, a note of it (`#123-4`, `#123#note-4`), and `##123`, which Redmine shows with its subject.
 const REDMINE_REF_RE = /^##?(\d+)(?:-\d+|#note-\d+)?$/;
@@ -319,6 +320,8 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
         id !== null && id !== undefined && CLICKUP_ID_RE.test(id) ? id : keyId(id, keyOk);
       return {
         find: (t) => {
+          // `#4821` is an issue number in GitHub, GitLab or Redmine.
+          if (ISSUE_NUMBER_RE.test(t)) return undefined;
           const ref = CLICKUP_REF_RE.exec(t)?.[1];
           if (ref !== undefined) return taskId(ref);
           if (KEY_RE.test(t)) return keyId(t, keyOk);
@@ -328,7 +331,10 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
             const peek = url.searchParams.get('p');
             return peek !== null && CLICKUP_ID_RE.test(peek) ? peek : undefined;
           }
-          return taskId(CLICKUP_TASK_PATH_RE.exec(url.pathname)?.[1]);
+          const match = CLICKUP_TASK_PATH_RE.exec(url.pathname);
+          // `/t/9015210959`, with no workspace before it, is a workspace link, not a task.
+          if (match?.[1] === undefined && DIGITS_RE.test(match?.[2] ?? '')) return undefined;
+          return taskId(match?.[2]);
         },
         expected: `a ClickUp task like CU-86abc123 or ${prefixes?.[0] ?? 'DEV'}-123${describeList('with prefix', prefixes)}, or a ClickUp task link`,
         example: prefixes === undefined ? 'CU-86abc123' : `${prefixes[0]}-123`,

@@ -250,8 +250,15 @@ const tables: Record<string, Table> = {
       'https://app.clickup.com/t/9015210959/DEV-123',
       'https://app.clickup.com/t/9015210959/86abc123/',
       'https://app.clickup.com/9015210959/v/li/901500000001?p=86abc123',
+      // The `CU-` prefix and a workspace segment say it's a task, so the ID may be digits only.
+      'CU-4821',
+      'https://app.clickup.com/t/9015210959/4821',
     ],
     rejects: [
+      // Without them, digits alone are an issue number or a workspace link, not a task.
+      '#4821',
+      'https://app.clickup.com/t/9015210959',
+      'https://app.clickup.com/t/9015210959/',
       'CU-86ABC123',
       'cu-86abc123',
       // ClickUp task IDs always have a digit, so placeholder words aren't IDs.
@@ -262,6 +269,7 @@ const tables: Record<string, Table> = {
       'dev-123',
       '#86abc12_',
       'https://app.clickup.com/9015210959/v/li/901500000001',
+      'https://app.clickup.com/9015210959/home',
       'https://app.clickup.com/9015210959/v/li/901500000001?p=86ABC',
       'https://app.clickup.com/t/9015210959/dev-123',
       'https://sharing.clickup.com/9015210959/t/h/86abc123/0123456789ABCDEF',
