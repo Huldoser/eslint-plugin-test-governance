@@ -69,6 +69,46 @@ export function directiveOf(comment: Comment): Directive | undefined {
   return { kind, rules, description: { separator: separator.index, start: separator.index + separator[0].length } };
 }
 
+// A call at the start of a comment line, as `test('...'`, `test.describe.skip(` or `await test.step(`.
+const COMMENTED_CALL_RE = /^(\s*\*?\s*)(?:await\s+)?([A-Za-z_$][\w$]*)(?:\s*\.\s*[A-Za-z_$][\w$]*)*\s*\(/;
+
+/**
+ * Blocks of comments that hold a test or describe written out as code: comments on consecutive lines with
+ * no code before them, one of whose lines starts with a call of `names`. A JSDoc comment is documentation,
+ * so a test in its example doesn't count.
+ */
+function findCommentedOutTests(
+  sourceCode: SourceCode,
+  comments: Comment[],
+  names: ReadonlySet<string>,
+  states: StateDef[],
+): { found: CommentedOutTest[]; comments: Set<Comment> } {
+  const blocks: Comment[][] = [];
+  for (const comment of comments) {
+    if (sourceCode.getTokenBefore(comment)?.loc.end.line === comment.loc.start.line) continue;
+    const block = blocks.at(-1);
+    const last = block?.at(-1);
+    if (block && last && comment.loc.start.line === last.loc.end.line + 1) block.push(comment);
+    else blocks.push([comment]);
+  }
+  const found: CommentedOutTest[] = [];
+  const claimed = new Set<Comment>();
+  for (const block of blocks) {
+    const range = block
+      .filter((comment) => comment.type === 'Line' || !comment.value.startsWith('*'))
+      .flatMap(commentLines)
+      .flatMap(({ text, start }): TSESTree.Range[] => {
+        const match = COMMENTED_CALL_RE.exec(text);
+        return match && names.has(match[2]) ? [[start + match[1].length, start + text.trimEnd().length]] : [];
+      })
+      .at(0);
+    if (range === undefined) continue;
+    for (const comment of block) claimed.add(comment);
+    found.push({ range, markers: block.flatMap((comment) => parseMarkers(comment, states)) });
+  }
+  return { found, comments: claimed };
+}
+
 interface Region {
   start: number;
   end: number;
@@ -152,10 +192,20 @@ export interface Subject {
   functionName?: string;
 }
 
+/** A block of comments holding a test or describe written out as code, as `// test('places an order', ...)`. */
+export interface CommentedOutTest {
+  /** The first line that is a commented-out test or describe, without the comment's leading space or `*`. */
+  range: TSESTree.Range;
+  /** The markers anywhere in the block. */
+  markers: Marker[];
+}
+
 export interface Analysis {
   subjects: Subject[];
   /** Markers that are not in the comment block of any test, describe or runtime call. */
   detachedMarkers: StateMarker[];
+  /** Commented-out tests; their comments are left out of the comment blocks of the tests around them. */
+  commentedOutTests: CommentedOutTest[];
   /** Whether the file uses the test framework at all: an import from it or a call to a test function. */
   isTestFile: boolean;
 }
@@ -1212,7 +1262,17 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   );
   const subjects: Subject[] = [];
   const claimed = new Set<Comment>();
-  const comments = sourceCode.getAllComments();
+  const allComments = sourceCode.getAllComments();
+  const commentedOut = findCommentedOutTests(
+    sourceCode,
+    allComments,
+    new Set([
+      ...options.testFunctions,
+      ...[...framework.exports, ...framework.globals].flatMap(([name, root]) => (root.kind === 'hook' ? [] : [name])),
+    ]),
+    states,
+  );
+  const comments = allComments.filter((comment) => !commentedOut.comments.has(comment));
   const regions = disableRegions(comments, states);
   // `test.skip(...); // eslint-disable-line rule -- SKIP: TRADE-1` holds its marker on the test's own line.
   const lineDirectives = new Map<number, Comment[]>();
@@ -1243,10 +1303,14 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     parent = stack.at(-1),
   ): Subject => {
     const anchor = anchorOf(call);
-    const block = commentBlock(sourceCode, anchor, options.allowBlankLine);
+    const block = commentBlock(sourceCode, anchor, options.allowBlankLine).filter(
+      (comment) => !commentedOut.comments.has(comment),
+    );
     // `symbols.forEach((symbol) =>\n  // SKIP: TRADE-1\n  test.skip(...))`: the marker sits above the call itself.
     if (call.parent.type === 'ArrowFunctionExpression' && call.parent.body === call) {
-      block.push(...commentBlock(sourceCode, call, options.allowBlankLine));
+      block.push(
+        ...commentBlock(sourceCode, call, options.allowBlankLine).filter((c) => !commentedOut.comments.has(c)),
+      );
     }
     block.push(...(lineDirectives.get(call.loc.start.line) ?? []));
     const inRegions = regions.filter(
@@ -1700,7 +1764,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     .flatMap((comment) => parseMarkers(comment, states))
     .filter(isStateMarker);
 
-  return { subjects, detachedMarkers, isTestFile: usesTest };
+  return { subjects, detachedMarkers, commentedOutTests: commentedOut.found, isTestFile: usesTest };
 }
 
 /** Whether `subject` is in `stateName` at all, required or not, including inherited and runtime states. */

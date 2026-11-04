@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- A new rule, `require-ticket-for-commented-out-tests`, set to warn in every config: a test commented out by hand,
+  such as `// test('places an order', ...)`, needs the `// SKIP: <ticket>` marker a skipped test needs, anywhere in
+  its block of comments. It reads comment text, so the configs warn rather than fail. A marker in such a block
+  belongs to it, not to the test below the block.
 - A `retry` state, off by default: with `states: { retry: true }`, retries need a `// RETRY: <ticket>` marker, as a
   skip needs `// SKIP:`. It reads Playwright's `test.describe.configure({ retries })`, Jest's `jest.retryTimes()`,
   Vitest's `{ retry }`, Mocha's `this.retries()` in a describe, test or hook written as a `function`, and Cypress's
