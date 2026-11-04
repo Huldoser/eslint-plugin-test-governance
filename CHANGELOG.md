@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The `clickup` preset no longer takes digits alone as a task in `#4821` or `https://app.clickup.com/t/9015210959`:
+  the first is an issue number in GitHub, GitLab or Redmine, and the second is a workspace link. Write an
+  all-digit task ID as `CU-4821` or `/t/<workspace>/4821`.
+
 ## [0.11.1] - 2026-11-03
 
 ### Fixed
