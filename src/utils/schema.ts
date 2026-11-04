@@ -127,7 +127,11 @@ export const optionsSchema: Schema = {
     annotations: {
       anyOf: [
         { type: 'boolean', enum: [false] },
-        { type: 'object', properties: { type: { type: 'string' } }, additionalProperties: false },
+        {
+          type: 'object',
+          properties: { type: { type: 'string' }, only: { type: 'boolean' } },
+          additionalProperties: false,
+        },
       ],
     },
     requireTicketForConditional: { type: 'boolean' },

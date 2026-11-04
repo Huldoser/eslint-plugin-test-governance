@@ -305,7 +305,9 @@ function unwrap(node: Node): Node {
   return current;
 }
 
-function isFunction(node: Node | undefined): node is TSESTree.ArrowFunctionExpression | TSESTree.FunctionExpression {
+export function isFunction(
+  node: Node | undefined,
+): node is TSESTree.ArrowFunctionExpression | TSESTree.FunctionExpression {
   return node?.type === 'ArrowFunctionExpression' || node?.type === 'FunctionExpression';
 }
 
