@@ -88,6 +88,9 @@ runRule('require-ticket', rule, {
     "// SKIP: TRADE-1\ntest.skip.bind(null, 'places an order', async () => {})();",
     "test.call(null, 'places an order', async () => {});",
     'test.skip.apply(null, [title, fn]);',
+    // An `apply` whose list isn't an array written here can't be read, so it declares nothing to check.
+    'test.skip.apply(null, args);',
+    'test.skip.apply(null);',
     // A note on a marker that doesn't belong here is no-orphaned-marker's job.
     "// SKIP: TRADE-1 left over\ntest('shows prices', async () => {});",
     "// FIXME: TRADE-1\ntest.fixme('places an order', async ({ isMobile }) => {\n  // FIXME: TRADE-2 left over\n  test.skip(isMobile);\n});",
