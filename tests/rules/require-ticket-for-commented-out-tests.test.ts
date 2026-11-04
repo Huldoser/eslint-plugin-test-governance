@@ -19,6 +19,8 @@ runRule('require-ticket-for-commented-out-tests', rule, {
     // Prose that mentions a test function, a call to anything else, and a JSDoc example are not tests.
     `// The test('places an order') case is in orders.spec.ts.${TEST}`,
     `// expect(price).toBe(101.5);${TEST}`,
+    // A sentence that goes on with a parenthesis after "it" or "test": code has no space before a call's `(`.
+    `// test (see the setup above) for the margin case.${TEST}`,
     `/**\n * @example\n * test('places an order', async () => {});\n */\nexport function placeOrder() {}${TEST}`,
     // A file that doesn't use the framework is not a test file.
     "// test('places an order', async () => {});\nexport const price = 1;",
@@ -34,6 +36,7 @@ runRule('require-ticket-for-commented-out-tests', rule, {
     },
     ...withOptions({ framework: 'jest' }, [
       "// SKIP: TRADE-1\n// it('places an order', () => {});\n// describe('orders', () => {});\ntest('cancels an order', () => {});",
+      "// it (the order above) settles first, so the cancel finds nothing.\ntest('cancels an order', () => {});",
     ]),
   ],
   invalid: [

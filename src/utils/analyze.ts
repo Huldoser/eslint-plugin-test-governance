@@ -69,8 +69,9 @@ export function directiveOf(comment: Comment): Directive | undefined {
   return { kind, rules, description: { separator: separator.index, start: separator.index + separator[0].length } };
 }
 
-// A call at the start of a comment line, as `test('...'`, `test.describe.skip(` or `await test.step(`.
-const COMMENTED_CALL_RE = /^(\s*\*?\s*)(?:await\s+)?([A-Za-z_$][\w$]*)(?:\s*\.\s*[A-Za-z_$][\w$]*)*\s*\(/;
+// A call at the start of a comment line, as `test('...'`, `test.describe.skip(` or `await test.step(`. Code has
+// no space before a call's `(`, and a sentence such as `// it (see above) ...` has one.
+const COMMENTED_CALL_RE = /^(\s*\*?\s*)(?:await\s+)?([A-Za-z_$][\w$]*)(?:\.[A-Za-z_$][\w$]*)*\(/;
 
 /**
  * Blocks of comments that hold a test or describe written out as code: comments on consecutive lines with
