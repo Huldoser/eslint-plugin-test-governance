@@ -373,7 +373,9 @@ const nodeTest: Framework = {
   anyOptionValue: true,
   exclusiveStates: ['skip', 'todo', 'fail'],
   optionalTitle: true,
-  plainTags: false,
+  // Node 26.2's `{ tags: ['db'] }`: names without their `@`, as Vitest writes them.
+  tagKey: 'tags',
+  plainTags: true,
   info: { param: 0, methods: NODE_TEST_CONTEXT },
   subtests: true,
   skipWithoutBody: true,

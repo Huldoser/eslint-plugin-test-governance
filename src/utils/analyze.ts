@@ -1007,11 +1007,11 @@ function collectTags(
   framework: Framework,
   details: Details,
 ): TagInfo {
-  if (!hasTitle) return NO_TAGS;
   const source = sourceCode.text;
   const tags: TagOccurrence[] = [];
   const title = { texts: [] as FoundText[], unread: new Set<Node>() };
-  readTexts(sourceCode, call.arguments[0], title);
+  // node:test's `test({ tags: ['db'] }, fn)` has no title, only options.
+  if (hasTitle) readTexts(sourceCode, call.arguments[0], title);
   for (const found of title.texts) scanTags(source, found, tags);
   const values = { texts: [] as FoundText[], unread: new Set<Node>() };
   for (const [key, value] of details.entries) {

@@ -23,6 +23,10 @@ runRule('require-ticket (node:test)', requireTicket, {
     "import { test } from 'node:test';\ntest('fills a limit order', { skip: false, todo: undefined }, () => {});",
     // A value only known when the test runs is a condition.
     "import { test, describe } from 'node:test';\ntest('fills a limit order', { skip: process.platform === 'win32' }, () => {});\ndescribe('order book', { skip }, () => {});\ntest('cancels', { todo: !ready && 'needs the clearing API' }, () => {});",
+    {
+      code: "import { test, describe } from 'node:test';\n// NEW: TRADE-1\ntest('fills a limit order', { tags: ['new'] }, () => {});\n// QUARANTINED: TRADE-2\ndescribe('order book', { tags: ['quarantined'] }, () => {\n  test('settles', () => {});\n});",
+      settings: settings({ lifecycleTags: true }),
+    },
     // `t.skip()` and `t.todo()` take a message, so with or without one they always apply.
     "import { test } from 'node:test';\ntest('fills a limit order', (t) => {\n  // SKIP: TRADE-1\n  t.skip('broker sandbox is down');\n});",
     "import { test } from 'node:test';\n// TODO: TRADE-1\ntest('settles at T+1', async (context) => {\n  context.todo();\n});",
@@ -303,6 +307,16 @@ runRule('require-ticket (node:test)', requireTicket, {
         { ...missing('quarantined', 'QUARANTINED', 'This describe block'), line: 3 },
       ],
     },
+    // Node 26.2's `tags` option holds names without their `@`, as Vitest's does, also when the options come first.
+    {
+      code: "import { test, describe } from 'node:test';\ntest('fills a limit order', { tags: ['new', 'db'] }, () => {});\ndescribe('order book', { tags: ['quarantined'] }, () => {});\ntest({ tags: ['new'] }, () => {});",
+      settings: settings({ lifecycleTags: true }),
+      errors: [
+        { ...missing('new', 'NEW'), line: 2 },
+        { ...missing('quarantined', 'QUARANTINED', 'This describe block'), line: 3 },
+        { ...missing('new', 'NEW'), line: 4 },
+      ],
+    },
     // `testFunctions` counts without an import, as for a project's own wrapper.
     {
       code: "test.skip('fills', () => {});\nit.todo('settles');",
@@ -336,6 +350,10 @@ runRule('marker-matches-state (node:test)', markerMatchesState, {
 
 runRule('no-orphaned-marker (node:test)', noOrphanedMarker, {
   valid: withOptions(nodeTest, [
+    {
+      code: "import { test } from 'node:test';\n// NEW: TRADE-1\ntest('fills a limit order', { tags: ['new'] }, () => {});",
+      settings: settings({ lifecycleTags: true }),
+    },
     "import { test } from 'node:test';\n// SKIP: TRADE-1\ntest('fills', { skip: 'flaky' }, () => {});",
     "import { test } from 'node:test';\n// SKIP: TRADE-1\ntest('fills', (t) => {\n  t.skip();\n});",
   ]),

@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- `node:test`'s `tags` option, added in Node 26.2, is read like Vitest's: `{ tags: ['new'] }` puts a test or
+  describe in the `@new` state, also when the options come first, as in `test({ tags: ['new'] }, fn)`. The README
+  now also says that `fail` exists in `node:test`, where `test.expectFailure` and `{ expectFailure }` already put a
+  test in it.
+
 ## [0.12.0] - 2026-11-04
 
 ### Added

@@ -58,7 +58,7 @@ export interface GovernanceOptions {
    * `skip`, `fixme` and `todo` are on by default, `fail`, `slow` and `retry` off; a setting for `new` or
    * `quarantined` wins over `lifecycleTags`. Only `new` and `quarantined` have a tag, e.g.
    * `{ quarantined: { tag: '@flaky', marker: 'FLAKY' } }`. `fixme` and `slow` exist only in Playwright,
-   * `todo` in every framework but Playwright, `fail` in Playwright, Jest and Vitest, and `retry` in every
+   * `todo` in every framework but Playwright, `fail` in Playwright, Jest, Vitest and node:test, and `retry` in every
    * framework but node:test and Jasmine.
    */
   states?: Partial<Record<BuiltinStateName, boolean | StateOverride>>;
