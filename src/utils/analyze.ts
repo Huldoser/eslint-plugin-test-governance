@@ -702,7 +702,9 @@ function detailKey(sourceCode: SourceCode, prop: TSESTree.Property, unread: Node
     return key.type === 'Identifier' ? key.name : String((key as TSESTree.Literal).value);
   }
   if (key.type === 'Literal' && typeof key.value === 'string') return key.value;
-  if (key.type === 'TemplateLiteral' && key.expressions.length === 0) return key.quasis[0]?.value.cooked ?? undefined;
+  // `cooked` is only null in tagged templates, which a computed key isn't.
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
+  if (key.type === 'TemplateLiteral' && key.expressions.length === 0) return key.quasis[0].value.cooked!;
   const value = constantValue(sourceCode, key);
   const resolved = value && unwrap(value);
   if (resolved?.type === 'Literal' && typeof resolved.value === 'string') return resolved.value;
@@ -742,10 +744,9 @@ function detailsOf(sourceCode: SourceCode, call: TSESTree.CallExpression, option
   const object = value && unwrap(value);
   if (object?.type !== 'ObjectExpression') {
     // A name that can't be read is the details object only when a body comes after it:
-    // `test.skip('places an order', placeOrder)` has a body defined elsewhere and no details.
-    return call.arguments.slice(optionsFirst ? 1 : 2).some(isFunction)
-      ? { entries: [], unread: [details] }
-      : { entries: [], unread: [] };
+    // `test.skip('places an order', placeOrder)` has a body defined elsewhere and no details. Options
+    // come first only when they are an object that can be read, so a name read here is the second argument.
+    return call.arguments.slice(2).some(isFunction) ? { entries: [], unread: [details] } : { entries: [], unread: [] };
   }
   const unread: Node[] = [];
   return { entries: objectDetails(sourceCode, object, unread), unread };
