@@ -56,6 +56,8 @@ runRule('no-orphaned-marker', rule, {
     // A marker in the wrong case reads as a sentence unless a valid ticket follows it.
     "// skip: not on mobile\ntest('places an order', async () => {});",
     "// Skip:\ntest('places an order', async () => {});",
+    // A region's marker covers the tests in that state and leaves the others alone.
+    "/* eslint-disable no-console -- SKIP: TRADE-1 */\ntest.skip('places an order', async () => {});\ntest('cancels an order', async () => {});",
   ],
   invalid: [
     // An annotation that satisfies the state leaves the wrong marker a leftover, not a hint.
@@ -276,6 +278,36 @@ runRule('no-orphaned-marker', rule, {
               messageId: 'removeMarker',
               output:
                 "test('places an order', async () => {\n  await test.step('fills the order', async () => {});\n});",
+            },
+          ],
+        },
+      ],
+    },
+    // Removing a directive's marker keeps the directive.
+    {
+      code: "// eslint-disable-next-line no-console -- SKIP: TRADE-1\ntest('places an order', async () => {});",
+      errors: [
+        {
+          messageId: 'orphaned',
+          suggestions: [
+            {
+              messageId: 'removeMarker',
+              output: "// eslint-disable-next-line no-console\ntest('places an order', async () => {});",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: "/* eslint-disable no-console -- SKIP: TRADE-1 */\nconst broker = connectBroker();\n/* eslint-enable no-console */\ntest('places an order', async () => {});",
+      errors: [
+        {
+          messageId: 'detached',
+          suggestions: [
+            {
+              messageId: 'removeMarker',
+              output:
+                "/* eslint-disable no-console */\nconst broker = connectBroker();\n/* eslint-enable no-console */\ntest('places an order', async () => {});",
             },
           ],
         },

@@ -14,6 +14,9 @@ const SKIPPING_MODIFIERS = new Set(['skip', 'fixme', 'todo']);
 /** What a step's `TestStepInfo` can do at runtime: `step.skip()`. */
 const STEP_INFO_METHODS = new Set(['skip']);
 const MARKER_LINE_RE = /^\s*\*?\s*([A-Za-z][\w-]*)\s*:(.*)$/;
+const DIRECTIVE_RE = /^\s*(eslint-disable-next-line|eslint-disable-line|eslint-disable|eslint-enable)(?=\s|$)/;
+// ESLint splits a directive's description off at the first run of two or more dashes between spaces.
+const DESCRIPTION_SEPARATOR_RE = /\s-{2,}\s/;
 const TAG_RE = /(?<![\w@])@[\w-]+/g;
 
 interface MarkerTicket {
@@ -39,6 +42,57 @@ export type StateMarker = Marker & { state: StateDef };
 
 export function isStateMarker(marker: Marker): marker is StateMarker {
   return marker.state !== undefined;
+}
+
+export interface Directive {
+  kind: 'eslint-disable-next-line' | 'eslint-disable-line' | 'eslint-disable' | 'eslint-enable';
+  /** The rules it names; none means every rule. */
+  rules: string[];
+  /** Where ` -- ` starts in the comment's value and where the description after it starts. */
+  description?: { separator: number; start: number };
+}
+
+/** The ESLint directive a comment holds, read the way ESLint reads it, or undefined for any other comment. */
+export function directiveOf(comment: Comment): Directive | undefined {
+  const kind = DIRECTIVE_RE.exec(comment.value)?.[1] as Directive['kind'] | undefined;
+  // ESLint reads `eslint-disable` and `eslint-enable` only from block comments.
+  if (kind === undefined || (comment.type === 'Line' && !kind.endsWith('-line'))) return undefined;
+  const separator = DESCRIPTION_SEPARATOR_RE.exec(comment.value);
+  const rules = comment.value
+    .slice(0, separator?.index)
+    .trim()
+    .slice(kind.length)
+    .split(',')
+    .map((rule) => rule.trim())
+    .filter(Boolean);
+  if (!separator) return { kind, rules };
+  return { kind, rules, description: { separator: separator.index, start: separator.index + separator[0].length } };
+}
+
+interface Region {
+  start: number;
+  end: number;
+  comment: Comment;
+  markers: Marker[];
+}
+
+/**
+ * The `eslint-disable` block comments with a description, each with the part of the file it covers: up
+ * to the `eslint-enable` of one of its rules or of every rule, or the end of the file.
+ */
+function disableRegions(comments: Comment[], states: StateDef[]): Region[] {
+  const directives = comments.flatMap((comment) => {
+    const directive = directiveOf(comment);
+    return directive ? [{ comment, ...directive }] : [];
+  });
+  return directives.flatMap((open, i): Region[] => {
+    if (open.kind !== 'eslint-disable' || open.description === undefined) return [];
+    const close = directives
+      .slice(i + 1)
+      .find((d) => d.kind === 'eslint-enable' && (d.rules.length === 0 || d.rules.some((r) => open.rules.includes(r))));
+    const markers = parseMarkers(open.comment, states);
+    return [{ start: open.comment.range[1], end: close?.comment.range[0] ?? Infinity, comment: open.comment, markers }];
+  });
 }
 
 export interface TagOccurrence {
@@ -87,6 +141,8 @@ export interface Subject {
   skipped: boolean;
   ownSkip: boolean;
   markers: Marker[];
+  /** Markers of the `eslint-disable` regions this node is in, other than those in its own block. */
+  regionMarkers: Marker[];
   /** Tickets read from annotations of the configured type on this call, with the node to report at. */
   annotationTickets: { text: string; node: Node }[];
   /** Annotation values of the configured type on this call whose ticket can't be read. */
@@ -520,17 +576,24 @@ export function parseTickets(text: string, offset: number, matcher: TicketMatche
 
 const LINE_BREAK_RE = /\r\n|[\r\n\u2028\u2029]/g;
 
-/** The lines of a comment and where each starts in the source, split at every line break JavaScript has. */
+/**
+ * The lines of a comment and where each starts in the source, split at every line break JavaScript has.
+ * In an ESLint directive, only the description after ` -- ` is comment text.
+ */
 export function commentLines(comment: Comment): { text: string; start: number }[] {
+  const directive = directiveOf(comment);
+  if (directive && directive.description === undefined) return [];
+  const from = directive?.description?.start ?? 0;
+  const value = comment.value.slice(from);
   const lines: { text: string; start: number }[] = [];
   // `//` and `/*` are both two characters, so the comment's value starts two characters in.
-  const valueStart = comment.range[0] + 2;
+  const valueStart = comment.range[0] + 2 + from;
   let lineStart = 0;
-  for (const lineBreak of comment.value.matchAll(LINE_BREAK_RE)) {
-    lines.push({ text: comment.value.slice(lineStart, lineBreak.index), start: valueStart + lineStart });
+  for (const lineBreak of value.matchAll(LINE_BREAK_RE)) {
+    lines.push({ text: value.slice(lineStart, lineBreak.index), start: valueStart + lineStart });
     lineStart = lineBreak.index + lineBreak[0].length;
   }
-  lines.push({ text: comment.value.slice(lineStart), start: valueStart + lineStart });
+  lines.push({ text: value.slice(lineStart), start: valueStart + lineStart });
   return lines;
 }
 
@@ -1129,6 +1192,14 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   );
   const subjects: Subject[] = [];
   const claimed = new Set<Comment>();
+  const comments = sourceCode.getAllComments();
+  const regions = disableRegions(comments, states);
+  // `test.skip(...); // eslint-disable-line rule -- SKIP: TRADE-1` holds its marker on the test's own line.
+  const lineDirectives = new Map<number, Comment[]>();
+  for (const comment of comments) {
+    if (directiveOf(comment)?.kind !== 'eslint-disable-line') continue;
+    lineDirectives.set(comment.loc.start.line, [...(lineDirectives.get(comment.loc.start.line) ?? []), comment]);
+  }
   const stack: Subject[] = [];
   const infos: InfoName[] = [];
   const keys = sourceCode.visitorKeys as Record<string, readonly string[] | undefined>;
@@ -1154,7 +1225,11 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     if (call.parent.type === 'ArrowFunctionExpression' && call.parent.body === call) {
       block.push(...commentBlock(sourceCode, call, options.allowBlankLine));
     }
-    for (const comment of block) claimed.add(comment);
+    block.push(...(lineDirectives.get(call.loc.start.line) ?? []));
+    const inRegions = regions.filter(
+      (r) => r.start <= call.range[0] && call.range[0] < r.end && !block.includes(r.comment),
+    );
+    for (const comment of [...block, ...inRegions.map((r) => r.comment)]) claimed.add(comment);
     const ownTags = new Set(tagInfo.tags.map((t) => t.tag));
     const sources: StateSource[] = [];
     for (const state of states) {
@@ -1201,6 +1276,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       skipped: ownSkip || (kind !== 'runtime' && parent?.skipped === true),
       ownSkip,
       markers: block.flatMap((comment) => parseMarkers(comment, states)),
+      regionMarkers: inRegions.flatMap((r) => r.markers),
       annotationTickets: tagInfo.annotations,
       unreadTickets: tagInfo.unreadAnnotations,
       dynamicTitle: tagInfo.dynamic,
@@ -1539,8 +1615,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   };
   walk(sourceCode.ast);
 
-  const detachedMarkers = sourceCode
-    .getAllComments()
+  const detachedMarkers = comments
     .filter((comment) => !claimed.has(comment))
     .flatMap((comment) => parseMarkers(comment, states))
     .filter(isStateMarker);
@@ -1558,11 +1633,12 @@ export function appliesTo(subject: Subject, stateName: string): boolean {
 }
 
 /**
- * Markers that can satisfy `state` for `subject`: its own block, then the blocks of enclosing
- * describes that are in the same state. A runtime call can also use any enclosing test or describe.
+ * Markers that can satisfy `state` for `subject`: its own block and the `eslint-disable` regions it is
+ * in, then the blocks of enclosing describes that are in the same state. A runtime call can also use any
+ * enclosing test or describe.
  */
 function candidateMarkers(subject: Subject, state: StateDef): Marker[] {
-  const found = subject.markers.filter((m) => m.state === state);
+  const found = [...subject.markers, ...subject.regionMarkers].filter((m) => m.state === state);
   let current = subject.parent;
   while (current && (subject.kind === 'runtime' || appliesTo(current, state.name))) {
     found.push(...current.markers.filter((m) => m.state === state));

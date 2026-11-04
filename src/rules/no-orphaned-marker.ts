@@ -1,6 +1,6 @@
 import { describeSubject, isProse, missingStates, strayMarkers, type StateMarker } from '../utils/analyze.ts';
 import { createRule } from '../utils/create-rule.ts';
-import { removeComment } from '../utils/fix.ts';
+import { removeMarkerComment } from '../utils/fix.ts';
 
 export default createRule({
   meta: {
@@ -46,7 +46,7 @@ export default createRule({
         loc: marker.comment.loc,
         messageId,
         data: { marker: marker.keyword, state: marker.state.name, subject },
-        suggest: [{ messageId: 'removeMarker', fix: () => removeComment(sourceCode, marker.comment) }],
+        suggest: [{ messageId: 'removeMarker', fix: () => removeMarkerComment(sourceCode, marker.comment) }],
       });
     }
   },

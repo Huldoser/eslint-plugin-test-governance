@@ -431,6 +431,16 @@ runRule('require-ticket', rule, {
       code: "test.skip('places a limit order', { annotation: { type: 'defect', description: 'TRADE-123' } }, async () => {});",
       settings: settings({ annotations: { type: 'defect' } }),
     },
+    // An ESLint directive's description, after ` -- `, can hold the marker: above the test, on its line, or
+    // opening an `eslint-disable` region that the test is in.
+    "// eslint-disable-next-line no-console -- SKIP: TRADE-1\ntest.skip('places an order', async () => {});",
+    "/* eslint-disable-next-line no-console -- SKIP: TRADE-1 */\ntest.skip('places an order', async () => {});",
+    "// SKIP: TRADE-1\n// eslint-disable-next-line no-console\ntest.skip('places an order', async () => {});",
+    "test.skip('places an order', async () => {}); // eslint-disable-line no-console -- SKIP: TRADE-1",
+    "/* eslint-disable no-console -- SKIP: TRADE-1 */\ntest.skip('places an order', async () => {});\n\ntest.describe('limits', () => {\n  test.skip('rejects an order', async () => {});\n});\n/* eslint-enable no-console */",
+    // Enabling another rule doesn't end the region.
+    "/* eslint-disable no-console -- SKIP: TRADE-1 */\n/* eslint-enable no-alert */\n\ntest.skip('places an order', async () => {});",
+    "/* eslint-disable\n  no-console,\n  no-alert\n  -- SKIP: TRADE-1 */\ntest.skip('places an order', async () => {});",
   ],
   invalid: [
     { code: "test.skip('places an order', async () => {});", errors: [missing('skip', 'SKIP')] },
@@ -1290,6 +1300,53 @@ runRule('require-ticket', rule, {
     {
       code: "test('places an order', async () => {\n  // SKIP: TRADE-1\n  await test.step('fills the order', async () => {\n    test.skip();\n  });\n});",
       errors: [{ ...missing('skip', 'SKIP', 'This skip call'), line: 4 }],
+    },
+    // A region ends at the `eslint-enable` of its rule, or of every rule.
+    {
+      code: "/* eslint-disable no-console -- SKIP: TRADE-1 */\ntest.skip('places an order', async () => {});\n/* eslint-enable no-console */\ntest.skip('cancels an order', async () => {});",
+      errors: [{ ...missing('skip', 'SKIP'), line: 4 }],
+    },
+    {
+      code: "/* eslint-disable no-console -- SKIP: TRADE-1 */\nconst broker = connectBroker();\n/* eslint-enable */\n\ntest.skip('places an order', async () => {});",
+      errors: [missing('skip', 'SKIP')],
+    },
+    // ESLint reads `eslint-disable` only from a block comment, so a line comment opens no region.
+    {
+      code: "// eslint-disable no-console -- SKIP: TRADE-1\n\ntest.skip('places an order', async () => {});",
+      errors: [missing('skip', 'SKIP')],
+    },
+    // A description that isn't a marker, and an `eslint-disable-line` on another line.
+    {
+      code: "// eslint-disable-next-line no-console -- flaky on CI\ntest.skip('places an order', async () => {});",
+      errors: [missing('skip', 'SKIP')],
+    },
+    {
+      code: "test.skip(\n  'places an order', // eslint-disable-line no-console -- SKIP: TRADE-1\n  async () => {},\n);",
+      errors: [missing('skip', 'SKIP')],
+    },
+    // A directive's marker is checked like any other, and a broken one in a region is reported once.
+    {
+      code: "// eslint-disable-next-line no-console -- SKIP: nope\ntest.skip('places an order', async () => {});",
+      errors: [{ messageId: 'invalidTicket', data: { ticket: 'nope', state: 'skip', expected: ANY }, line: 1 }],
+    },
+    {
+      code: "/* eslint-disable no-console -- SKIP: TBD */\ntest.skip('places an order', async () => {});\ntest.skip('cancels an order', async () => {});",
+      errors: [{ messageId: 'placeholderTicket', line: 1 }],
+    },
+    {
+      code: "/* eslint-disable no-console -- SKIP: TRADE-1 flaky */\ntest.skip('places an order', async () => {});\ntest.skip('cancels an order', async () => {});",
+      errors: [
+        {
+          messageId: 'extraText',
+          suggestions: [
+            {
+              messageId: 'removeExtraText',
+              output:
+                "/* eslint-disable no-console -- SKIP: TRADE-1 */\ntest.skip('places an order', async () => {});\ntest.skip('cancels an order', async () => {});",
+            },
+          ],
+        },
+      ],
     },
   ],
 });
