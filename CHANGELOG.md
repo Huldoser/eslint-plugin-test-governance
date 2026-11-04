@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-04
+
 ### Added
 
 - `annotations: { only: true }` for Playwright and Vitest: a test or describe must carry its ticket in the
@@ -482,7 +484,8 @@ First release.
 - Support for ESLint 9 and 10 flat config, JavaScript and TypeScript test files, `.extend()`
   fixtures, describe blocks, runtime skips and tags in titles or the `tag` option.
 
-[Unreleased]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.11.1...HEAD
+[Unreleased]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.10.0...v0.10.1
