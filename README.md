@@ -369,6 +369,21 @@ left alone, and an annotation whose ticket isn't static text is reported with `r
 both must be valid. Jest, Mocha, Jasmine, node:test and Cypress have no annotations, so for them it is
 comments only.
 
+### Markers in `eslint-disable` comments
+
+If you also run a rule that bans skipped tests, such as `jest/no-disabled-tests`, the comment that turns it off
+can hold the marker in its description, after `--`:
+
+```js
+// eslint-disable-next-line jest/no-disabled-tests -- SKIP: TRADE-123
+test.skip('rejects a margin order above the buying power', () => {});
+```
+
+The description is read as a marker comment, with the same tickets and notes rules. It works in an
+`eslint-disable-next-line` above the test, an `eslint-disable-line` on the line the test starts on, and an
+`eslint-disable` block comment, whose marker covers every test up to the `eslint-enable` of one of its rules, or of
+every rule. A suggestion that removes or adds a marker keeps the directive working.
+
 ### Which functions count as `test`
 
 In Playwright files:

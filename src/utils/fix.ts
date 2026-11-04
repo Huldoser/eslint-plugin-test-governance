@@ -1,4 +1,5 @@
 import type { TSESLint, TSESTree } from '@typescript-eslint/utils';
+import { directiveOf } from './analyze.ts';
 
 type SourceCode = Readonly<TSESLint.SourceCode>;
 
@@ -16,8 +17,17 @@ export function keywordRange(sourceCode: SourceCode, comment: TSESTree.Comment, 
   return [start, start + keyword.length];
 }
 
-/** Removes a comment, and its whole line when nothing else is on it. */
-export function removeComment(sourceCode: SourceCode, comment: TSESTree.Comment): TSESLint.RuleFix {
+/**
+ * Removes a marker comment, and its whole line when nothing else is on it. From an ESLint directive it
+ * removes only the description, so the directive keeps working.
+ */
+export function removeMarkerComment(sourceCode: SourceCode, comment: TSESTree.Comment): TSESLint.RuleFix {
+  const description = directiveOf(comment)?.description;
+  if (description) {
+    // `//` and `/*` are both two characters; a block comment keeps the space before its `*/`.
+    const valueStart = comment.range[0] + 2;
+    return { range: [valueStart + description.separator, valueStart + comment.value.trimEnd().length], text: '' };
+  }
   const { text } = sourceCode;
   const lineStart = text.lastIndexOf('\n', comment.range[0] - 1) + 1;
   const newline = text.indexOf('\n', comment.range[1]);

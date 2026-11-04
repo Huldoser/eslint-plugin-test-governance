@@ -1,4 +1,11 @@
-import { appliesTo, describeSubject, isStateMarker, missingStates, strayMarkers } from '../utils/analyze.ts';
+import {
+  appliesTo,
+  describeSubject,
+  directiveOf,
+  isStateMarker,
+  missingStates,
+  strayMarkers,
+} from '../utils/analyze.ts';
 import { createRule } from '../utils/create-rule.ts';
 import { indentOf, keywordRange } from '../utils/fix.ts';
 
@@ -56,8 +63,13 @@ export default createRule({
         .filter(isStateMarker)
         .find((m) => m.state !== missing[0] && appliesTo(subject, m.state.name));
       if (!present) continue;
+      // A marker added after an `eslint-disable-next-line` would take the line it disables, so it goes above.
+      // One on the test's own line, in an `eslint-disable-line`, has no line of its own to go next to.
+      const directive = directiveOf(present.comment);
+      const indent = indentOf(sourceCode, present.comment);
       for (const state of missing) {
         const tickets = present.tickets.map((t) => t.text).join(', ');
+        const added = `// ${state.marker}: ${tickets}`;
         context.report({
           loc: present.comment.loc,
           messageId: 'sharedMarker',
@@ -69,16 +81,15 @@ export default createRule({
             subject: subjectName,
           },
           suggest:
-            present.comment.type === 'Line' && tickets !== ''
+            present.comment.type === 'Line' && tickets !== '' && directive?.kind !== 'eslint-disable-line'
               ? [
                   {
                     messageId: 'addMarker' as const,
                     data: { expected: state.marker, tickets },
                     fix: (fixer) =>
-                      fixer.insertTextAfterRange(
-                        present.comment.range,
-                        `\n${indentOf(sourceCode, present.comment)}// ${state.marker}: ${tickets}`,
-                      ),
+                      directive
+                        ? fixer.insertTextBeforeRange(present.comment.range, `${added}\n${indent}`)
+                        : fixer.insertTextAfterRange(present.comment.range, `\n${indent}${added}`),
                   },
                 ]
               : [],

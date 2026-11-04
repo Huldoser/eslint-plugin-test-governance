@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- A marker can be the description of an ESLint directive, as in
+  `// eslint-disable-next-line jest/no-disabled-tests -- SKIP: TRADE-123`, so a skip that also turns off a rule
+  banning skipped tests needs one comment, not two. It works in `eslint-disable-next-line` above the test,
+  `eslint-disable-line` on its first line, and an `eslint-disable` block comment, which covers the tests up to the
+  `eslint-enable` of one of its rules or of every rule. Removing such a marker keeps the directive, and a marker
+  added next to it goes above it.
+
 ### Fixed
 
 - The `clickup` preset no longer takes digits alone as a task in `#4821` or `https://app.clickup.com/t/9015210959`:

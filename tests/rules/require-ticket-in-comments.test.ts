@@ -10,6 +10,9 @@ const missing = (keyword: string, upper = keyword.toUpperCase(), example = 'PROJ
 runRule('require-ticket-in-comments', rule, {
   valid: [
     `// TODO: TRADE-1${TEST}`,
+    // In an ESLint directive, only the description after ` -- ` is comment text.
+    `// eslint-disable-next-line no-console -- TODO: TRADE-1${TEST}`,
+    `/* eslint-disable no-console */${TEST}`,
     `// FIXME: TRADE-1, TRADE-2\nconst retries = 2;${TEST}`,
     `/* TODO: TRADE-1 */${TEST}`,
     `/**\n * Places an order through the broker API.\n * TODO: TRADE-3\n */\nfunction placeOrder() {}${TEST}`,
@@ -40,6 +43,10 @@ runRule('require-ticket-in-comments', rule, {
     { code: `// TODO: TRADE-1 remove after the migration${TEST}`, settings: settings({ allowNotes: true }) },
   ],
   invalid: [
+    {
+      code: `// eslint-disable-next-line no-console -- TODO: fix later${TEST}`,
+      errors: [{ ...missing('TODO'), line: 1, column: 43, endLine: 1, endColumn: 58 }],
+    },
     {
       code: `// TODO: fix later${TEST}`,
       errors: [{ ...missing('TODO'), line: 1, column: 4, endLine: 1, endColumn: 19 }],

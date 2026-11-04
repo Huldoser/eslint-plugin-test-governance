@@ -213,5 +213,38 @@ runRule('marker-matches-state', rule, {
         },
       ],
     },
+    // In a directive, the keyword is renamed in place, and an added marker goes above the directive so it
+    // still disables the line below it.
+    {
+      code: "// eslint-disable-next-line no-console -- SKIP: TRADE-1\ntest.fixme('cancels an order', async () => {});",
+      errors: [
+        {
+          messageId: 'wrongMarker',
+          suggestions: [
+            {
+              messageId: 'renameMarker',
+              output:
+                "// eslint-disable-next-line no-console -- FIXME: TRADE-1\ntest.fixme('cancels an order', async () => {});",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: "test.describe('risk limits', () => {\n  // eslint-disable-next-line no-console -- SKIP: TRADE-1\n  test.skip('rejects an order @quarantined', async () => {});\n});",
+      settings: lifecycle,
+      errors: [
+        {
+          messageId: 'sharedMarker',
+          suggestions: [
+            {
+              messageId: 'addMarker',
+              output:
+                "test.describe('risk limits', () => {\n  // QUARANTINED: TRADE-1\n  // eslint-disable-next-line no-console -- SKIP: TRADE-1\n  test.skip('rejects an order @quarantined', async () => {});\n});",
+            },
+          ],
+        },
+      ],
+    },
   ],
 });

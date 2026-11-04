@@ -119,7 +119,7 @@ export default createRule({
       // Markers are ticket-only unless notes are allowed. A marker with a broken ticket is
       // already reported above, so its extra text waits until the ticket is fixed.
       if (options.allowNotes) continue;
-      for (const marker of subject.markers) {
+      for (const marker of [...subject.markers, ...subject.regionMarkers]) {
         const { extra, state } = marker;
         if (!extra || !state || !appliesTo(subject, state.name)) continue;
         if (marker.tickets.some((t) => t.result !== 'ok') || !reportOnce(`extra:${extra.range[0]}`)) continue;
