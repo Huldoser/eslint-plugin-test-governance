@@ -168,8 +168,9 @@ for (const [name, framework] of Object.entries(specs)) {
     const small = spec(framework, 5000);
     const large = spec(framework, 20000);
     await ruleTime(framework.options, small, 1); // warms up the JIT
+    // Each size takes its fastest of five, so one busy moment in the parallel test run can't skew the ratio.
     const smallMs = await ruleTime(framework.options, small, 5);
-    const largeMs = await ruleTime(framework.options, large, 2);
+    const largeMs = await ruleTime(framework.options, large, 5);
     assert.ok(largeMs < LIMIT_MS, `took ${Math.round(largeMs)} ms, more than ${LIMIT_MS} ms`);
     // Linear growth gives about 4; an analysis that compares every test with every other one gives 16.
     assert.ok(largeMs / smallMs < 8, `took ${Math.round(largeMs)} ms, ${(largeMs / smallMs).toFixed(1)} times as long`);
