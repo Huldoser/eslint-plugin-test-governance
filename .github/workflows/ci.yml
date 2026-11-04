@@ -39,21 +39,13 @@ jobs:
       - run: npm install --no-save eslint@${{ matrix.eslint }} # zizmor: ignore[adhoc-packages] the ESLint major under test
       - run: npm run typecheck
       # The coverage thresholds run in this cell only, a pair the matrix above must keep. They measure this
-      # repo's tests, not the runtime, and Node's merge of coverage from the processes that run the test
-      # files can report a covered branch as missed (TG-44). Every cell runs the whole suite below.
+      # repo's tests, not the runtime. Every cell runs the whole suite below.
       - name: Test with coverage
         if: matrix.node == 24 && matrix.eslint == 10
         run: npm run test:coverage
       - name: Test
         if: matrix.node != 24 || matrix.eslint != 10
         run: npm test
-      # TG-44: Node's coverage merge sometimes drops a range, so the log of a failed run is kept.
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: failure() && matrix.node == 24 && matrix.eslint == 10
-        with:
-          name: coverage-log-node-${{ matrix.node }}-eslint-${{ matrix.eslint }}
-          path: coverage-run.log
-          if-no-files-found: ignore
       - run: npm run test:pack -- --eslint ${{ matrix.eslint }}
 
   # The oldest versions package.json accepts: Node 22.12 (engines) and ESLint 9.0.0 (peer range).
