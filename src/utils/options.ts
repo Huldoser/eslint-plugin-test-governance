@@ -79,9 +79,11 @@ export interface GovernanceOptions {
    * Vitest's `meta` key of that name, as in
    * `test.skip('title', { annotation: { type: 'issue', description: 'TRADE-123' } }, fn)`. One valid
    * annotation covers every state the test is in, and a describe's covers its tests. Defaults to
-   * `{ type: 'issue' }`; `false` turns it off. Comments stay the form that works everywhere.
+   * `{ type: 'issue' }`; `false` turns it off. Comments stay the form that works everywhere. With `only`,
+   * a test or describe in Playwright or Vitest must carry its ticket in the annotation, which reaches the
+   * test report; runtime skips and steps, which can't carry one, keep their comments.
    */
-  annotations?: false | { type?: string };
+  annotations?: false | { type?: string; only?: boolean };
   /** Allow free text after the tickets, e.g. `// SKIP: TRADE-1 flaky on CI`. Off by default: details belong in the ticket. */
   allowNotes?: boolean;
   /**
@@ -118,7 +120,7 @@ export interface ResolvedOptions {
    * How annotation tickets are accepted, for frameworks that have annotations: the type Playwright's
    * `annotation` must have and the Vitest `meta` key that holds the ticket.
    */
-  annotations?: { type: string };
+  annotations?: { type: string; only: boolean };
   /** Keywords checked by `require-ticket-in-comments`; empty when `comments: false`. */
   commentKeywords: string[];
   /**
@@ -290,6 +292,15 @@ function crossFieldProblems(options: GovernanceOptions): string[] {
       problems.push(...presetProblems((state as StateOverride).ticket, `states.${name}.ticket`));
     }
   }
+  // An unknown framework is the schema's to report.
+  const name: unknown = options.framework;
+  const framework =
+    typeof name === 'string' && Object.hasOwn(FRAMEWORKS, name) ? FRAMEWORKS[name as FrameworkName] : undefined;
+  if (framework && framework.annotations === undefined && options.annotations && options.annotations.only === true) {
+    problems.push(
+      `annotations.only needs a framework with annotations, "playwright" or "vitest" (got "${framework.name}")`,
+    );
+  }
   for (const [name, custom] of Object.entries(options.customStates ?? {})) {
     if ((BUILTIN_STATE_NAMES as readonly string[]).includes(name)) {
       problems.push(
@@ -364,7 +375,10 @@ export function compileOptions(options: GovernanceOptions): ResolvedOptions {
     allowBlankLine: options.allowBlankLine ?? false,
     allowNotes: options.allowNotes ?? false,
     reportUnreadableTags: options.reportUnreadableTags ?? false,
-    annotations: options.annotations === false ? undefined : { type: options.annotations?.type ?? 'issue' },
+    annotations:
+      options.annotations === false
+        ? undefined
+        : { type: options.annotations?.type ?? 'issue', only: options.annotations?.only ?? false },
     commentKeywords,
     workCommentKeywords: new Set([...DEFAULT_COMMENT_KEYWORDS, ...commentKeywords]),
     commentTicket: defaultMatcher,

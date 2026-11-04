@@ -334,6 +334,6 @@ change what it reports:
 - `requireTicketForConditional`: conditional skips need a ticket too.
 - `allowBlankLine`: blank lines may separate a marker from its test.
 - `allowNotes`: text may follow the tickets.
-- `annotations`: the ticket may also come from a Playwright annotation of the configured type or Vitest's `meta` key of that name.
+- `annotations`: the ticket may also come from a Playwright annotation of the configured type or Vitest's `meta` key of that name. With `only: true`, a test or describe must take it from there, and a marker comment above one is reported with a suggestion that moves it.
 - `reportUnreadableTags`: report titles and tags that can't be read (see [Titles and tags that can't be read](#titles-and-tags-that-cant-be-read)).
 - `framework` and `testFunctions`: which functions count as the framework's `test`.

@@ -1,3 +1,4 @@
+import type { StateDef } from '../utils/options.ts';
 import {
   annotationTicketsOf,
   appliesTo,
@@ -6,8 +7,10 @@ import {
   hasAnnotationTicket,
   headLoc,
   unreadAnnotationsOf,
+  type Subject,
 } from '../utils/analyze.ts';
 import { createRule } from '../utils/create-rule.ts';
+import { moveToAnnotation } from '../utils/fix.ts';
 
 export default createRule({
   meta: {
@@ -33,6 +36,11 @@ export default createRule({
       dynamicTags:
         "These tags can't be read in this file, so they can't be checked. Use strings, or constants declared in this file.",
       invalidAnnotation: "'{{ticket}}' is not a valid ticket for the '{{state}}' state. Expected {{expected}}.",
+      useAnnotation:
+        'Put the ticket in an `{{type}}` annotation instead of a comment, so it reaches the test report, e.g. `{{example}}`.',
+      missingAnnotation:
+        "{{subject}} is in the '{{state}}' state but has no `{{type}}` annotation with a ticket, e.g. `{{example}}`.",
+      moveToAnnotation: 'Move the ticket into an `{{type}}` annotation.',
       unreadAnnotation:
         "This annotation's ticket isn't static text, so it can't be checked. Use a string, or a constant declared in this file.",
     },
@@ -42,6 +50,44 @@ export default createRule({
     // A broken marker on a describe can be reached from several tests; report it once.
     const reported = new Set<string>();
     const reportOnce = (key: string): boolean => !reported.has(key) && Boolean(reported.add(key));
+
+    // With `annotations.only`, a test or describe takes its ticket from an annotation only; runtime skips
+    // and steps can't carry one, so their comments still count.
+    const only =
+      options.annotations?.only === true && options.framework.annotations !== undefined
+        ? { source: options.framework.annotations, type: options.annotations.type }
+        : undefined;
+
+    /** Reports the comment markers that should be annotations, or the missing annotation when there is none. */
+    const reportAnnotationOnly = (
+      subject: Subject,
+      state: StateDef,
+      { source, type }: NonNullable<typeof only>,
+    ): void => {
+      const example =
+        source.shape === 'meta'
+          ? `meta: { ${type}: '${state.ticket.example}' }`
+          : `annotation: { type: '${type}', description: '${state.ticket.example}' }`;
+      const markers = [...subject.markers, ...subject.regionMarkers].filter((m) => m.state === state);
+      for (const marker of markers) {
+        if (!reportOnce(`only:${marker.comment.range[0]}`)) continue;
+        const fix = subject.markers.includes(marker)
+          ? moveToAnnotation(context.sourceCode, subject.node, marker, source, type)
+          : undefined;
+        context.report({
+          loc: marker.comment.loc,
+          messageId: 'useAnnotation',
+          data: { type, example },
+          suggest: fix ? [{ messageId: 'moveToAnnotation', data: { type }, fix }] : [],
+        });
+      }
+      if (markers.length > 0 || hasAnnotationTicket(subject, state, options)) return;
+      context.report({
+        loc: headLoc(subject),
+        messageId: 'missingAnnotation',
+        data: { subject: describeSubject(subject), state: state.name, type, example },
+      });
+    };
     for (const subject of analysis.subjects) {
       const needsTicket = subject.states.some((s) => s.required);
       if (options.reportUnreadableTags && hasTagStates) {
@@ -56,8 +102,13 @@ export default createRule({
           }
         }
       }
+      const annotationOnly = only && (subject.kind === 'test' || subject.kind === 'describe') ? only : undefined;
       for (const { state, required } of subject.states) {
         if (!required) continue;
+        if (annotationOnly) {
+          reportAnnotationOnly(subject, state, annotationOnly);
+          continue;
+        }
         const result = evaluate(subject, state);
         // Annotations are checked whenever a ticket is needed, whatever the markers say.
         for (const ticket of annotationTicketsOf(subject)) {
@@ -118,7 +169,7 @@ export default createRule({
 
       // Markers are ticket-only unless notes are allowed. A marker with a broken ticket is
       // already reported above, so its extra text waits until the ticket is fixed.
-      if (options.allowNotes) continue;
+      if (options.allowNotes || annotationOnly) continue;
       for (const marker of [...subject.markers, ...subject.regionMarkers]) {
         const { extra, state } = marker;
         if (!extra || !state || !appliesTo(subject, state.name)) continue;

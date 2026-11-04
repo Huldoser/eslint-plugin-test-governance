@@ -23,9 +23,10 @@ describe('compileOptions', () => {
   });
 
   it('resolves the annotation type', () => {
-    assert.deepEqual(compile({}).annotations, { type: 'issue' });
+    assert.deepEqual(compile({}).annotations, { type: 'issue', only: false });
     assert.equal(compile({ annotations: false }).annotations, undefined);
-    assert.deepEqual(compile({ annotations: { type: 'defect' } }).annotations, { type: 'defect' });
+    assert.deepEqual(compile({ annotations: { type: 'defect' } }).annotations, { type: 'defect', only: false });
+    assert.deepEqual(compile({ annotations: { only: true } }).annotations, { type: 'issue', only: true });
   });
 
   it('turns on @new and @quarantined with lifecycleTags', () => {
@@ -200,6 +201,11 @@ describe('compileOptions', () => {
     [{ ticket: { preset: 'jira', projects: [] } }, /ticket\.projects must have at least 1 item/],
     [{ ticket: { preset: 'linear', teams: [] } }, /ticket\.teams must have at least 1 item/],
     [{ ticket: { preset: 'clickup', prefixes: [] } }, /ticket\.prefixes must have at least 1 item/],
+    // Only Playwright and Vitest have annotations, so elsewhere `only` could never be met.
+    [
+      { framework: 'jest', annotations: { only: true } },
+      /annotations\.only needs a framework with annotations, "playwright" or "vitest" \(got "jest"\)/,
+    ],
     [
       { ticket: { preset: 'redmine', host: 'https://redmine.acme.io' } },
       /ticket\.host must be a host name such as tracker\.example\.com or \*\.example\.com, with no scheme, port or path \(got "https:\/\/redmine\.acme\.io"\)/,

@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `annotations: { only: true }` for Playwright and Vitest: a test or describe must carry its ticket in the
+  annotation, which reaches the test report, and a marker comment above one is reported with a suggestion that moves
+  its tickets into `annotation` or `meta`. Runtime skips and steps, which can't carry an annotation, keep their
+  comments. With any other framework, `only` is a configuration error.
 - A new rule, `require-ticket-for-commented-out-tests`, set to warn in every config: a test commented out by hand,
   such as `// test('places an order', ...)`, needs the `// SKIP: <ticket>` marker a skipped test needs, anywhere in
   its block of comments. It reads comment text, so the configs warn rather than fail. A marker in such a block
