@@ -28,6 +28,13 @@ All notable changes to this project are documented here. The format follows
   `eslint-enable` of one of its rules or of every rule. Removing such a marker keeps the directive, and a marker
   added next to it goes above it.
 
+### Changed
+
+- `require-ticket-in-comments` now reads the description of an ESLint directive, the text after `--`, as it
+  reads any comment, so `// eslint-disable-next-line rule -- TODO: migrate this` in a test file needs a ticket:
+  `-- TODO: TRADE-123`. Directives weren't read before, so a test file with such descriptions can get new reports on
+  upgrade. Add the tickets, or set `comments: false` to turn the check off.
+
 ### Fixed
 
 - The `clickup` preset no longer takes digits alone as a task in `#4821` or `https://app.clickup.com/t/9015210959`:

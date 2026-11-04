@@ -34,6 +34,8 @@ How comments are read:
   such as Jest's `test.todo(...)` or Mocha's `it('title')`, is checked by [`require-ticket`](require-ticket.md) instead, so it is
   reported once. That includes one in the wrong case, `// fixme:` or `// Todo:`, which `require-ticket` asks to write in
   uppercase.
+- In an ESLint directive, only the description after `--` is read, as a comment of its own:
+  `// eslint-disable-next-line no-console -- TODO: TRADE-512` is checked, the directive itself never is.
 - Only test files (a test framework import or a call to a test function) are checked.
   Application code is left alone, even if your config applies the plugin to it.
 
