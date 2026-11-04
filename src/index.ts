@@ -3,6 +3,7 @@ import type { ESLint, Rule } from 'eslint';
 import markerMatchesState from './rules/marker-matches-state.ts';
 import noConflictingStates from './rules/no-conflicting-states.ts';
 import noOrphanedMarker from './rules/no-orphaned-marker.ts';
+import requireTicketForCommentedOutTests from './rules/require-ticket-for-commented-out-tests.ts';
 import requireTicketInComments from './rules/require-ticket-in-comments.ts';
 import requireTicket from './rules/require-ticket.ts';
 import { FRAMEWORK_NAMES, type FrameworkName } from './utils/constants.ts';
@@ -22,7 +23,8 @@ export type RuleName =
   | 'marker-matches-state'
   | 'no-orphaned-marker'
   | 'no-conflicting-states'
-  | 'require-ticket-in-comments';
+  | 'require-ticket-in-comments'
+  | 'require-ticket-for-commented-out-tests';
 
 const ruleModules: Record<RuleName, { meta: { docs: { recommended: 'error' | 'warn' } } }> = {
   'require-ticket': requireTicket,
@@ -30,6 +32,7 @@ const ruleModules: Record<RuleName, { meta: { docs: { recommended: 'error' | 'wa
   'no-orphaned-marker': noOrphanedMarker,
   'no-conflicting-states': noConflictingStates,
   'require-ticket-in-comments': requireTicketInComments,
+  'require-ticket-for-commented-out-tests': requireTicketForCommentedOutTests,
 };
 
 // Public types come from `eslint` itself, so users don't need typescript-eslint installed.
