@@ -21,10 +21,11 @@ A test is in a state when it is:
 | `new`          | the `@new` tag                                                                                                                        | `// NEW:`              | with `lifecycleTags: true` |
 | `quarantined`  | the `@quarantined` tag                                                                                                                | `// QUARANTINED:`      | with `lifecycleTags: true` |
 | `fail`, `slow` | `test.fail(...)`, `test.slow()`, `testInfo.fail()`, `testInfo.slow()`                                                                 | `// FAIL:`, `// SLOW:` | no                         |
+| `retry`        | `describe.configure({ retries })`, `jest.retryTimes()`, Vitest's `{ retry }`, `this.retries()`, Cypress's `{ retries }`               | `// RETRY:`            | no                         |
 | custom         | any tag you list in `customStates`                                                                                                    | your keyword           | when configured            |
 
 In Jest and Vitest, `xit`, `xdescribe`, Vitest's `{ skip: true }`, `skipIf(true)`, `context.skip()` and
-`context.skip('note')`, in a test or in `beforeEach`, skip a test too, and `test.failing` and `test.fails` put it in the `fail` state. In Mocha, Cypress and WebdriverIO, `xit`, `xdescribe` and
+`context.skip('note')`, in a test or in `beforeEach`, skip a test too, and `test.failing` and `test.fails` put it in the `fail` state. Any retry count but `0` puts a test, describe or file in the `retry` state, including one known only when the tests run, such as `process.env.CI ? 2 : 0`; node:test and Jasmine have no retries. In Mocha, Cypress and WebdriverIO, `xit`, `xdescribe` and
 `this.skip()` in a test or hook skip a test too, and Cypress's `{ browser: '!webkit' }` skips it in other
 browsers, which counts as a conditional skip. In `node:test`, `{ skip: 'reason' }`, `t.skip()` and `this.skip()` skip a test, `{ todo: true }`,
 `t.todo()` and `this.todo()` make it a todo, `t.test()` subtests count as tests, and `test.expectFailure` puts it in the `fail` state. In

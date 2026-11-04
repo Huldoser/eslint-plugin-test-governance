@@ -1064,6 +1064,26 @@ function optionApplies(node: Node): boolean | undefined {
   return OPTION_VALUES.has(value.type) ? true : undefined;
 }
 
+/** Keys of a retry options object that hold a count: Vitest's `count`, Cypress's `runMode` and `openMode`. */
+const RETRY_COUNT_KEYS = new Set(['count', 'runMode', 'openMode']);
+
+/**
+ * Whether a retry count gives retries: anything but `0`, `false`, `null` or `undefined` written out, since a
+ * count known only when the tests run, as `process.env.CI ? 2 : 0`, retries where flaky tests hide. An
+ * object retries unless every count it holds is one of those.
+ */
+function retries(node: Node | undefined): boolean {
+  if (node === undefined) return false;
+  const value = unwrap(node);
+  if (value.type === 'Literal') return value.value !== 0 && value.value !== false && value.value !== null;
+  if (value.type === 'Identifier') return value.name !== 'undefined';
+  if (value.type !== 'ObjectExpression') return true;
+  const counts = value.properties.flatMap((prop) =>
+    prop.type === 'Property' && RETRY_COUNT_KEYS.has(propertyName(prop) ?? '') ? [prop.value] : [],
+  );
+  return counts.length === 0 || counts.some(retries);
+}
+
 /** Values that are never `false` or `undefined`. */
 const OPTION_VALUES = new Set([
   'TemplateLiteral',
@@ -1205,8 +1225,11 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   const keys = sourceCode.visitorKeys as Record<string, readonly string[] | undefined>;
   /** States an options object can put a test in, such as `skip` for Vitest's `{ skip: true }`. */
   const optionModifiers = new Set<string>(framework.optionEffects.values());
+  if (framework.retryOption !== undefined) optionModifiers.add('retry');
   /** Bodies of Mocha tests and hooks written as a `function`, where `this.skip()` skips at runtime. */
   const thisBodies = new Set<Node>();
+  /** Describe bodies written as a `function`, whose `this` is Mocha's suite, which `this.retries()` acts on. */
+  const suiteBodies = new Set<Node>();
 
   /**
    * `modifiers` maps each state modifier the call has to whether it always applies; a conditional one,
@@ -1308,6 +1331,10 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     }
     // `{ skip: true }` always skips, `{ skip: isMobile }` only sometimes, `{ skip: false }` never.
     for (const [key, value] of details) {
+      if (key === framework.retryOption) {
+        if (retries(value)) add('retry', true);
+        continue;
+      }
       const modifier = framework.optionEffects.get(key);
       const always = framework.anyOptionValue ? optionApplies(value) : booleanOf(value);
       if (modifier && always !== false) add(modifier, always === true);
@@ -1437,6 +1464,8 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const { details, tagInfo } = headOf(call);
     const modifiers = declarationModifiers(kind, args, modifiersOf(members, details.entries, conditions));
     if (kind === 'test') addThisBody(args);
+    const body = args.findLast(isFunction);
+    if (kind === 'describe' && body?.type === 'FunctionExpression') suiteBodies.add(body);
     return { subject: makeSubject(kind, call, modifiers, tagInfo), infos };
   };
 
@@ -1455,10 +1484,21 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   const visitCall = (original: TSESTree.CallExpression): { subject?: Subject; infos?: InfoName[] } => {
     const call = throughFunctionMethods(original);
     const callee = target(chainOf(call.callee, framework.factories));
-    if (callee === undefined) return subtestOf(call) ?? pickedDeclaration(call) ?? { subject: runtimeCall(call) };
+    if (callee === undefined) {
+      return subtestOf(call) ?? pickedDeclaration(call) ?? { subject: runtimeCall(call) ?? retryCall(call) };
+    }
     usesTest = true;
     const args = call.arguments;
     const { path } = callee;
+    if (framework.retryCall === 'describe.configure' && path.join('.') === 'describe.configure') {
+      const options = args.at(0);
+      const object = options && unwrap(options);
+      const count =
+        object?.type === 'ObjectExpression'
+          ? object.properties.find((p) => p.type === 'Property' && propertyName(p) === 'retries')
+          : undefined;
+      return { subject: retrySubject(call, count?.type === 'Property' ? count.value : undefined, 'configure') };
+    }
     const declaration = declarationOf(callee);
     // Vitest's `beforeEach((context) => context.skip())` and Mocha's `before(function () { this.skip(); })`
     // skip the tests they run for.
@@ -1574,13 +1614,53 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     return isTestInfo ? runtimeSubject(call, name) : undefined;
   };
 
+  /**
+   * Mocha's `this.retries(2)` in a describe, test or hook written as a `function`, and Jest's
+   * `jest.retryTimes(3)` with Jest's own `jest`.
+   */
+  const retryCall = (call: TSESTree.CallExpression): Subject | undefined => {
+    const { callee } = call;
+    if (callee.type !== 'MemberExpression') return undefined;
+    const name = memberName(callee);
+    const { object } = callee;
+    if (framework.retryCall === 'this.retries' && name === 'retries' && object.type === 'ThisExpression') {
+      const owner = thisFunction(call);
+      const ownsThis = owner !== undefined && (thisBodies.has(owner) || suiteBodies.has(owner));
+      return ownsThis ? retrySubject(call, call.arguments.at(0), name) : undefined;
+    }
+    if (framework.retryCall !== 'jest.retryTimes' || name !== 'retryTimes' || object.type !== 'Identifier') {
+      return undefined;
+    }
+    const def = declaredVariable(sourceCode, object)?.defs.at(0);
+    const isJest =
+      object.name === 'jest' &&
+      (def === undefined ||
+        (def.type === 'ImportBinding' &&
+          def.parent.type === 'ImportDeclaration' &&
+          framework.ownsModule(def.parent.source.value)));
+    return isJest ? retrySubject(call, call.arguments.at(0), name) : undefined;
+  };
+
+  /** A call that gives retries when `count` does; retries need a ticket even when only some runs get them. */
+  const retrySubject = (call: TSESTree.CallExpression, count: Node | undefined, name: string): Subject | undefined => {
+    if (!retries(count)) return undefined;
+    const subject = runtimeSubject(call, 'retry', undefined, true);
+    if (subject) subject.functionName = name;
+    return subject;
+  };
+
   /** `step` is set for `step.skip()`, which skips only its step; the other calls act on the whole test. */
-  const runtimeSubject = (call: TSESTree.CallExpression, modifier: string, step?: Subject): Subject | undefined => {
+  const runtimeSubject = (
+    call: TSESTree.CallExpression,
+    modifier: string,
+    step?: Subject,
+    always = isUnconditional(call, framework.skipNotes),
+  ): Subject | undefined => {
     if (!states.some((s) => s.modifier === modifier)) return undefined;
     const subject = makeSubject(
       'runtime',
       call,
-      new Map([[modifier, isUnconditional(call, framework.skipNotes)]]),
+      new Map([[modifier, always]]),
       NO_TAGS,
       step ?? stack.findLast((s) => s.kind !== 'step'),
     );

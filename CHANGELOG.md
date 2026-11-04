@@ -8,6 +8,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- A `retry` state, off by default: with `states: { retry: true }`, retries need a `// RETRY: <ticket>` marker, as a
+  skip needs `// SKIP:`. It reads Playwright's `test.describe.configure({ retries })`, Jest's `jest.retryTimes()`,
+  Vitest's `{ retry }`, Mocha's `this.retries()` in a describe, test or hook written as a `function`, and Cypress's
+  `{ retries }`. Any count but `0` counts, including one known only when the tests run, such as
+  `process.env.CI ? 2 : 0`, since retries on CI are where flaky tests hide. node:test and Jasmine have no retries.
 - A marker can be the description of an ESLint directive, as in
   `// eslint-disable-next-line jest/no-disabled-tests -- SKIP: TRADE-123`, so a skip that also turns off a rule
   banning skipped tests needs one comment, not two. It works in `eslint-disable-next-line` above the test,

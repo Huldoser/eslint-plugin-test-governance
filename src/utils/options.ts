@@ -55,10 +55,11 @@ export interface GovernanceOptions {
   lifecycleTags?: boolean;
   /**
    * Turns built-in states on or off, renames their tag or marker, or gives them their own ticket format.
-   * `skip`, `fixme` and `todo` are on by default, `fail` and `slow` off; a setting for `new` or `quarantined`
-   * wins over `lifecycleTags`. Only `new` and `quarantined` have a tag, e.g.
+   * `skip`, `fixme` and `todo` are on by default, `fail`, `slow` and `retry` off; a setting for `new` or
+   * `quarantined` wins over `lifecycleTags`. Only `new` and `quarantined` have a tag, e.g.
    * `{ quarantined: { tag: '@flaky', marker: 'FLAKY' } }`. `fixme` and `slow` exist only in Playwright,
-   * `todo` in every framework but Playwright, and `fail` in Playwright, Jest and Vitest.
+   * `todo` in every framework but Playwright, `fail` in Playwright, Jest and Vitest, and `retry` in every
+   * framework but node:test and Jasmine.
    */
   states?: Partial<Record<BuiltinStateName, boolean | StateOverride>>;
   /** Adds a state for a tag, e.g. `{ 'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' } }`. */
@@ -143,6 +144,7 @@ const BUILTIN_STATES: {
   fail: { marker: 'FAIL', modifier: 'fail', enabled: false },
   slow: { marker: 'SLOW', modifier: 'slow', enabled: false },
   todo: { marker: 'TODO', modifier: 'todo', enabled: true },
+  retry: { marker: 'RETRY', modifier: 'retry', enabled: false },
   new: { marker: 'NEW', tag: '@new', lifecycle: true, enabled: false },
   quarantined: { marker: 'QUARANTINED', tag: '@quarantined', lifecycle: true, enabled: false },
 };

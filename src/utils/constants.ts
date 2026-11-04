@@ -9,7 +9,7 @@ export const HOST_ENTRY_RE = new RegExp(
   `^(?:${HOST_LABEL}(?:\\.${HOST_LABEL})*|\\*\\.${HOST_LABEL}(?:\\.${HOST_LABEL})+)\\.?$`,
 );
 
-export const BUILTIN_STATE_NAMES = ['skip', 'fixme', 'fail', 'slow', 'todo', 'new', 'quarantined'] as const;
+export const BUILTIN_STATE_NAMES = ['skip', 'fixme', 'fail', 'slow', 'todo', 'retry', 'new', 'quarantined'] as const;
 export type BuiltinStateName = (typeof BUILTIN_STATE_NAMES)[number];
 /** The built-in states a tag puts a test in, so the only ones whose tag can be renamed. */
 export const TAG_STATE_NAMES = ['new', 'quarantined'] as const satisfies readonly BuiltinStateName[];

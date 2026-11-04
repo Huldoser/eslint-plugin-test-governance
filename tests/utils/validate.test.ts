@@ -42,7 +42,7 @@ describe('options validation', () => {
     [{ ticket: { preset: 'numeric', minLength: 0 } }, 'ticket.minLength must be at least 1 (got 0)'],
     [
       { states: { blocked: true } },
-      'states.blocked is not a known option (expected one of: skip, fixme, fail, slow, todo, new, quarantined)',
+      'states.blocked is not a known option (expected one of: skip, fixme, fail, slow, todo, retry, new, quarantined)',
     ],
     [{ states: { skip: null } }, 'states.skip must be a boolean or an object (got null)'],
     [{ comments: true }, 'comments must be false (got true)'],
