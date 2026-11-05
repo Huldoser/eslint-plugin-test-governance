@@ -16,7 +16,7 @@ export default createRule({
   meta: {
     type: 'problem',
     docs: {
-      description: 'Require a ticket marker comment above skipped, fixme and tagged tests',
+      description: 'Require a ticket for skipped, fixme, todo, retried and tagged tests',
       recommended: 'error',
       url: 'https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/rules/require-ticket.md',
     },
