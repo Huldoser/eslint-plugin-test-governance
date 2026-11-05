@@ -112,6 +112,7 @@ export const optionsSchema: Schema = {
         additionalProperties: false,
       },
     },
+    knownTags: { type: 'array', items: { type: 'string', pattern: TAG_RE.source, patternHint: TAG_HINT } },
     comments: {
       anyOf: [
         { type: 'boolean', enum: [false] },

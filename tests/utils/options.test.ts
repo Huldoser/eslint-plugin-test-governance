@@ -155,6 +155,7 @@ describe('compileOptions', () => {
       /two states use the tag "@new"/,
     ],
     [{ states: { quarantined: { tag: 'flaky' } } }, /states\.quarantined\.tag must be a tag such as @needs-data/],
+    [{ knownTags: ['@smoke', 'regression'] }, /knownTags\[1\] must be a tag such as @needs-data \(got "regression"\)/],
     // Only a state that a tag puts a test in has a tag to rename.
     [
       { states: { skip: { tag: '@skipped' } } },
