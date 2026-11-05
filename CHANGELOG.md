@@ -14,6 +14,9 @@ All notable changes to this project are documented here. The format follows
   has one, as Playwright's `test.skip(condition, 'why')`, Vitest's `context.skip(condition, 'why')`, node:test's
   `t.skip('why')` and `{ skip: isWindows && 'why' }`, and Jasmine's `pending('why')`. `require-ticket` reports the
   skips that give none.
+- `knownTags`, such as `['@smoke', '@regression']`: `no-conflicting-states` gives these tags the case and typo
+  checks state tags get, so `@Smoke` is fixed to `@smoke` and `@smok` is reported. A listed tag is never reported as
+  a typo of a state tag.
 
 ## [0.12.1] - 2026-11-04
 

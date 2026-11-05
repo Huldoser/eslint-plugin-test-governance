@@ -22,7 +22,8 @@ export default createRule({
     },
   },
   create(context, analysis, options) {
-    const tagStates = options.states.filter(isTagState);
+    // State tags first, so a tag near both a state tag and a known tag is read as the state's.
+    const checkedTags = [...options.states.filter(isTagState).map((s) => s.tag), ...options.knownTags];
     const newTag = options.states.find((s) => s.name === 'new')?.tag;
     const quarantinedTag = options.states.find((s) => s.name === 'quarantined')?.tag;
 
@@ -57,22 +58,22 @@ export default createRule({
       const { tag, range } = occurrence;
       // A Vitest tag name is written without its `@`, so show it, and fix it, the same way.
       const written = (name: string): string => (occurrence.plain ? name.slice(1) : name);
-      if (tagStates.some((s) => s.tag === tag)) return;
+      if (checkedTags.includes(tag)) return;
       const lower = tag.toLowerCase();
-      const sameLetters = tagStates.find((s) => s.tag.toLowerCase() === lower);
+      const sameLetters = checkedTags.find((checked) => checked.toLowerCase() === lower);
       if (sameLetters) {
         context.report({
           node: occurrence.node,
           messageId: 'tagCase',
-          data: { found: written(tag), expected: written(sameLetters.tag) },
-          fix: range && ((fixer) => fixer.replaceTextRange(range, written(sameLetters.tag))),
+          data: { found: written(tag), expected: written(sameLetters) },
+          fix: range && ((fixer) => fixer.replaceTextRange(range, written(sameLetters))),
         });
         return;
       }
       // A typo changes, adds, drops or swaps a letter or two. A tag that is two or more letters
       // shorter or longer, like `@unquarantined` next to `@quarantined`, is a different word.
-      const near = tagStates.find((s) => {
-        const expected = s.tag.toLowerCase();
+      const near = checkedTags.find((checked) => {
+        const expected = checked.toLowerCase();
         return (
           Math.abs(lower.length - expected.length) < 2 &&
           editDistance(lower, expected) <= typoThreshold(expected.length - 1)
@@ -82,7 +83,7 @@ export default createRule({
         context.report({
           node: occurrence.node,
           messageId: 'tagTypo',
-          data: { found: written(tag), expected: written(near.tag) },
+          data: { found: written(tag), expected: written(near) },
         });
       }
     }

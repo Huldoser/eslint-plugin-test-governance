@@ -64,6 +64,11 @@ export interface GovernanceOptions {
   states?: Partial<Record<BuiltinStateName, boolean | StateOverride>>;
   /** Adds a state for a tag, e.g. `{ 'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' } }`. */
   customStates?: Record<string, CustomState>;
+  /**
+   * Your team's other tags, such as `['@smoke', '@regression']`, which get the case and typo checks state tags
+   * get: `@Smoke` and `@smok` are reported. Write them with the `@`, also for Vitest's `tags: ['smoke']`.
+   */
+  knownTags?: string[];
   /** Require a ticket for conditional skips such as `test.skip(browserName === 'webkit')`. */
   requireTicketForConditional?: boolean;
   /**
@@ -117,6 +122,8 @@ export interface ResolvedOptions {
   framework: Framework;
   testFunctions: Set<string>;
   states: StateDef[];
+  /** Tags besides the state tags whose case and spelling `no-conflicting-states` checks. */
+  knownTags: string[];
   requireTicketForConditional: boolean;
   requireReasonForConditional: boolean;
   allowBlankLine: boolean;
@@ -377,6 +384,7 @@ export function compileOptions(options: GovernanceOptions): ResolvedOptions {
     framework,
     testFunctions: new Set(options.testFunctions ?? framework.testFunctions),
     states,
+    knownTags: options.knownTags ?? [],
     requireTicketForConditional: options.requireTicketForConditional ?? false,
     requireReasonForConditional: options.requireReasonForConditional ?? false,
     allowBlankLine: options.allowBlankLine ?? false,

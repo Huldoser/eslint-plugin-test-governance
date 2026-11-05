@@ -4,6 +4,7 @@ import { runRule, settings } from '../helpers.ts';
 const lifecycle = settings({ lifecycleTags: true });
 const custom = settings({ customStates: { quarantine: { when: '@quarantine', marker: 'QUARANTINE' } } });
 const flaky = settings({ lifecycleTags: true, states: { quarantined: { tag: '@flaky', marker: 'FLAKY' } } });
+const known = settings({ knownTags: ['@smoke', '@regression', '@e2e'] });
 
 runRule('no-conflicting-states', rule, {
   valid: [
@@ -45,8 +46,43 @@ runRule('no-conflicting-states', rule, {
       code: "test('places an order @new', async () => {\n  await test.step('fills the order', async (step) => {\n    step.skip();\n  });\n});",
       settings: lifecycle,
     },
+    { code: "test('places an order @smoke @regression', async () => {});", settings: known },
+    // A tag of three letters is too short to tell a typo from another word.
+    { code: "test('places an order @e2f', async () => {});", settings: known },
+    // A tag listed as known is never a typo of a state tag.
+    {
+      code: "test('places an order @quarantine', async () => {});",
+      settings: settings({ lifecycleTags: true, knownTags: ['@quarantine'] }),
+    },
   ],
   invalid: [
+    // Known tags get the case and typo checks of state tags.
+    {
+      code: "test('places an order @Smoke', async () => {});",
+      settings: known,
+      output: "test('places an order @smoke', async () => {});",
+      errors: [{ messageId: 'tagCase', data: { found: '@Smoke', expected: '@smoke' } }],
+    },
+    {
+      code: "test('places an order @smok @regresion', async () => {});",
+      settings: known,
+      errors: [
+        { messageId: 'tagTypo', data: { found: '@smok', expected: '@smoke' } },
+        { messageId: 'tagTypo', data: { found: '@regresion', expected: '@regression' } },
+      ],
+    },
+    {
+      code: "test('places an order', { tags: ['Smoke'] }, () => {});",
+      settings: settings({ framework: 'vitest', knownTags: ['@smoke'] }),
+      output: "test('places an order', { tags: ['smoke'] }, () => {});",
+      errors: [{ messageId: 'tagCase', data: { found: 'Smoke', expected: 'smoke' } }],
+    },
+    // Near both a state tag and a known tag, a tag is read as the state's.
+    {
+      code: "test('places an order @quarantind', async () => {});",
+      settings: settings({ lifecycleTags: true, knownTags: ['@quarantine'] }),
+      errors: [{ messageId: 'tagTypo', data: { found: '@quarantind', expected: '@quarantined' } }],
+    },
     // A tag from a constant is reported where the test uses it. The constant may be shared, so there is no autofix.
     {
       code: "const TAGS = { NEW: '@New' };\ntest('places an order', { tag: TAGS.NEW }, async () => {});",
