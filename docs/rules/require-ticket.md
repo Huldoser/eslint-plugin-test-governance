@@ -109,6 +109,41 @@ title and tags count as usual, and a marker goes above it, or in code without se
 If one test or describe has several markers for the same state, each must be valid: in
 `// SKIP: TRADE-1` followed by `// SKIP: nope`, the second line is reported.
 
+## Reasons for conditional skips
+
+With `requireReasonForConditional: true`, a conditional skip needs a reason but no ticket, so nobody has
+to guess later why it doesn't run. Any of these counts:
+
+- a comment with text above it, above a statement around it in the same function, such as the `if`, or
+  above its test; an `eslint-disable` comment counts by its description after `--`;
+- the reason its call takes, where the runner has one: Playwright's `test.skip(condition, 'why')` and
+  `testInfo.skip(condition, 'why')`, Vitest's `context.skip(condition, 'why')` or `context.skip('why')`,
+  node:test's `t.skip('why')` and Jasmine's `pending('why')`. A reason held in a name is taken on trust;
+- in node:test, text in the option, as `{ skip: isWindows && 'No symlinks' }`, which Node reports;
+- a ticket, from a marker or an annotation.
+
+The same goes for the other states a condition can set, such as `test.fixme(condition)`. With
+`requireTicketForConditional` as well, the ticket is required and the reason alone is not enough.
+
+<!-- example: valid settings={"requireReasonForConditional":true} -->
+
+```js
+test('copies the order ID', async ({ browserName }) => {
+  test.skip(browserName === 'webkit', 'WebKit has no clipboard API in headless mode');
+});
+
+// Touch screens have no hover.
+(isMobile ? test.skip : test)('shows the price on hover', async ({ page }) => {});
+```
+
+<!-- example: invalid settings={"framework":"mocha","requireReasonForConditional":true} -->
+
+```js
+it('places an order', function () {
+  if (isWeekend) this.skip();
+});
+```
+
 ## Titles and tags that can't be read
 
 Tags can only be read from text: a string or a template literal such as `` `buys ${symbol} @new` ``,
@@ -332,6 +367,7 @@ change what it reports:
 - `lifecycleTags`, `states` and `customStates`: which states need a marker, which tag puts a test in
   each, what the marker is called, and, for a state with its own `ticket`, which tickets it accepts.
 - `requireTicketForConditional`: conditional skips need a ticket too.
+- `requireReasonForConditional`: conditional skips need a reason, a comment or the call's own reason argument.
 - `allowBlankLine`: blank lines may separate a marker from its test.
 - `allowNotes`: text may follow the tickets.
 - `annotations`: the ticket may also come from a Playwright annotation of the configured type or Vitest's `meta` key of that name. With `only: true`, a test or describe must take it from there, and a marker comment above one is reported with a suggestion that moves it.

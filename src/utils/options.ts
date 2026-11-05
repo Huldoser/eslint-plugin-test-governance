@@ -66,6 +66,11 @@ export interface GovernanceOptions {
   customStates?: Record<string, CustomState>;
   /** Require a ticket for conditional skips such as `test.skip(browserName === 'webkit')`. */
   requireTicketForConditional?: boolean;
+  /**
+   * Require a reason for conditional skips, without a ticket: a comment above the skip, or the reason the
+   * call takes, as `test.skip(browserName === 'webkit', 'No clipboard API')`.
+   */
+  requireReasonForConditional?: boolean;
   /** Let blank lines separate a marker from the test it belongs to. */
   allowBlankLine?: boolean;
   /**
@@ -113,6 +118,7 @@ export interface ResolvedOptions {
   testFunctions: Set<string>;
   states: StateDef[];
   requireTicketForConditional: boolean;
+  requireReasonForConditional: boolean;
   allowBlankLine: boolean;
   allowNotes: boolean;
   reportUnreadableTags: boolean;
@@ -372,6 +378,7 @@ export function compileOptions(options: GovernanceOptions): ResolvedOptions {
     testFunctions: new Set(options.testFunctions ?? framework.testFunctions),
     states,
     requireTicketForConditional: options.requireTicketForConditional ?? false,
+    requireReasonForConditional: options.requireReasonForConditional ?? false,
     allowBlankLine: options.allowBlankLine ?? false,
     allowNotes: options.allowNotes ?? false,
     reportUnreadableTags: options.reportUnreadableTags ?? false,

@@ -94,6 +94,11 @@ export interface Framework {
    */
   skipNotes: boolean;
   /**
+   * Whether a runtime call takes the reason for its state, as Playwright's `test.skip(condition, 'why')`, after
+   * its condition, or with `skipNotes` as its only argument. Mocha's `this.skip()` takes none.
+   */
+  reasonArgument: boolean;
+  /**
    * The methods a test or hook written as a `function` can change its state with at runtime through `this`,
    * as Mocha's `this.skip()`. Empty when `this` can't.
    */
@@ -174,6 +179,7 @@ const playwright: Framework = {
   subtests: false,
   skipWithoutBody: false,
   skipNotes: false,
+  reasonArgument: true,
   thisMethods: new Set(),
   todoWithoutBody: false,
   runtimeFunctions: new Map(),
@@ -216,6 +222,7 @@ const jest: Framework = {
   subtests: false,
   skipWithoutBody: false,
   skipNotes: false,
+  reasonArgument: false,
   thisMethods: new Set(),
   todoWithoutBody: false,
   runtimeFunctions: new Map(),
@@ -268,6 +275,7 @@ const vitest: Framework = {
   subtests: false,
   skipWithoutBody: true,
   skipNotes: true,
+  reasonArgument: true,
   thisMethods: new Set(),
   todoWithoutBody: false,
   runtimeFunctions: new Map(),
@@ -319,6 +327,7 @@ const mocha: Omit<Framework, 'name'> = {
   subtests: false,
   skipWithoutBody: true,
   skipNotes: false,
+  reasonArgument: false,
   thisMethods: new Set(['skip']),
   todoWithoutBody: true,
   runtimeFunctions: new Map(),
@@ -381,6 +390,7 @@ const nodeTest: Framework = {
   skipWithoutBody: true,
   // `t.skip('why')` takes a message, not a condition.
   skipNotes: true,
+  reasonArgument: true,
   thisMethods: NODE_TEST_CONTEXT,
   todoWithoutBody: false,
   runtimeFunctions: new Map(),
@@ -427,6 +437,7 @@ const jasmine: Framework = {
   skipWithoutBody: true,
   // `pending('why')` takes a reason, not a condition.
   skipNotes: true,
+  reasonArgument: true,
   thisMethods: new Set(),
   todoWithoutBody: true,
   runtimeFunctions: new Map([
