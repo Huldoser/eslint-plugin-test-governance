@@ -1,6 +1,6 @@
-# Require a ticket marker comment above skipped, fixme and tagged tests (`test-governance/require-ticket`)
+# Require a ticket for skipped, fixme, todo, retried and tagged tests (`test-governance/require-ticket`)
 
-📝 Require a ticket marker comment above skipped, fixme and tagged tests.
+📝 Require a ticket for skipped, fixme, todo, retried and tagged tests.
 
 💼 This rule is enabled in the following [configs](https://github.com/Huldoser/eslint-plugin-test-governance#usage): 🌲 `cypress`, 🌼 `jasmine`, 🃏 `jest`, ☕ `mocha`, 🟢 `node-test`, 🎭 `playwright`, ⚡ `vitest`, 🤖 `webdriverio`.
 
