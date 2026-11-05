@@ -30,6 +30,11 @@ runRule('require-ticket (conditional reasons, Playwright)', requireTicket, {
       '// SKIP: TRADE-1\ntest.skip(isMobile);',
       "// SKIP: TRADE-1\ntest.describe('orders', () => {\n  test('hovers', async ({ isMobile }) => {\n    if (isMobile) test.skip();\n  });\n});",
       "(isMobile ? test.skip : test)('hovers', { annotation: { type: 'issue', description: 'TRADE-1' } }, async () => {});",
+      // A comment at the end of the line, or above the hook or step the call is in.
+      'test.skip(isMobile); // Touch screens have no hover.',
+      '// Touch screens have no hover.\ntest.beforeEach(async ({ isMobile }) => {\n  test.skip(isMobile);\n});',
+      "test.describe('orders', () => {\n  // Touch screens have no hover.\n  test.beforeEach(async ({ isMobile }) => {\n    test.skip(isMobile);\n  });\n});",
+      "test('hovers', async ({ isMobile }) => {\n  // Touch screens have no hover.\n  await test.step('opens the menu', async () => {\n    test.skip(isMobile);\n  });\n});",
       // Skips that always apply need their ticket, not a reason.
       "// SKIP: TRADE-1\ntest.skip('hovers', async () => {});",
     ]),
@@ -66,6 +71,15 @@ runRule('require-ticket (conditional reasons, Playwright)', requireTicket, {
           ...missingReason('This skip call', call("test.skip(condition, 'why')")),
           line,
         })),
+      },
+      // Commented-out code and a marker with nothing after it say nothing.
+      {
+        code: "test('hovers', async ({ isMobile }) => {\n  // test('old hover', async () => {});\n  if (isMobile) {\n    test.skip();\n  }\n});",
+        errors: [{ ...missingReason('This skip call', call("test.skip(condition, 'why')")), line: 4 }],
+      },
+      {
+        code: '// SKIP:\ntest.skip(isMobile);',
+        errors: [{ ...missingReason('This skip call', call("test.skip(condition, 'why')")), line: 2 }],
       },
       // Only the test around the call counts, not a describe further out or a statement outside its function.
       {
@@ -124,6 +138,9 @@ runRule('require-ticket (conditional reasons, node:test)', requireTicket, {
     "test('follows links', { skip: isLinux ? false : 'No symlinks' }, () => {});",
     "test('follows links', { todo: isWindows && 'Symlinks next' }, () => {});",
     "test('follows links', (t) => {\n  if (isWindows) t.skip('No symlinks');\n});",
+    // node:test's `t.skip()` takes only a reason, so a name or a template is one.
+    "test('follows links', (t) => {\n  if (isWindows) t.skip(reason);\n});",
+    "test('follows links', (t) => {\n  if (isWindows) t.skip(`${platform} has no symlinks`);\n});",
   ]),
   invalid: withOptions({ ...reasons, framework: 'node-test' }, [
     { code: "test('follows links', { skip: isWindows }, () => {});", errors: [missingReason('This test')] },
@@ -147,11 +164,24 @@ runRule('require-ticket (conditional reasons, other runners)', requireTicket, {
       settings: settings({ ...reasons, framework: 'jasmine' }),
     },
     {
+      code: "it('places an order', () => {\n  if (marketClosed) pending(reason);\n});",
+      settings: settings({ ...reasons, framework: 'jasmine' }),
+    },
+    {
+      code: "describe('orders', function () {\n  // The sandbox has no market data on weekends.\n  before(function () {\n    if (isWeekend) this.skip();\n  });\n});",
+      settings: settings({ ...reasons, framework: 'mocha' }),
+    },
+    {
       code: "it('places an order', function () {\n  // The sandbox has no market data on weekends.\n  if (isWeekend) this.skip();\n});",
       settings: settings({ ...reasons, framework: 'mocha' }),
     },
   ],
   invalid: [
+    {
+      code: "it('places an order', () => {\n  if (marketClosed) pending('');\n});",
+      settings: settings({ ...reasons, framework: 'jasmine' }),
+      errors: [missingReason('This pending call', call("pending('why')"))],
+    },
     {
       code: "it('places an order', () => {\n  if (marketClosed) pending();\n});",
       settings: settings({ ...reasons, framework: 'jasmine' }),

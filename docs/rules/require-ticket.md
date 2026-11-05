@@ -114,11 +114,13 @@ If one test or describe has several markers for the same state, each must be val
 With `requireReasonForConditional: true`, a conditional skip needs a reason but no ticket, so nobody has
 to guess later why it doesn't run. Any of these counts:
 
-- a comment with text above it, above a statement around it in the same function, such as the `if`, or
-  above its test; an `eslint-disable` comment counts by its description after `--`;
+- a comment above it or at the end of its line, above a statement around it, such as the `if`, or above
+  the hook, step or test it is in. Commented-out code, a marker keyword alone such as `// SKIP:`, and an
+  `eslint-disable` comment without a description after `--` say nothing, so they don't count;
 - the reason its call takes, where the runner has one: Playwright's `test.skip(condition, 'why')` and
   `testInfo.skip(condition, 'why')`, Vitest's `context.skip(condition, 'why')` or `context.skip('why')`,
-  node:test's `t.skip('why')` and Jasmine's `pending('why')`. A reason held in a name is taken on trust;
+  node:test's `t.skip('why')` and Jasmine's `pending('why')`. A reason held in a name or built in a
+  template is taken on trust;
 - in node:test, text in the option, as `{ skip: isWindows && 'No symlinks' }`, which Node reports;
 - a ticket, from a marker or an annotation.
 

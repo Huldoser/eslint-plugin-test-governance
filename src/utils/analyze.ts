@@ -1168,9 +1168,12 @@ function isUnconditional(call: TSESTree.CallExpression, notes: boolean): boolean
   return always && !isGuarded(call);
 }
 
-/** Whether a comment holds any text; a directive counts only by its description. */
+/**
+ * Whether a comment says anything: a line with text other than a marker keyword alone, such as `SKIP:`. A
+ * directive counts only by its description.
+ */
 function hasText(comment: Comment): boolean {
-  return commentLines(comment).some((line) => /[^\s*]/.test(line.text));
+  return commentLines(comment).some(({ text }) => /[^\s*]/.test(text) && MARKER_LINE_RE.exec(text)?.[2].trim() !== '');
 }
 
 /**
@@ -1189,15 +1192,17 @@ function isReasonText(sourceCode: SourceCode, node: Node): boolean {
   return Boolean(staticText(sourceCode, node)?.trim());
 }
 
-/**
- * Whether a runtime call gives the reason for its state: Playwright's `test.skip(condition, 'why')` and
- * Vitest's `context.skip(condition, 'why')` after the condition, or with `notes` as the only argument, as
- * node:test's `t.skip('why')` and Jasmine's `pending('why')`.
- */
-function callReason(sourceCode: SourceCode, call: TSESTree.CallExpression, notes: boolean): boolean {
+/** Whether a runtime call gives the reason for its state where its framework takes one (see `reasonArgument`). */
+function callReason(
+  sourceCode: SourceCode,
+  call: TSESTree.CallExpression,
+  where: NonNullable<Framework['reasonArgument']>,
+): boolean {
   const first = call.arguments.at(0);
   const second = call.arguments.at(1);
-  if (notes && first !== undefined && staticText(sourceCode, first) !== undefined) {
+  if (where === 'only') return first !== undefined && saysWhy(sourceCode, first);
+  // Vitest's `context.skip(isMobile)` takes a condition, so only text first is a reason.
+  if (where === 'either' && first !== undefined && staticText(sourceCode, first) !== undefined) {
     return isReasonText(sourceCode, first);
   }
   return second !== undefined && saysWhy(sourceCode, second);
@@ -1350,16 +1355,33 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   /** Describe bodies written as a `function`, whose `this` is Mocha's suite, which `this.retries()` acts on. */
   const suiteBodies = new Set<Node>();
 
-  /** Whether a statement around `anchor` in its function has a comment with text above it, as `// why` above an `if`. */
-  const commentedAround = (anchor: Node): boolean => {
-    for (let node = anchor.parent; node && !FUNCTIONS.has(node.type); node = node.parent) {
-      const container = node.parent;
-      if (container && STATEMENT_CONTAINERS.has(container.type)) {
-        if (commentBlock(sourceCode, node, options.allowBlankLine).some(hasText)) return true;
+  /**
+   * Whether a statement around `anchor` has a comment that says something above it, as `// why` above an `if`,
+   * up to `owner`, the test or describe the call acts on. The walk goes on through a callback passed to another
+   * call, such as a hook's or a step's, but stops at a function declared some other way.
+   */
+  const commentedAround = (anchor: Node, owner: Node | undefined): boolean => {
+    for (let node = anchor.parent; node; node = node.parent) {
+      if (FUNCTIONS.has(node.type)) {
+        const call = node.parent;
+        if (call?.type !== 'CallExpression' || call === owner || !(call.arguments as Node[]).includes(node)) {
+          return false;
+        }
+        continue;
       }
+      const container = node.parent;
+      if (!container || !STATEMENT_CONTAINERS.has(container.type)) continue;
+      const block = commentBlock(sourceCode, node, options.allowBlankLine);
+      if (block.some((comment) => !commentedOut.comments.has(comment) && hasText(comment))) return true;
     }
     return false;
   };
+
+  /** Whether a comment that says something ends the line `node` ends on, as `test.skip(isMobile); // why`. */
+  const trailingText = (node: Node): boolean =>
+    sourceCode
+      .getCommentsAfter(node)
+      .some((comment) => comment.loc.start.line === node.loc.end.line && hasText(comment));
 
   /**
    * `modifiers` maps each state modifier the call has to whether it always applies; a conditional one,
@@ -1392,9 +1414,10 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     // its arguments.
     const reasonedCall = (): boolean =>
       kind === 'runtime' &&
-      ((framework.reasonArgument && callReason(sourceCode, call, framework.skipNotes)) ||
+      ((framework.reasonArgument !== undefined && callReason(sourceCode, call, framework.reasonArgument)) ||
         parent?.commented === true ||
-        commentedAround(anchor));
+        trailingText(anchor) ||
+        commentedAround(anchor, parent?.node));
     const ownTags = new Set(tagInfo.tags.map((t) => t.tag));
     const sources: StateSource[] = [];
     for (const state of states) {

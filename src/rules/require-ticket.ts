@@ -95,15 +95,14 @@ export default createRule({
       if (evaluate(subject, state).kind === 'ok' || hasAnnotationTicket(subject, state, options)) return;
       const callee = context.sourceCode.getText(subject.node.callee);
       const first = subject.node.arguments.at(0);
-      // Vitest's `context.skip()` takes a condition before the reason; node:test and Jasmine take only the reason.
-      const notesOnly =
-        options.framework.skipNotes &&
-        (first === undefined || first.type === 'Literal' || first.type === 'TemplateLiteral');
-      const example = notesOnly ? `${callee}('why')` : `${callee}(condition, 'why')`;
+      const where = options.framework.reasonArgument;
+      // Vitest's `context.skip()` takes either a reason alone or a condition and then the reason.
+      const reasonOnly =
+        where === 'only' ||
+        (where === 'either' && (first === undefined || first.type === 'Literal' || first.type === 'TemplateLiteral'));
+      const example = reasonOnly ? `${callee}('why')` : `${callee}(condition, 'why')`;
       const argument =
-        subject.kind === 'runtime' && options.framework.reasonArgument
-          ? `, or pass it to the call: \`${example}\``
-          : '';
+        subject.kind === 'runtime' && where !== undefined ? `, or pass it to the call: \`${example}\`` : '';
       context.report({
         loc: headLoc(subject),
         messageId: 'missingReason',
