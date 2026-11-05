@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `requireReasonForConditional`, off by default: a conditional skip, such as `test.skip(isMobile)` or
+  `if (isWeekend) this.skip()`, needs a reason but no ticket. A comment above it or at the end of its line, above
+  the `if` around it, or above its hook, step or test counts, and so does the reason the call takes where the runner
+  has one, as Playwright's `test.skip(condition, 'why')`, Vitest's `context.skip(condition, 'why')`, node:test's
+  `t.skip('why')` and `{ skip: isWindows && 'why' }`, and Jasmine's `pending('why')`. `require-ticket` reports the
+  skips that give none.
+
 ## [0.12.1] - 2026-11-04
 
 ### Fixed

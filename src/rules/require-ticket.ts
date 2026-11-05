@@ -25,6 +25,8 @@ export default createRule({
     messages: {
       missingMarker:
         "{{subject}} is in the '{{state}}' state but has no `// {{marker}}: <ticket>` comment directly above it, e.g. `// {{marker}}: {{example}}`.",
+      missingReason:
+        "{{subject}} is in the '{{state}}' state only under a condition and doesn't say why. Write the reason in a comment above it{{argument}}.",
       missingTicket: '`{{marker}}:` needs a ticket right after the colon, e.g. `// {{marker}}: {{example}}`.',
       invalidTicket: "'{{ticket}}' is not a valid ticket for the '{{state}}' state. Expected {{expected}}.",
       placeholderTicket: "'{{ticket}}' is a placeholder, not a real ticket. Link the ticket that tracks this test.",
@@ -88,6 +90,26 @@ export default createRule({
         data: { subject: describeSubject(subject), state: state.name, type, example },
       });
     };
+    /** Reports a conditional state that gives no reason and has no ticket, which would say why as well. */
+    const reportReason = (subject: Subject, state: StateDef): void => {
+      if (evaluate(subject, state).kind === 'ok' || hasAnnotationTicket(subject, state, options)) return;
+      const callee = context.sourceCode.getText(subject.node.callee);
+      const first = subject.node.arguments.at(0);
+      const where = options.framework.reasonArgument;
+      // Vitest's `context.skip()` takes either a reason alone or a condition and then the reason.
+      const reasonOnly =
+        where === 'only' ||
+        (where === 'either' && (first === undefined || first.type === 'Literal' || first.type === 'TemplateLiteral'));
+      const example = reasonOnly ? `${callee}('why')` : `${callee}(condition, 'why')`;
+      const argument =
+        subject.kind === 'runtime' && where !== undefined ? `, or pass it to the call: \`${example}\`` : '';
+      context.report({
+        loc: headLoc(subject),
+        messageId: 'missingReason',
+        data: { subject: describeSubject(subject), state: state.name, argument },
+      });
+    };
+
     for (const subject of analysis.subjects) {
       const needsTicket = subject.states.some((s) => s.required);
       if (options.reportUnreadableTags && hasTagStates) {
@@ -103,8 +125,11 @@ export default createRule({
         }
       }
       const annotationOnly = only && (subject.kind === 'test' || subject.kind === 'describe') ? only : undefined;
-      for (const { state, required } of subject.states) {
-        if (!required) continue;
+      for (const { state, required, reasoned } of subject.states) {
+        if (!required) {
+          if (options.requireReasonForConditional && reasoned === false) reportReason(subject, state);
+          continue;
+        }
         if (annotationOnly) {
           reportAnnotationOnly(subject, state, annotationOnly);
           continue;

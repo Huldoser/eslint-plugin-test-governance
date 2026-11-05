@@ -94,6 +94,13 @@ export interface Framework {
    */
   skipNotes: boolean;
   /**
+   * Where a runtime call takes the reason for its state: `after-condition`, as Playwright's
+   * `test.skip(condition, 'why')`; `only`, as node:test's `t.skip('why')` and Jasmine's `pending('why')`; or
+   * `either`, as Vitest's `context.skip('why')` and `context.skip(condition, 'why')`. Unset when it takes none,
+   * as Mocha's `this.skip()`.
+   */
+  reasonArgument?: 'after-condition' | 'only' | 'either';
+  /**
    * The methods a test or hook written as a `function` can change its state with at runtime through `this`,
    * as Mocha's `this.skip()`. Empty when `this` can't.
    */
@@ -174,6 +181,7 @@ const playwright: Framework = {
   subtests: false,
   skipWithoutBody: false,
   skipNotes: false,
+  reasonArgument: 'after-condition',
   thisMethods: new Set(),
   todoWithoutBody: false,
   runtimeFunctions: new Map(),
@@ -268,6 +276,7 @@ const vitest: Framework = {
   subtests: false,
   skipWithoutBody: true,
   skipNotes: true,
+  reasonArgument: 'either',
   thisMethods: new Set(),
   todoWithoutBody: false,
   runtimeFunctions: new Map(),
@@ -381,6 +390,7 @@ const nodeTest: Framework = {
   skipWithoutBody: true,
   // `t.skip('why')` takes a message, not a condition.
   skipNotes: true,
+  reasonArgument: 'only',
   thisMethods: NODE_TEST_CONTEXT,
   todoWithoutBody: false,
   runtimeFunctions: new Map(),
@@ -427,6 +437,7 @@ const jasmine: Framework = {
   skipWithoutBody: true,
   // `pending('why')` takes a reason, not a condition.
   skipNotes: true,
+  reasonArgument: 'only',
   thisMethods: new Set(),
   todoWithoutBody: true,
   runtimeFunctions: new Map([

@@ -153,6 +153,11 @@ interface StateSource {
   state: StateDef;
   /** False for conditional skips unless `requireTicketForConditional` is set. */
   required: boolean;
+  /**
+   * Set for a conditional state: whether something says why, a comment above it or its test, the reason its
+   * call takes, or one its option gives.
+   */
+  reasoned?: boolean;
 }
 
 export interface Subject {
@@ -167,6 +172,8 @@ export interface Subject {
   inherited: Set<string>;
   /** Names of states added by runtime calls directly inside this test or describe. */
   runtimeStates: Set<string>;
+  /** Whether the comment block above this node holds any text, an `eslint-disable` description included. */
+  commented: boolean;
   /** Every tag written on this node, known or not. */
   tags: TagOccurrence[];
   /** Tags this node inherits from enclosing describes. */
@@ -989,6 +996,8 @@ interface TagInfo {
   annotations: { text: string; node: Node }[];
   /** Annotation values of the configured type whose ticket can't be read. */
   unreadAnnotations: Node[];
+  /** Modifiers whose option gives its own reason, as node:test's `{ skip: isWindows && 'no symlinks' }`. */
+  reasonedOptions: ReadonlySet<string>;
 }
 
 const NO_TAGS: TagInfo = {
@@ -998,6 +1007,7 @@ const NO_TAGS: TagInfo = {
   opaqueDetails: false,
   annotations: [],
   unreadAnnotations: [],
+  reasonedOptions: new Set(),
 };
 
 function collectTags(
@@ -1006,7 +1016,7 @@ function collectTags(
   hasTitle: boolean,
   framework: Framework,
   details: Details,
-): TagInfo {
+): Omit<TagInfo, 'reasonedOptions'> {
   const source = sourceCode.text;
   const tags: TagOccurrence[] = [];
   const title = { texts: [] as FoundText[], unread: new Set<Node>() };
@@ -1158,6 +1168,57 @@ function isUnconditional(call: TSESTree.CallExpression, notes: boolean): boolean
   return always && !isGuarded(call);
 }
 
+/**
+ * Whether a comment says anything: a line with text other than a marker keyword alone, such as `SKIP:`. A
+ * directive counts only by its description.
+ */
+function hasText(comment: Comment): boolean {
+  return commentLines(comment).some(({ text }) => /[^\s*]/.test(text) && MARKER_LINE_RE.exec(text)?.[2].trim() !== '');
+}
+
+/**
+ * Whether a reason argument says why: text that isn't blank, or a value known only when the tests run, as
+ * `reason` or `` `${browserName} has no clipboard` ``, which is taken on trust.
+ */
+function saysWhy(sourceCode: SourceCode, node: Node): boolean {
+  const text = staticText(sourceCode, node);
+  if (text !== undefined) return text.trim() !== '';
+  const value = unwrap(node);
+  return value.type !== 'Literal' && !(value.type === 'Identifier' && value.name === 'undefined');
+}
+
+/** Whether `node` is text that isn't blank. */
+function isReasonText(sourceCode: SourceCode, node: Node): boolean {
+  return Boolean(staticText(sourceCode, node)?.trim());
+}
+
+/** Whether a runtime call gives the reason for its state where its framework takes one (see `reasonArgument`). */
+function callReason(
+  sourceCode: SourceCode,
+  call: TSESTree.CallExpression,
+  where: NonNullable<Framework['reasonArgument']>,
+): boolean {
+  const first = call.arguments.at(0);
+  const second = call.arguments.at(1);
+  if (where === 'only') return first !== undefined && saysWhy(sourceCode, first);
+  // Vitest's `context.skip(isMobile)` takes a condition, so only text first is a reason.
+  if (where === 'either' && first !== undefined && staticText(sourceCode, first) !== undefined) {
+    return isReasonText(sourceCode, first);
+  }
+  return second !== undefined && saysWhy(sourceCode, second);
+}
+
+/**
+ * Whether a conditional option gives its reason, as node:test's `{ skip: isWindows && 'no symlinks' }` or
+ * `{ skip: isWindows ? 'no symlinks' : false }`, where the text is what Node reports.
+ */
+function optionReason(sourceCode: SourceCode, node: Node): boolean {
+  const value = unwrap(node);
+  if (value.type === 'LogicalExpression') return value.operator === '&&' && isReasonText(sourceCode, value.right);
+  if (value.type !== 'ConditionalExpression') return false;
+  return isReasonText(sourceCode, value.consequent) || isReasonText(sourceCode, value.alternate);
+}
+
 const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression']);
 
 /** Whether a statement always leaves the function or block: `return`, `throw`, or a block containing one. */
@@ -1295,6 +1356,34 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   const suiteBodies = new Set<Node>();
 
   /**
+   * Whether a statement around `anchor` has a comment that says something above it, as `// why` above an `if`,
+   * up to `owner`, the test or describe the call acts on. The walk goes on through a callback passed to another
+   * call, such as a hook's or a step's, but stops at a function declared some other way.
+   */
+  const commentedAround = (anchor: Node, owner: Node | undefined): boolean => {
+    for (let node = anchor.parent; node; node = node.parent) {
+      if (FUNCTIONS.has(node.type)) {
+        const call = node.parent;
+        if (call?.type !== 'CallExpression' || call === owner || !(call.arguments as Node[]).includes(node)) {
+          return false;
+        }
+        continue;
+      }
+      const container = node.parent;
+      if (!container || !STATEMENT_CONTAINERS.has(container.type)) continue;
+      const block = commentBlock(sourceCode, node, options.allowBlankLine);
+      if (block.some((comment) => !commentedOut.comments.has(comment) && hasText(comment))) return true;
+    }
+    return false;
+  };
+
+  /** Whether a comment that says something ends the line `node` ends on, as `test.skip(isMobile); // why`. */
+  const trailingText = (node: Node): boolean =>
+    sourceCode
+      .getCommentsAfter(node)
+      .some((comment) => comment.loc.start.line === node.loc.end.line && hasText(comment));
+
+  /**
    * `modifiers` maps each state modifier the call has to whether it always applies; a conditional one,
    * like `test.skip(isMobile)` or Vitest's `skipIf(...)`, needs a ticket only with `requireTicketForConditional`.
    */
@@ -1320,6 +1409,15 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       (r) => r.start <= call.range[0] && call.range[0] < r.end && !block.includes(r.comment),
     );
     for (const comment of [...block, ...inRegions.map((r) => r.comment)]) claimed.add(comment);
+    const commented = [...block, ...inRegions.map((r) => r.comment)].some(hasText);
+    // A runtime call can also say why above the statements around it in its function, above its test, or in
+    // its arguments.
+    const reasonedCall = (): boolean =>
+      kind === 'runtime' &&
+      ((framework.reasonArgument !== undefined && callReason(sourceCode, call, framework.reasonArgument)) ||
+        parent?.commented === true ||
+        trailingText(anchor) ||
+        commentedAround(anchor, parent?.node));
     const ownTags = new Set(tagInfo.tags.map((t) => t.tag));
     const sources: StateSource[] = [];
     for (const state of states) {
@@ -1328,7 +1426,10 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
         continue;
       }
       const always = modifiers.get(state.modifier);
-      if (always !== undefined) sources.push({ state, required: always || options.requireTicketForConditional });
+      if (always === undefined) continue;
+      const source: StateSource = { state, required: always || options.requireTicketForConditional };
+      if (!always) source.reasoned = commented || tagInfo.reasonedOptions.has(state.modifier) || reasonedCall();
+      sources.push(source);
     }
     const inherited = new Set<string>();
     const inheritedTags = new Set<string>();
@@ -1357,6 +1458,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       anchor,
       parent,
       states: sources,
+      commented,
       inherited,
       runtimeStates: new Set(),
       tags: tagInfo.tags,
@@ -1516,9 +1618,16 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       options.annotations === undefined || framework.annotations === undefined
         ? { annotations: [], unreadAnnotations: [] }
         : collectAnnotations(sourceCode, details, framework.annotations, options.annotations);
+    const reasonedOptions = new Set<string>();
+    if (framework.anyOptionValue) {
+      for (const [key, value] of details.entries) {
+        const modifier = framework.optionEffects.get(key);
+        if (modifier && optionReason(sourceCode, value)) reasonedOptions.add(modifier);
+      }
+    }
     return {
       details,
-      tagInfo: { ...collectTags(sourceCode, call, !untitled, framework, details), ...annotations },
+      tagInfo: { ...collectTags(sourceCode, call, !untitled, framework, details), ...annotations, reasonedOptions },
     };
   };
 
