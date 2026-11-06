@@ -40,8 +40,9 @@ export interface GovernanceOptions {
   framework: FrameworkName;
   /**
    * Names that are treated as the framework's `test` function. Defaults to `['test']` for Playwright,
-   * `['test', 'it']` for Jest and Vitest, and `['it', 'specify', 'test']` for Mocha, Cypress and
-   * WebdriverIO. Your list replaces the default one, so include those names if you still need them.
+   * `['test', 'it']` for Jest, Vitest and node:test, `['it', 'specify', 'test']` for Mocha, Cypress and
+   * WebdriverIO, and `['it']` for Jasmine. Your list replaces the default one, so include those names if you
+   * still need them.
    */
   testFunctions?: string[];
   /** Accepted ticket formats. Defaults to `{ preset: 'any' }`. */

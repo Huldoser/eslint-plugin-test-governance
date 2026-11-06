@@ -406,15 +406,20 @@ describe('option defaults', () => {
     }
   });
 
-  it('lists the test functions Jest and Vitest use by default', () => {
-    const literal = /Jest and Vitest default to `([^`]+)`/.exec(
-      optionRows.get('testFunctions')?.[descriptionColumn] ?? '',
-    )?.[1];
-    assert.ok(literal);
-    for (const framework of ['jest', 'vitest'] as const) {
-      assert.deepEqual(resolved({ framework, testFunctions: evaluate(literal) }), resolved({ framework }), framework);
+  it('lists the test functions each framework uses by default', () => {
+    const description = optionRows.get('testFunctions')?.[descriptionColumn] ?? '';
+    for (const [names, frameworks] of [
+      ['Jest, Vitest and node:test default to', ['jest', 'vitest', 'node-test']],
+      ['Mocha, Cypress and WebdriverIO to', ['mocha', 'cypress', 'webdriverio']],
+      ['Jasmine to', ['jasmine']],
+    ] as const) {
+      const literal = new RegExp(`${names} \`([^\`]+)\``).exec(description)?.[1];
+      assert.ok(literal, names);
+      for (const framework of frameworks) {
+        assert.deepEqual(resolved({ framework, testFunctions: evaluate(literal) }), resolved({ framework }), framework);
+      }
     }
-    assert.ok(hoverDocs.get('testFunctions')?.includes(`\`${literal}\` for Jest and Vitest`));
+    assert.ok(hoverDocs.get('testFunctions')?.includes("`['test', 'it']` for Jest, Vitest and node:test"));
   });
 
   it('lists the default placeholders', () => {
