@@ -112,13 +112,16 @@ export function moveToAnnotation(
   if (isFunction(title)) return undefined;
   const remove = removeMarkerComment(sourceCode, marker);
   if (isFunction(details)) {
+    // Vitest reads a timeout or options after the function only as the third argument.
+    if (call.arguments.length > 2) return undefined;
     return (fixer) => [remove, fixer.insertTextAfter(title, `, { ${property} }`)];
   }
   if (details?.type !== 'ObjectExpression') return undefined;
   const taken = details.properties.some(
     (prop) =>
       prop.type === 'SpreadElement' ||
-      (!prop.computed && (prop.key.type === 'Identifier' ? prop.key.name : String(prop.key.value)) === source.key),
+      prop.computed ||
+      (prop.key.type === 'Identifier' ? prop.key.name : String(prop.key.value)) === source.key,
   );
   if (taken) return undefined;
   const last = details.properties.at(-1);

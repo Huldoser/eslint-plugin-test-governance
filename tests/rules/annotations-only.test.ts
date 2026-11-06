@@ -68,6 +68,10 @@ runRule('require-ticket (annotations.only, Playwright)', rule, {
       errors: [useAnnotation()],
     },
     {
+      code: "// SKIP: TRADE-1\ntest.skip('places an order', { ['annotation']: { type: 'perf', description: 'slow' } }, async () => {});",
+      errors: [useAnnotation()],
+    },
+    {
       code: "// SKIP: TRADE-1\ntest.skip('places an order', { ...base }, async () => {});",
       errors: [useAnnotation()],
     },
@@ -129,6 +133,8 @@ runRule('require-ticket (annotations.only, Vitest)', rule, {
       errors: [meta("test.skip('places an order', { meta: { issue: 'TRADE-1' } }, () => {});")],
     },
     { code: "// SKIP: TRADE-1\ntest.skip('places an order');", errors: [meta()] },
+    // Details added before a timeout would push it to an argument Vitest doesn't read.
+    { code: "// SKIP: TRADE-1\ntest.skip('places an order', () => {}, 5000);", errors: [meta()] },
     // `meta` holds one value per key, and a `meta` already written is left alone.
     { code: "// SKIP: TRADE-1, TRADE-2\ntest.skip('places an order', () => {});", errors: [meta()] },
     {
