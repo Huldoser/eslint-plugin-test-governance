@@ -34,7 +34,6 @@ export interface RuleDefinition<MessageIds extends string> {
 export function createRule<MessageIds extends string>(definition: RuleDefinition<MessageIds>): Rule<MessageIds> {
   return {
     meta: definition.meta,
-    defaultOptions: [],
     create(context) {
       const options = resolveOptions(context.settings);
       return {
