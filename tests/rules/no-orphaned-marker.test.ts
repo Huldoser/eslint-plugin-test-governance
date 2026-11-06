@@ -58,8 +58,28 @@ runRule('no-orphaned-marker', rule, {
     "// Skip:\ntest('places an order', async () => {});",
     // A region's marker covers the tests in that state and leaves the others alone.
     "/* eslint-disable no-console -- SKIP: TRADE-1 */\ntest.skip('places an order', async () => {});\ntest('cancels an order', async () => {});",
+    "/* eslint-disable no-console -- SKIP: TRADE-1 */\ntest('places an order', async () => {});\ntest.skip('cancels an order', async () => {});",
+    "/* eslint-disable no-console -- TODO: TRADE-1 */\ntest('places an order', async () => {});",
   ],
   invalid: [
+    // A region's marker that no test up to its `eslint-enable` uses is left over.
+    {
+      code: "/* eslint-disable no-console -- SKIP: TRADE-1 */\ntest('places an order', async () => {});\n/* eslint-enable no-console */\ntest.skip('cancels an order', async () => {});",
+      errors: [
+        {
+          messageId: 'orphanedRegion',
+          data: { marker: 'SKIP', state: 'skip', subject: '' },
+          line: 1,
+          suggestions: [
+            {
+              messageId: 'removeMarker',
+              output:
+                "/* eslint-disable no-console */\ntest('places an order', async () => {});\n/* eslint-enable no-console */\ntest.skip('cancels an order', async () => {});",
+            },
+          ],
+        },
+      ],
+    },
     // An annotation that satisfies the state leaves the wrong marker a leftover, not a hint.
     {
       code: "// FIXME: TRADE-1\ntest.skip('places a limit order', { annotation: { type: 'issue', description: 'TRADE-123' } }, async () => {});",
@@ -361,7 +381,7 @@ runRule('no-orphaned-marker', rule, {
       code: "/* eslint-disable no-console -- logs are needed for debugging\n   SKIP: TRADE-1 */\ntest('places an order', async () => {});",
       errors: [
         {
-          messageId: 'orphaned',
+          messageId: 'orphanedRegion',
           suggestions: [
             {
               messageId: 'removeMarker',

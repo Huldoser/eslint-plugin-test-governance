@@ -3,37 +3,9 @@ import { commentLines, directiveOf, isFunction, type Marker } from './analyze.ts
 
 type SourceCode = Readonly<TSESLint.SourceCode>;
 
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
- * The lines of a marker's comment, which of them holds the marker, and where its keyword starts in that line.
- * The line is the one with the marker's keyword and tickets, so a keyword in prose above it is not taken.
- */
-function markerLine(marker: Marker): {
-  lines: ReturnType<typeof commentLines>;
-  index: number;
-  keywordStart: number;
-} {
-  const tickets = marker.tickets.map((ticket) => escapeRegExp(ticket.text)).join('\\s*,\\s*');
-  // Tickets as parseTickets reads them. `(?=(\s*))\2` takes every space after the colon, so a marker without
-  // tickets doesn't match a line that has some.
-  const re = new RegExp(
-    `^(\\s*\\*?\\s*)${escapeRegExp(marker.keyword)}\\s*:(?=(\\s*))\\2${tickets}(?=[.:;]*(?:[\\s,]|$))`,
-  );
-  const lines = commentLines(marker.comment);
-  const index = lines.findIndex(({ text }) => re.test(text));
-  // The marker was parsed from one of these lines, so one always matches.
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
-  const keywordStart = lines[index].start + re.exec(lines[index].text)![1].length;
-  return { lines, index, keywordStart };
-}
-
 /** Range of a marker's keyword on the marker's own line. */
 export function keywordRange(marker: Marker): TSESTree.Range {
-  const { keywordStart } = markerLine(marker);
-  return [keywordStart, keywordStart + marker.keyword.length];
+  return [marker.keywordStart, marker.keywordStart + marker.keyword.length];
 }
 
 /**
@@ -42,8 +14,8 @@ export function keywordRange(marker: Marker): TSESTree.Range {
  * description, so the directive keeps working.
  */
 export function removeMarkerComment(sourceCode: SourceCode, marker: Marker): TSESLint.RuleFix {
-  const { comment } = marker;
-  const { lines, index } = markerLine(marker);
+  const { comment, line: index } = marker;
+  const lines = commentLines(comment);
   if (lines.some(({ text }, i) => i !== index && /[^\s*]/.test(text))) {
     const { start, text } = lines[index];
     if (index === 0) {

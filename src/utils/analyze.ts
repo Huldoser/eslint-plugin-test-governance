@@ -35,6 +35,10 @@ export interface Marker {
   tickets: MarkerTicket[];
   /** Text after the last ticket, such as a note or a stray separator, with its source range. */
   extra?: { text: string; range: TSESTree.Range };
+  /** The index of the marker's line in `commentLines(comment)`. */
+  line: number;
+  /** Where the keyword starts in the source. */
+  keywordStart: number;
 }
 
 /** A marker whose keyword is exactly a state's marker. */
@@ -222,6 +226,8 @@ export interface Analysis {
   subjects: Subject[];
   /** Markers that are not in the comment block of any test, describe or runtime call. */
   detachedMarkers: StateMarker[];
+  /** Markers of `eslint-disable` regions that cover tests, none of them in the marker's state. */
+  idleRegionMarkers: StateMarker[];
   /** Commented-out tests; their comments are left out of the comment blocks of the tests around them. */
   commentedOutTests: CommentedOutTest[];
   /** Whether the file uses the test framework at all: an import from it or a call to a test function. */
@@ -677,18 +683,19 @@ export function commentLines(comment: Comment): { text: string; start: number }[
 
 function parseMarkers(comment: Comment, states: StateDef[]): Marker[] {
   const markers: Marker[] = [];
-  for (const { text, start } of commentLines(comment)) {
+  for (const [line, { text, start }] of commentLines(comment).entries()) {
     const match = MARKER_LINE_RE.exec(text);
     if (!match) continue;
     const [, keyword, rest] = match;
     const restOffset = start + match[0].length - rest.length;
+    const at = { comment, keyword, line, keywordStart: start + text.indexOf(keyword) };
     const state = states.find((s) => s.marker === keyword);
     if (state) {
-      markers.push({ comment, keyword, state, ...parseTickets(rest, restOffset, state.ticket) });
+      markers.push({ ...at, state, ...parseTickets(rest, restOffset, state.ticket) });
       continue;
     }
     const caseOf = states.find((s) => s.marker === keyword.toUpperCase());
-    if (caseOf) markers.push({ comment, keyword, caseOf, ...parseTickets(rest, restOffset, caseOf.ticket) });
+    if (caseOf) markers.push({ ...at, caseOf, ...parseTickets(rest, restOffset, caseOf.ticket) });
   }
   return markers;
 }
@@ -1922,7 +1929,25 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     .flatMap((comment) => parseMarkers(comment, states))
     .filter(isStateMarker);
 
-  return { subjects, detachedMarkers, commentedOutTests: commentedOut.found, isTestFile: usesTest };
+  const idleRegionMarkers = regions
+    .flatMap((region) => region.markers)
+    .filter(isStateMarker)
+    .filter((marker) => {
+      const covered = subjects.filter((subject) => subject.regionMarkers.includes(marker));
+      return (
+        covered.length > 0 &&
+        !isWorkComment(marker, options) &&
+        !covered.some((s) => appliesTo(s, marker.state.name) || s.unknownStates.has(marker.state.name))
+      );
+    });
+
+  return {
+    subjects,
+    detachedMarkers,
+    idleRegionMarkers,
+    commentedOutTests: commentedOut.found,
+    isTestFile: usesTest,
+  };
 }
 
 /** Whether `subject` is in `stateName` at all, required or not, including inherited and runtime states. */

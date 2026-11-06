@@ -11,7 +11,9 @@
 When a test is promoted from `@new`, or a skipped test is fixed, its marker is often left behind.
 A leftover marker makes searches for open tickets lie. This rule reports:
 
-- a marker above a test, describe or skip call that is not in that marker's state, and
+- a marker above a test, describe or skip call that is not in that marker's state,
+- a marker in the description of an `eslint-disable` block comment, which covers the tests up to the
+  `eslint-enable`, when none of those tests is in that marker's state, and
 - a marker that is not directly above a test, describe or skip call at all, so it has no effect.
 
 `FIXME:` and `TODO:` are also everyday work comments, so this rule leaves them to
