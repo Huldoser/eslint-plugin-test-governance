@@ -67,6 +67,11 @@ runRule('require-ticket (conditional reasons, Playwright)', requireTicket, {
         code: "(isMobile ? test.skip : test)('hovers', async () => {});",
         errors: [missingReason('This test')],
       },
+      // The example is written on one line, however the call is.
+      {
+        code: "test('hovers', async ({ isMobile }) => {\n  test\n    .skip(isMobile);\n});",
+        errors: [{ ...missingReason('This skip call', call("test.skip(condition, 'why')")), line: 2 }],
+      },
       // A comment with no text, or a directive with no description, gives no reason.
       {
         code: '//\ntest.skip(isMobile);\n// eslint-disable-next-line no-console\ntest.skip(isTablet);',

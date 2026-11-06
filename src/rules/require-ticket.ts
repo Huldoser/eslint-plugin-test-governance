@@ -93,7 +93,7 @@ export default createRule({
     /** Reports a conditional state that gives no reason and has no ticket, which would say why as well. */
     const reportReason = (subject: Subject, state: StateDef): void => {
       if (evaluate(subject, state).kind === 'ok' || hasAnnotationTicket(subject, state, options)) return;
-      const callee = context.sourceCode.getText(subject.node.callee);
+      const callee = context.sourceCode.getText(subject.node.callee).replace(/\s+/g, '');
       const first = subject.node.arguments.at(0);
       const where = options.framework.reasonArgument;
       // Vitest's `context.skip()` takes either a reason alone or a condition and then the reason.
