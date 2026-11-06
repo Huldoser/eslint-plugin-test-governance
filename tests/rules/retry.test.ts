@@ -20,6 +20,7 @@ runRule('require-ticket (retry, Playwright)', requireTicket, {
       "test.describe.configure({ retries: 0 });\ntest.describe.configure({ mode: 'serial' });",
       // Options the file can't read are left alone, as unreadable tags are.
       'test.describe.configure(options);',
+      'const options = { retries: 0 };\ntest.describe.configure(options);',
     ]),
   ],
   invalid: withOptions(retry, [
@@ -35,6 +36,16 @@ runRule('require-ticket (retry, Playwright)', requireTicket, {
     {
       code: "test.describe.configure({ mode: 'serial', retries: RETRIES });",
       errors: [missing('This configure call')],
+    },
+    // Options in a constant or a spread, and `describe` taken from `test`, are read too.
+    {
+      code: 'const options = { retries: 2 };\ntest.describe.configure(options);',
+      errors: [{ ...missing('This configure call'), line: 2 }],
+    },
+    { code: 'test.describe.configure({ ...{ retries: 2 } });', errors: [missing('This configure call')] },
+    {
+      code: "import { test } from '@playwright/test';\nconst { describe } = test;\ndescribe.configure({ retries: 2 });",
+      errors: [{ ...missing('This configure call'), line: 3 }],
     },
   ]),
 });

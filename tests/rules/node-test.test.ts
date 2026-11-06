@@ -80,6 +80,14 @@ runRule('require-ticket (node:test)', requireTicket, {
     "require('node:test').bogus('fills a limit order', () => {});",
   ]),
   invalid: withOptions(nodeTest, [
+    // `t.skip()` takes only a message, so whatever it is given, the test is skipped.
+    {
+      code: "import { test } from 'node:test';\ntest('fills a limit order', (t) => {\n  t.skip(reason);\n  t.todo(`${broker} sandbox is down`);\n});",
+      errors: [
+        { ...missing('skip', 'SKIP', 'This skip call'), line: 3 },
+        { ...missing('todo', 'TODO', 'This todo call'), line: 4 },
+      ],
+    },
     {
       code: "import { test, it, describe, suite } from 'node:test';\ntest.skip('fills', () => {});\nit.skip('cancels', () => {});\ndescribe.skip('order book', () => {});\nsuite.skip('quotes', () => {});",
       errors: [

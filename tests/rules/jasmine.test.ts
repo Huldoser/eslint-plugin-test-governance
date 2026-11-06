@@ -53,6 +53,11 @@ runRule('require-ticket (Jasmine)', requireTicket, {
     "const { xdescribe } = require('mocha');\nxdescribe('order book', () => {});",
   ]),
   invalid: withOptions(jasmine, [
+    // `pending()` takes only a message, so a message in a name always applies.
+    {
+      code: "it('fills a limit order', () => {\n  pending(reason);\n});",
+      errors: [{ ...missing('skip', 'SKIP', 'This pending call'), line: 2 }],
+    },
     {
       code: "it('fills a limit order', () => {\n  const p = pending;\n  p();\n});",
       errors: [{ ...missing('skip', 'SKIP', 'This skip call'), line: 3 }],

@@ -56,6 +56,8 @@ runRule('no-orphaned-marker', rule, {
     // A marker in the wrong case reads as a sentence unless a valid ticket follows it.
     "// skip: not on mobile\ntest('places an order', async () => {});",
     "// Skip:\ntest('places an order', async () => {});",
+    // A describe whose arrow body is the test shares the test's marker block.
+    "// SKIP: TRADE-1\ntest.describe('orders', () => test.skip('places an order', async () => {}));",
     // A region's marker covers the tests in that state and leaves the others alone.
     "/* eslint-disable no-console -- SKIP: TRADE-1 */\ntest.skip('places an order', async () => {});\ntest('cancels an order', async () => {});",
     "/* eslint-disable no-console -- SKIP: TRADE-1 */\ntest('places an order', async () => {});\ntest.skip('cancels an order', async () => {});",
