@@ -73,6 +73,36 @@ const plugin: TestGovernancePlugin = {
   configure,
 };
 
+type WithTicket = Pick<GovernanceOptions, 'ticket'>;
+
+/** `ticket` as a list, so ESLint replaces it whole when it merges two configs' settings. */
+function ticketAsList<T extends WithTicket>(options: T): T {
+  const { ticket } = options;
+  return ticket === undefined || Array.isArray(ticket) ? options : { ...options, ticket: [ticket] };
+}
+
+/**
+ * ESLint merges the settings of configs that apply to the same file key by key and replaces arrays. Merged
+ * key by key, a later config's `{ preset: 'github' }` would keep an earlier `projects` that github doesn't take,
+ * so every ticket format goes in a list.
+ */
+function ticketsAsLists(options: GovernanceOptions): GovernanceOptions {
+  const { states, customStates } = options;
+  return {
+    ...ticketAsList(options),
+    ...(states && {
+      states: Object.fromEntries(
+        Object.entries(states).map(([name, state]) => [name, typeof state === 'object' ? ticketAsList(state) : state]),
+      ),
+    }),
+    ...(customStates && {
+      customStates: Object.fromEntries(
+        Object.entries(customStates).map(([name, state]) => [name, ticketAsList(state)]),
+      ),
+    }),
+  };
+}
+
 /**
  * Returns the config of `options.framework` with shared options in `settings['test-governance']`,
  * so all rules read the same ticket formats and states.
@@ -83,7 +113,7 @@ export function configure(options: GovernanceOptions): FlatConfig {
     name: `${PLUGIN_NAME}/${options.framework}`,
     plugins: { [PLUGIN_NAME]: plugin },
     rules: { ...configRules },
-    settings: { [SETTINGS_KEY]: options },
+    settings: { [SETTINGS_KEY]: ticketsAsLists(options) },
   };
 }
 

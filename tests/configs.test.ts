@@ -67,6 +67,32 @@ describe('configs', () => {
     assert.deepEqual(linter.verify(SKIPPED_VITEST_TEST, config, 'e2e/pricing.spec.ts'), []);
   });
 
+  it('replaces the ticket formats of an earlier configure() for the same files', () => {
+    const linter = new Linter();
+    const code =
+      "import { test } from '@playwright/test';\n// SKIP: #12\ntest.skip('fills a limit order', async () => {});";
+    const config = [
+      configure({
+        framework: 'playwright',
+        ticket: { preset: 'jira', projects: ['TRADE'] },
+        states: { skip: { ticket: { preset: 'jira', host: 'jira.acme.io' } } },
+        customStates: { flaky: { when: '@flaky', marker: 'FLAKY', ticket: { preset: 'jira' } } },
+      }),
+      {
+        files: ['legacy/**'],
+        ...configure({
+          framework: 'playwright',
+          ticket: { preset: 'github' },
+          states: { skip: { ticket: { preset: 'github' } } },
+          customStates: { flaky: { when: '@flaky', marker: 'FLAKY', ticket: { preset: 'github' } } },
+        }),
+      },
+    ];
+    // ESLint merges settings objects key by key, which would give github a `projects` or `host` it doesn't take.
+    assert.deepEqual(linter.verify(code, config, 'legacy/orders.spec.js'), []);
+    assert.equal(linter.verify(code, config, 'e2e/orders.spec.js').length, 1);
+  });
+
   it('lets the Playwright config win over a framework set for all files', () => {
     const linter = new Linter();
     const config = [configure({ framework: 'vitest' }), { files: ['e2e/**'], ...configs.playwright }];
