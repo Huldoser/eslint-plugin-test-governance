@@ -45,7 +45,8 @@ and checked as usual.
 
 Files without tests, such as application code, are not checked.
 
-The rule offers a suggestion to delete the comment.
+The rule offers a suggestion to delete the comment. From a block comment that says more, such as a doc
+comment above the test, it deletes only the marker's line.
 
 ## Examples
 

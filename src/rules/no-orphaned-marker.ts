@@ -46,7 +46,7 @@ export default createRule({
         loc: marker.comment.loc,
         messageId,
         data: { marker: marker.keyword, state: marker.state.name, subject },
-        suggest: [{ messageId: 'removeMarker', fix: () => removeMarkerComment(sourceCode, marker.comment) }],
+        suggest: [{ messageId: 'removeMarker', fix: () => removeMarkerComment(sourceCode, marker) }],
       });
     }
   },

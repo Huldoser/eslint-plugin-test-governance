@@ -74,7 +74,7 @@ runRule('marker-matches-state', rule, {
             {
               messageId: 'renameMarker',
               output:
-                "/*\n * Context first. FIXME: is not a marker here\n * SKIP : TRADE-1\n */\ntest.fixme('cancels an open order', async () => {});",
+                "/*\n * Context first. SKIP: is not a marker here\n * FIXME : TRADE-1\n */\ntest.fixme('cancels an open order', async () => {});",
             },
           ],
         },
@@ -241,6 +241,47 @@ runRule('marker-matches-state', rule, {
               messageId: 'addMarker',
               output:
                 "test.describe('risk limits', () => {\n  // QUARANTINED: TRADE-1\n  // eslint-disable-next-line no-console -- SKIP: TRADE-1\n  test.skip('rejects an order @quarantined', async () => {});\n});",
+            },
+          ],
+        },
+      ],
+    },
+    // The keyword is renamed on the marker's own line, not where it shows up earlier in the comment.
+    {
+      code: "/*\n * Note FIXME: below is temporary\n * FIXME: TRADE-1\n */\ntest.skip('cancels an order', async () => {});",
+      errors: [
+        {
+          messageId: 'wrongMarker',
+          suggestions: [
+            {
+              messageId: 'renameMarker',
+              output:
+                "/*\n * Note FIXME: below is temporary\n * SKIP: TRADE-1\n */\ntest.skip('cancels an order', async () => {});",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: "/*\n * FIXME: TRADE-1\n * FIXME: TRADE-2\n */\ntest.skip('cancels an order', async () => {});",
+      errors: [
+        {
+          messageId: 'wrongMarker',
+          line: 1,
+          suggestions: [
+            {
+              messageId: 'renameMarker',
+              output: "/*\n * SKIP: TRADE-1\n * FIXME: TRADE-2\n */\ntest.skip('cancels an order', async () => {});",
+            },
+          ],
+        },
+        {
+          messageId: 'wrongMarker',
+          line: 1,
+          suggestions: [
+            {
+              messageId: 'renameMarker',
+              output: "/*\n * FIXME: TRADE-1\n * SKIP: TRADE-2\n */\ntest.skip('cancels an order', async () => {});",
             },
           ],
         },

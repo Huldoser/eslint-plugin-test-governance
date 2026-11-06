@@ -49,8 +49,7 @@ export default createRule({
           suggest: missing.map((state) => ({
             messageId: 'renameMarker' as const,
             data: { expected: state.marker },
-            fix: (fixer) =>
-              fixer.replaceTextRange(keywordRange(sourceCode, marker.comment, marker.keyword), state.marker),
+            fix: (fixer) => fixer.replaceTextRange(keywordRange(marker), state.marker),
           })),
         });
       }

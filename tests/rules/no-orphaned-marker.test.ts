@@ -313,5 +313,95 @@ runRule('no-orphaned-marker', rule, {
         },
       ],
     },
+    // In a block comment that says more, only the marker's line goes.
+    {
+      code: "/* FIXME: TRADE-2\n   SKIP: TRADE-1 */\ntest.fixme('cancels an order', async () => {});",
+      errors: [
+        {
+          messageId: 'orphaned',
+          data: { marker: 'SKIP', state: 'skip', subject: 'this test' },
+          suggestions: [
+            {
+              messageId: 'removeMarker',
+              output: "/* FIXME: TRADE-2 */\ntest.fixme('cancels an order', async () => {});",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: "/**\n * Checks the cancel flow.\n * SKIP: TRADE-1\n */\ntest('cancels an order', async () => {});",
+      errors: [
+        {
+          messageId: 'orphaned',
+          suggestions: [
+            {
+              messageId: 'removeMarker',
+              output: "/**\n * Checks the cancel flow.\n */\ntest('cancels an order', async () => {});",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: "/** SKIP: TRADE-1\n * Checks the cancel flow.\n */\ntest('cancels an order', async () => {});",
+      errors: [
+        {
+          messageId: 'orphaned',
+          suggestions: [
+            {
+              messageId: 'removeMarker',
+              output: "/**\n * Checks the cancel flow.\n */\ntest('cancels an order', async () => {});",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: "/* eslint-disable no-console -- logs are needed for debugging\n   SKIP: TRADE-1 */\ntest('places an order', async () => {});",
+      errors: [
+        {
+          messageId: 'orphaned',
+          suggestions: [
+            {
+              messageId: 'removeMarker',
+              output:
+                "/* eslint-disable no-console -- logs are needed for debugging */\ntest('places an order', async () => {});",
+            },
+          ],
+        },
+      ],
+    },
+    // A block comment that holds nothing but the marker goes whole.
+    {
+      code: "/*\n * SKIP: TRADE-1\n */\ntest('places an order', async () => {});",
+      errors: [
+        {
+          messageId: 'orphaned',
+          suggestions: [{ messageId: 'removeMarker', output: "test('places an order', async () => {});" }],
+        },
+      ],
+    },
+    // Each marker removes its own line, even when the keyword is the same.
+    {
+      code: "/*\n * SKIP: TRADE-1\n * SKIP:\n */\ntest('places an order', async () => {});",
+      errors: [
+        {
+          messageId: 'orphaned',
+          suggestions: [
+            { messageId: 'removeMarker', output: "/*\n * SKIP:\n */\ntest('places an order', async () => {});" },
+          ],
+        },
+        {
+          messageId: 'orphaned',
+          suggestions: [
+            {
+              messageId: 'removeMarker',
+              output: "/*\n * SKIP: TRADE-1\n */\ntest('places an order', async () => {});",
+            },
+          ],
+        },
+      ],
+    },
   ],
 });

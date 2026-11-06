@@ -1,5 +1,5 @@
 import type { TSESLint, TSESTree } from '@typescript-eslint/utils';
-import { directiveOf, isFunction, type Marker } from './analyze.ts';
+import { commentLines, directiveOf, isFunction, type Marker } from './analyze.ts';
 
 type SourceCode = Readonly<TSESLint.SourceCode>;
 
@@ -7,21 +7,53 @@ function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/** Range of `keyword` where it is used as a marker (`KEYWORD:`) inside `comment`. */
-export function keywordRange(sourceCode: SourceCode, comment: TSESTree.Comment, keyword: string): TSESTree.Range {
-  const text = sourceCode.getText(comment);
-  // Only called with a keyword that was parsed from this comment, so it always matches.
+/**
+ * The lines of a marker's comment, which of them holds the marker, and where its keyword starts in that line.
+ * The line is the one with the marker's keyword and tickets, so a keyword in prose above it is not taken.
+ */
+function markerLine(marker: Marker): {
+  lines: ReturnType<typeof commentLines>;
+  index: number;
+  keywordStart: number;
+} {
+  const tickets = marker.tickets.map((ticket) => escapeRegExp(ticket.text)).join('\\s*,\\s*');
+  // Tickets as parseTickets reads them. `(?=(\s*))\2` takes every space after the colon, so a marker without
+  // tickets doesn't match a line that has some.
+  const re = new RegExp(
+    `^(\\s*\\*?\\s*)${escapeRegExp(marker.keyword)}\\s*:(?=(\\s*))\\2${tickets}(?=[.:;]*(?:[\\s,]|$))`,
+  );
+  const lines = commentLines(marker.comment);
+  const index = lines.findIndex(({ text }) => re.test(text));
+  // The marker was parsed from one of these lines, so one always matches.
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
-  const match = new RegExp(`(^|[^\\w-])(${escapeRegExp(keyword)})\\s*:`).exec(text)!;
-  const start = comment.range[0] + match.index + match[1].length;
-  return [start, start + keyword.length];
+  const keywordStart = lines[index].start + re.exec(lines[index].text)![1].length;
+  return { lines, index, keywordStart };
+}
+
+/** Range of a marker's keyword on the marker's own line. */
+export function keywordRange(marker: Marker): TSESTree.Range {
+  const { keywordStart } = markerLine(marker);
+  return [keywordStart, keywordStart + marker.keyword.length];
 }
 
 /**
- * Removes a marker comment, and its whole line when nothing else is on it. From an ESLint directive it
- * removes only the description, so the directive keeps working.
+ * Removes a marker. From a comment that says more, it removes only the marker's line. Otherwise it removes
+ * the comment, and its whole line when nothing else is on it, or from an ESLint directive only the
+ * description, so the directive keeps working.
  */
-export function removeMarkerComment(sourceCode: SourceCode, comment: TSESTree.Comment): TSESLint.RuleFix {
+export function removeMarkerComment(sourceCode: SourceCode, marker: Marker): TSESLint.RuleFix {
+  const { comment } = marker;
+  const { lines, index } = markerLine(marker);
+  if (lines.some(({ text }, i) => i !== index && /[^\s*]/.test(text))) {
+    const { start, text } = lines[index];
+    if (index === 0) {
+      // A JSDoc comment keeps the `*` of its `/**`.
+      return { range: [start + text.search(/[^*]/), start + text.length], text: '' };
+    }
+    const previous = lines[index - 1];
+    const end = index === lines.length - 1 ? text.trimEnd().length : text.length;
+    return { range: [previous.start + previous.text.length, start + end], text: '' };
+  }
   const description = directiveOf(comment)?.description;
   if (description) {
     // `//` and `/*` are both two characters; a block comment keeps the space before its `*/`.
@@ -78,7 +110,7 @@ export function moveToAnnotation(
   // Vitest's `test.skip('title')` has no second argument.
   const details = call.arguments.at(1);
   if (isFunction(title)) return undefined;
-  const remove = removeMarkerComment(sourceCode, comment);
+  const remove = removeMarkerComment(sourceCode, marker);
   if (isFunction(details)) {
     return (fixer) => [remove, fixer.insertTextAfter(title, `, { ${property} }`)];
   }
