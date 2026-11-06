@@ -51,9 +51,9 @@ const JIRA_PATH_RE = /\/browse\/([A-Z][A-Z0-9_]+-\d+)\/?$/;
 // Gitea, Forgejo and Codeberg write a pull request as `/pulls/N`, GitHub as `/pull/N`.
 const GITHUB_PATH_RE = /^\/[^/]+\/[^/]+\/(?:issues|pulls?)\/(\d+)\/?$/;
 const GITLAB_PATH_RE = /\/-\/(?:issues|merge_requests|work_items)\/(\d+)\/?$/;
-const LINEAR_PATH_RE = /^\/[^/]+\/issue\/([A-Z][A-Z0-9]*-\d+)(?:\/[^/]*)?$/;
+const LINEAR_PATH_RE = /^\/[^/]+\/issue\/([A-Z][A-Z0-9]*-\d+)(?:\/[^/]+)?\/?$/;
 const AZURE_PATH_RE = /\/_workitems\/edit\/(\d+)\/?$/;
-const TRELLO_PATH_RE = /^\/c\/([A-Za-z0-9]{8})(?:\/[^/]*)?$/;
+const TRELLO_PATH_RE = /^\/c\/([A-Za-z0-9]{8})(?:\/[^/]+)?\/?$/;
 // A Notion page ID is 32 hex digits, plain or dashed as a UUID, at the end of the page's last path segment.
 const NOTION_ID = '[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const NOTION_PAGE_RE = new RegExp(`(?:^|-)(${NOTION_ID})$`);
@@ -73,10 +73,10 @@ const MONDAY_PATH_RE = /^\/boards\/\d+\/pulses\/(\d+)(?:\/.*)?$/;
 // YouTrack project IDs may start with a digit (4DM-12) but can't be digits only.
 const YOUTRACK_KEY_RE = /^([A-Z0-9_]+)-\d+$/;
 // `/issue/KT-1` and the newer `/projects/KT/issues/KT-1`, with an optional title after the key.
-const YOUTRACK_PATH_RE = /\/(?:issue|projects\/[^/]+\/issues)\/([A-Z0-9_]+-\d+)(?:\/[^/]*)?$/;
+const YOUTRACK_PATH_RE = /\/(?:issue|projects\/[^/]+\/issues)\/([A-Z0-9_]+-\d+)(?:\/[^/]+)?\/?$/;
 const BASECAMP_PATH_RE = /^\/\d+\/buckets\/\d+\/(?:todos|card_tables\/cards)\/(\d+)\/?$/;
 const SHORTCUT_REF_RE = /^(?:sc-(\d+)|\[sc-(\d+)\])$/i;
-const SHORTCUT_PATH_RE = /^\/[^/]+\/story\/(\d+)(?:\/[^/]*)?$/;
+const SHORTCUT_PATH_RE = /^\/[^/]+\/story\/(\d+)(?:\/[^/]+)?\/?$/;
 // OpenProject work packages: the canonical `/projects/<identifier>/work_packages/<id or AGILE-1>` with any
 // tab path after it, and the `/wp/<id>` short form its changelog links use.
 const OPENPROJECT_PATH_RE = /\/projects\/[^/]+\/work_packages\/([A-Z][A-Z0-9_]+-\d+|\d+)(?:\/.*)?\/?$/;
