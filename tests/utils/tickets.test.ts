@@ -635,6 +635,13 @@ describe('placeholders', () => {
     assert.equal(custom.check('#1234'), 'ok');
   });
 
+  it('ignores a leading # on a placeholder in the list', () => {
+    const custom = compileTicketSpec([{ preset: 'any' }], ['#TBD']);
+    assert.equal(custom.check('TBD'), 'placeholder');
+    assert.equal(custom.check('#TBD'), 'placeholder');
+    assert.equal(compileTicketSpec([{ preset: 'any' }], DEFAULT_PLACEHOLDERS).check('#TBD'), 'placeholder');
+  });
+
   it('matches a wildcard placeholder without backtracking', () => {
     const matcher = compileTicketSpec([{ preset: 'any' }], ['*a*a*a*a*b']);
     assert.equal(matcher.check(`${'a'.repeat(50)}b`), 'placeholder');

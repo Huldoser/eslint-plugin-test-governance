@@ -47,8 +47,9 @@ export interface GovernanceOptions {
   /** Accepted ticket formats. Defaults to `{ preset: 'any' }`. */
   ticket?: TicketSpec | TicketSpec[];
   /**
-   * Tickets that are rejected as placeholders. `*` matches any characters. Your list replaces the default
-   * one (`TODO`, `TBD`, `XXX-*`, ...); tickets numbered 0 are always rejected.
+   * Tickets that are rejected as placeholders. `*` matches any characters. Case-insensitive, and a leading `#`
+   * on the ticket or the placeholder is ignored. Your list replaces the default one (`TODO`, `TBD`, `XXX-*`,
+   * ...); tickets numbered 0 are always rejected.
    */
   placeholders?: string[];
   /** Turns on the `@new` and `@quarantined` states. */

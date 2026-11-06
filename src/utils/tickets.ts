@@ -592,10 +592,11 @@ function matchesGlob(glob: string, value: string): boolean {
 
 export function compileTicketSpec(specs: TicketSpec[], placeholders: string[]): TicketMatcher {
   const presets = specs.map(compilePreset);
+  const globs = placeholders.map((glob) => glob.replace(/^#/, ''));
   return {
     check(ticket) {
       const bare = ticket.replace(/^#/, '');
-      if (placeholders.some((glob) => matchesGlob(glob, ticket) || matchesGlob(glob, bare))) return 'placeholder';
+      if (globs.some((glob) => matchesGlob(glob, ticket) || matchesGlob(glob, bare))) return 'placeholder';
       for (const generic of [false, true]) {
         const ids = presets.flatMap((preset) =>
           Boolean(preset.generic) === generic ? (preset.find(ticket) ?? []) : [],
