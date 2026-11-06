@@ -175,6 +175,14 @@ describe('compileOptions', () => {
       { ticket: { preset: 'jira', projects: ['A'] } },
       /ticket\.projects\[0\] must start with a letter and have at least two characters, as Jira keys do \(got "A"\)/,
     ],
+    [
+      { ticket: { preset: 'plane', projects: ['WEB', '4DM'] } },
+      /ticket\.projects\[1\] must start with a letter and have at least two characters, as Plane keys do \(got "4DM"\)/,
+    ],
+    [
+      { ticket: { preset: 'plane', projects: ['A'] } },
+      /ticket\.projects\[0\] must start with a letter and have at least two characters, as Plane keys do \(got "A"\)/,
+    ],
     [{ ticket: { preset: 'youtrack', projects: ['123'] } }, /ticket\.projects\[0\] must be an uppercase key/],
     [
       { ticket: { preset: 'url', hosts: ['tracker.io:8080'] } },
@@ -295,6 +303,15 @@ describe('compileOptions', () => {
     assert.throws(
       () => compile({ ticket: { preset: 'jira', project: ['TRADE'] } as never }),
       /ticket\.project is not a known option; did you mean "projects"\?/,
+    );
+  });
+
+  it('checks options named like built-in object members', () => {
+    assert.throws(() => compile({ toString: true } as never), /toString is not a known option/);
+    assert.throws(() => compile({ states: { hasOwnProperty: true } } as never), /states\.hasOwnProperty is not/);
+    assert.throws(
+      () => compile({ customStates: { constructor: { when: 'not a tag', marker: 'lower case' } } }),
+      /customStates\.constructor\.marker/,
     );
   });
 
