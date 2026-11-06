@@ -24,6 +24,9 @@ runRule('require-ticket (conditional reasons, Playwright)', requireTicket, {
       "test('hovers', async ({ isMobile }, testInfo) => {\n  testInfo.skip(isMobile, 'No hover');\n});",
       // A comment above the statement around the call, or above its test.
       "test('hovers', async ({ isMobile }) => {\n  // Touch screens have no hover.\n  if (isMobile) {\n    test.skip();\n  }\n});",
+      // Or at the end of the line the statement starts on.
+      "test('hovers', async ({ isMobile }) => {\n  if (isMobile) { // Touch screens have no hover.\n    test.skip();\n  }\n});",
+      "test('hovers', async ({ isMobile }) => {\n  if (isMobile) // Touch screens have no hover.\n    test.skip();\n});",
       "// Touch screens have no hover.\ntest('hovers', async ({ isMobile }) => {\n  test.skip(isMobile);\n});",
       "// Touch screens have no hover.\n(isMobile ? test.skip : test)('hovers', async () => {});",
       // A ticket says why as well, from a marker, a marker on a describe around it, or an annotation.
@@ -90,6 +93,11 @@ runRule('require-ticket (conditional reasons, Playwright)', requireTicket, {
         code: "test('hovers', async ({ isMobile }) => {\n  // Helpers.\n  const check = () => {\n    if (isMobile) test.skip();\n  };\n  check();\n});",
         errors: [{ ...missingReason('This skip call', call("test.skip(condition, 'why')")), line: 4 }],
       },
+      // The description of an `eslint-disable` region says why the rule is off, not why a test is skipped.
+      {
+        code: "/* eslint-disable no-console -- the fixtures are untyped JSON */\ntest.describe('orders', () => {\n  test('hovers', async ({ isMobile }) => {\n    test.skip(isMobile);\n  });\n});",
+        errors: [{ ...missingReason('This skip call', call("test.skip(condition, 'why')")), line: 4 }],
+      },
     ]),
     // With a ticket required as well, the ticket wins.
     {
@@ -111,6 +119,9 @@ runRule('require-ticket (conditional reasons, Vitest)', requireTicket, {
     "test('hovers', (context) => {\n  if (isMobile) context.skip('No hover');\n});",
     "// Touch screens have no hover.\ntest.skipIf(isMobile)('hovers', () => {});",
     "// Touch screens have no hover.\ntest('hovers', { skip: isMobile }, () => {});",
+    "test.skipIf(isMobile)('hovers', () => {}); // Touch screens have no hover.",
+    // A template is text, so it is a reason, not a condition.
+    "test('hovers', (context) => {\n  if (isMobile) context.skip(`${device} has no hover`);\n});",
   ]),
   invalid: withOptions({ ...reasons, framework: 'vitest' }, [
     {
@@ -126,6 +137,10 @@ runRule('require-ticket (conditional reasons, Vitest)', requireTicket, {
       errors: [missingReason('This skip call', call("context.skip(condition, 'why')"))],
     },
     { code: "test.skipIf(isMobile)('hovers', () => {});", errors: [missingReason('This test')] },
+    {
+      code: "/* eslint-disable no-console -- debug output */\ntest.skipIf(isMobile)('hovers', () => {});",
+      errors: [{ ...missingReason('This test'), line: 2 }],
+    },
     // Vitest's `skip` option is a flag, so text in it is no reason it reports.
     { code: "test('hovers', { skip: isMobile && 'No hover' }, () => {});", errors: [missingReason('This test')] },
   ]),
@@ -137,6 +152,8 @@ runRule('require-ticket (conditional reasons, node:test)', requireTicket, {
     "test('follows links', { skip: isWindows ? 'No symlinks' : false }, () => {});",
     "test('follows links', { skip: isLinux ? false : 'No symlinks' }, () => {});",
     "test('follows links', { todo: isWindows && 'Symlinks next' }, () => {});",
+    "test('follows links', { skip: isWindows && `No symlinks on ${platform}` }, () => {});",
+    "test('follows links', { skip: isWindows ? `No symlinks on ${platform}` : false }, () => {});",
     "test('follows links', (t) => {\n  if (isWindows) t.skip('No symlinks');\n});",
     // node:test's `t.skip()` takes only a reason, so a name or a template is one.
     "test('follows links', (t) => {\n  if (isWindows) t.skip(reason);\n});",

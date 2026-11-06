@@ -1197,9 +1197,13 @@ function saysWhy(sourceCode: SourceCode, node: Node): boolean {
   return value.type !== 'Literal' && !(value.type === 'Identifier' && value.name === 'undefined');
 }
 
-/** Whether `node` is text that isn't blank. */
+/**
+ * Whether `node` is text that isn't blank, or a template with values in it, as `` `${browserName} has no
+ * clipboard` ``, which is taken on trust.
+ */
 function isReasonText(sourceCode: SourceCode, node: Node): boolean {
-  return Boolean(staticText(sourceCode, node)?.trim());
+  const text = staticText(sourceCode, node);
+  return text === undefined ? unwrap(node).type === 'TemplateLiteral' : text.trim() !== '';
 }
 
 /** Whether a runtime call gives the reason for its state where its framework takes one (see `reasonArgument`). */
@@ -1212,7 +1216,9 @@ function callReason(
   const second = call.arguments.at(1);
   if (where === 'only') return first !== undefined && saysWhy(sourceCode, first);
   // Vitest's `context.skip(isMobile)` takes a condition, so only text first is a reason.
-  if (where === 'either' && first !== undefined && staticText(sourceCode, first) !== undefined) {
+  const text =
+    first !== undefined && (staticText(sourceCode, first) !== undefined || unwrap(first).type === 'TemplateLiteral');
+  if (where === 'either' && text) {
     return isReasonText(sourceCode, first);
   }
   return second !== undefined && saysWhy(sourceCode, second);
@@ -1371,14 +1377,14 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   const suiteBodies = new Set<Node>();
 
   /**
-   * Whether a statement around `anchor` has a comment that says something above it, as `// why` above an `if`,
-   * up to `owner`, the test or describe the call acts on. The walk goes on through a callback passed to another
+   * Whether `anchor` or a statement around it has a comment that says something above it or at the end of its
+   * first line, as `// why` above an `if` or after its `{`, up to `owner`, the test or describe the call acts on. The walk goes on through a callback passed to another
    * call, such as a hook's or a step's, but stops at a function declared some other way.
    */
   const commentedAround = (anchor: Node, owner: Node | undefined): boolean => {
-    for (let node = anchor.parent; node; node = node.parent) {
+    for (let node: Node | undefined = anchor; node; node = node.parent) {
       if (FUNCTIONS.has(node.type)) {
-        const call = node.parent;
+        const call: Node | undefined = node.parent;
         if (call?.type !== 'CallExpression' || call === owner || !(call.arguments as Node[]).includes(node)) {
           return false;
         }
@@ -1387,7 +1393,10 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       const container = node.parent;
       if (!container || !STATEMENT_CONTAINERS.has(container.type)) continue;
       const block = commentBlock(sourceCode, node, options.allowBlankLine);
-      if (block.some((comment) => !commentedOut.comments.has(comment) && hasText(comment))) return true;
+      if (block.some((c) => !commentedOut.comments.has(c) && !regionComments.has(c) && hasText(c))) return true;
+      // `if (isMobile) { // why`: a comment at the end of the line the statement starts on.
+      const first = sourceCode.getCommentsInside(node).at(0);
+      if (first?.loc.start.line === node.loc.start.line && hasText(first)) return true;
     }
     return false;
   };
@@ -1422,15 +1431,16 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     block.push(...(lineDirectives.get(call.loc.start.line) ?? []));
     const inRegions = regions.filter((r) => r.start <= call.range[0] && call.range[0] < r.end);
     for (const comment of [...block, ...inRegions.map((r) => r.comment)]) claimed.add(comment);
-    const commented = [...block, ...inRegions.map((r) => r.comment)].some(hasText);
-    // A runtime call can also say why above the statements around it in its function, above its test, or in
-    // its arguments.
+    // A region's description says why a rule is off, not why a test is skipped; its marker's ticket counts.
+    const commented = block.some((comment) => !regionComments.has(comment) && hasText(comment));
+    // A comment at the end of the line also says why. A runtime call can also say why above the statements
+    // around it in its function, above its test, or in its arguments.
     const reasonedCall = (): boolean =>
-      kind === 'runtime' &&
-      ((framework.reasonArgument !== undefined && callReason(sourceCode, call, framework.reasonArgument)) ||
-        parent?.commented === true ||
-        trailingText(anchor) ||
-        commentedAround(anchor, parent?.node));
+      trailingText(anchor) ||
+      (kind === 'runtime' &&
+        ((framework.reasonArgument !== undefined && callReason(sourceCode, call, framework.reasonArgument)) ||
+          parent?.commented === true ||
+          commentedAround(anchor, parent?.node)));
     const ownTags = new Set(tagInfo.tags.map((t) => t.tag));
     const sources: StateSource[] = [];
     for (const state of states) {
