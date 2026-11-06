@@ -19,6 +19,9 @@ const tables: Record<string, Table> = {
       'group/sub/project#7',
       'https://example.com/x',
       'http://jira/browse/TRADE-1',
+      // A URL scheme is case-insensitive.
+      'HTTPS://example.com/x',
+      'Http://jira/browse/TRADE-1',
     ],
     rejects: [
       'trade-123',
@@ -43,6 +46,7 @@ const tables: Record<string, Table> = {
       // Jira Server and Data Center under a path.
       'https://issues.example.com/jira/browse/TRADE-123',
       'https://tools.example.com/tracking/jira/browse/TRADE-123/',
+      'HTTPS://acme.atlassian.net/browse/TRADE-123',
     ],
     rejects: [
       '#4821',
@@ -84,6 +88,7 @@ const tables: Record<string, Table> = {
       'acme/trading-engine.js#1',
       'https://github.com/acme/trading-engine/issues/4821',
       'https://github.com/acme/trading-engine/pull/7/',
+      'Https://github.com/acme/trading-engine/issues/4821',
     ],
     rejects: [
       'TRADE-1',
@@ -751,6 +756,7 @@ describe('placeholders', () => {
     { specs: [{ preset: 'any' }], ticket: 'https://tracker.example.com/a?ID=000/', result: 'placeholder' },
     { specs: [{ preset: 'any' }], ticket: 'https://tracker.example.com/issues/4821?page=0&tab=0', result: 'ok' },
     { specs: [{ preset: 'any' }], ticket: 'https://tracker.example.com/item/0/edit', result: 'ok' },
+    { specs: [{ preset: 'jira' }], ticket: 'HTTPS://tracker.example.com/a?id=0', result: 'placeholder' },
     {
       specs: [{ preset: 'url', hosts: ['tracker.acme.io'] }],
       ticket: 'https://tracker.acme.io/#/tasks/0',

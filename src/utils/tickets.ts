@@ -114,7 +114,7 @@ interface CompiledPreset {
 }
 
 function parseUrl(ticket: string): URL | undefined {
-  if (!/^https?:\/\//.test(ticket)) return undefined;
+  if (!/^https?:\/\//i.test(ticket)) return undefined;
   try {
     return new URL(ticket);
   } catch {
