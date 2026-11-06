@@ -38,6 +38,9 @@ export interface TicketMatcher {
 
 export const DEFAULT_PLACEHOLDERS = ['TODO', 'TBD', 'XXX-*', '0'];
 
+/** The `numeric` preset's `maxLength` when it isn't set. */
+export const NUMERIC_MAX_LENGTH = 20;
+
 // Every pattern below is anchored and has no nested or overlapping quantifiers, so matching is
 // linear in the token length. URLs are parsed with `new URL` rather than a regex.
 const KEY_RE = /^([A-Z][A-Z0-9_]+)-\d+$/;
@@ -191,6 +194,16 @@ function orList(list: string[]): string {
 /** ` in project TRADE or RISK` for `describeList('in project', ['TRADE', 'RISK'])`. */
 function describeList(words: string, list: string[] | undefined): string {
   return list === undefined ? '' : ` ${words} ${orList(list)}`;
+}
+
+/** The regex a `pattern` spec matches whole tickets with. Throws a SyntaxError when the pattern or flags are invalid. */
+export function ticketPattern(pattern: string, flags: string | undefined): RegExp {
+  // `g` and `y` make `test()` resume from the last match, so the same ticket would pass and fail
+  // in turn. A ticket is matched whole, so they never change what matches; drop them.
+  const kept = flags?.replace(/[gy]/g, '');
+  // Compiled alone first: a stray `)` in it would otherwise close the anchoring group and match anything.
+  new RegExp(pattern, kept);
+  return new RegExp(`^(?:${pattern})$`, kept);
 }
 
 function compilePreset(spec: TicketSpec): CompiledPreset {
@@ -522,10 +535,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
     }
     case 'numeric': {
       const min = spec.minLength ?? 1;
-      const max = spec.maxLength ?? 20;
-      if (min > max) {
-        throw new ConfigError(`numeric ticket minLength (${min}) is greater than maxLength (${max}).`);
-      }
+      const max = spec.maxLength ?? NUMERIC_MAX_LENGTH;
       return {
         find: (t) => (DIGITS_RE.test(t) && t.length >= min && t.length <= max ? t : undefined),
         expected: min === max ? `a ${min}-digit number` : `a number with ${min} to ${max} digits`,
@@ -539,12 +549,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
       }
       let re: RegExp;
       try {
-        // `g` and `y` make `test()` resume from the last match, so the same ticket would pass and fail
-        // in turn. A ticket is matched whole, so they never change what matches; drop them.
-        const flags = spec.flags?.replace(/[gy]/g, '');
-        // Compiled alone first: a stray `)` in it would otherwise close the anchoring group and match anything.
-        new RegExp(spec.pattern, flags);
-        re = new RegExp(`^(?:${spec.pattern})$`, flags);
+        re = ticketPattern(spec.pattern, spec.flags);
       } catch (error) {
         throw new ConfigError(`invalid ticket pattern "${spec.pattern}": ${(error as Error).message}`);
       }

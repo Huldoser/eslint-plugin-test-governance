@@ -283,6 +283,72 @@ describe('compileOptions', () => {
     );
   });
 
+  for (const [options, problem] of [
+    [
+      { ticket: { preset: 'jira', projects: ['trade'] } },
+      'ticket.projects[0] must be an uppercase key as it appears in tickets, such as WEB for WEB-123 (got "trade")',
+    ],
+    [
+      { ticket: { preset: 'plane', projects: ['web'] } },
+      'ticket.projects[0] must be an uppercase key as it appears in tickets, such as WEB for WEB-123 (got "web")',
+    ],
+    [
+      { ticket: { preset: 'numeric', minLength: 25 } },
+      'ticket.minLength (25) is greater than the default maxLength (20); set maxLength as well',
+    ],
+    [
+      { ticket: [{ preset: 'jira' }, { preset: 'numeric', minLength: 5, maxLength: 3 }] },
+      'ticket[1].minLength (5) is greater than maxLength (3)',
+    ],
+    [
+      { ticket: { preset: 'pattern', pattern: '(' } },
+      'ticket.pattern is not a valid regex: Invalid regular expression: /(/: Unterminated group',
+    ],
+    [
+      { ticket: { preset: 'pattern', pattern: 'TRADE-\\d+', flags: 'q' } },
+      "ticket.pattern is not a valid regex: Invalid flags supplied to RegExp constructor 'q'",
+    ],
+    // A state the framework lacks, or one that is off, still has its ticket format checked.
+    [
+      { framework: 'jest', states: { fixme: { ticket: { preset: 'pattern', pattern: 'TRADE-\\d+)|(.*' } } } },
+      "states.fixme.ticket.pattern is not a valid regex: Invalid regular expression: /TRADE-\\d+)|(.*/: Unmatched ')'",
+    ],
+    [
+      { framework: 'jest', states: { fixme: { ticket: { preset: 'numeric', minLength: 21 } } } },
+      'states.fixme.ticket.minLength (21) is greater than the default maxLength (20); set maxLength as well',
+    ],
+    [
+      { states: { fail: { ticket: { preset: 'numeric', minLength: 9, maxLength: 4 } } } },
+      'states.fail.ticket.minLength (9) is greater than maxLength (4)',
+    ],
+  ] as const) {
+    it(`reports ${JSON.stringify(options)} once, in the list of invalid options`, () => {
+      assert.throws(() => compile(options as never), new ConfigError(`invalid options:\n  - ${problem}`));
+    });
+  }
+
+  it('checks the ticket format of a state the framework lacks or that is off', () => {
+    assert.throws(
+      () => compile({ framework: 'jest', states: { fixme: { ticket: { preset: 'pattern' } as never } } }),
+      /"pattern" ticket preset needs a `pattern` regex string/,
+    );
+    assert.throws(
+      () => compile({ states: { fail: { ticket: { preset: 'pattern' } as never } } }),
+      /"pattern" ticket preset needs a `pattern` regex string/,
+    );
+  });
+
+  it('leaves a malformed numeric or pattern option to the schema', () => {
+    for (const [ticket, problem] of [
+      [{ preset: 'numeric', minLength: '25' }, 'ticket.minLength must be an integer (got "25")'],
+      [{ preset: 'numeric', minLength: 5, maxLength: '3' }, 'ticket.maxLength must be an integer (got "3")'],
+      [{ preset: 'pattern', pattern: 5 }, 'ticket.pattern must be a string (got 5)'],
+      [{ preset: 'pattern', pattern: 'x', flags: 5 }, 'ticket.flags must be a string (got 5)'],
+    ] as const) {
+      assert.throws(() => compile({ ticket: ticket as never }), new ConfigError(`invalid options:\n  - ${problem}`));
+    }
+  });
+
   it('does not read a ticket spec the schema already rejects as a preset', () => {
     for (const ticket of [
       { preset: 'bogus' },
