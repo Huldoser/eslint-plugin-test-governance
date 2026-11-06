@@ -541,6 +541,14 @@ function isLocalVariable(sourceCode: SourceCode, id: TSESTree.Identifier): boole
   return false;
 }
 
+/** Values a constant can hold a test function in: `it.skip`, `it.skipIf(...)`, `` it.each`...` `` or `a ? b : c`. */
+const ALIAS_VALUES = new Set([
+  'MemberExpression',
+  'CallExpression',
+  'TaggedTemplateExpression',
+  'ConditionalExpression',
+]);
+
 const STATEMENT_CONTAINERS = new Set(['Program', 'BlockStatement', 'StaticBlock', 'SwitchCase', 'TSModuleBlock']);
 
 /** The statement a call belongs to; its marker block sits above that statement. */
@@ -1608,8 +1616,11 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
    * `(isCI ? describe.skip : describe)('order entry', ...)`: a test or describe whose function is picked by
    * a condition. A state that only one side has depends on the condition, like `test.skip(isCI)`.
    */
-  const pickedDeclaration = (call: TSESTree.CallExpression): { subject: Subject; infos: InfoName[] } | undefined => {
-    const callee = unwrap(call.callee);
+  const pickedDeclaration = (
+    call: TSESTree.CallExpression,
+    picker: Node,
+  ): { subject: Subject; infos: InfoName[] } | undefined => {
+    const callee = unwrap(picker);
     if (callee.type !== 'ConditionalExpression') return undefined;
     const [yes, no] = [callee.consequent, callee.alternate].map((side) => {
       const picked = target(chainOf(unwrap(side), framework.factories));
@@ -1680,11 +1691,23 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       : undefined;
   };
 
+  /**
+   * The value of a constant that holds a test function the collected names can't: one a condition picks, as
+   * `const itIf = isCI ? it.skip : it`, one a factory builds, as `const d = describe.runIf(hasDocker)`, or any
+   * declared inside a function.
+   */
+  const aliasValue = (callee: Node): Node | undefined => {
+    if (callee.type !== 'Identifier' || testNames.roots.has(callee.name)) return undefined;
+    const value = declaredValue(sourceCode, callee);
+    return value && ALIAS_VALUES.has(unwrap(value).type) ? value : undefined;
+  };
+
   const visitCall = (original: TSESTree.CallExpression): { subject?: Subject; infos?: InfoName[] } => {
     const call = throughFunctionMethods(original);
-    const callee = target(chainOf(call.callee, framework.factories));
+    const written = aliasValue(call.callee) ?? call.callee;
+    const callee = target(chainOf(written, framework.factories));
     if (callee === undefined) {
-      return subtestOf(call) ?? pickedDeclaration(call) ?? { subject: runtimeCall(call) ?? retryCall(call) };
+      return subtestOf(call) ?? pickedDeclaration(call, written) ?? { subject: runtimeCall(call) ?? retryCall(call) };
     }
     usesTest = true;
     const args = call.arguments;

@@ -133,6 +133,10 @@ runRule('require-ticket (Vitest)', requireTicket, {
     "import vitestDefault from 'vitest';\nvitestDefault.skip('fills a limit order', () => {});",
   ]),
   invalid: withOptions(vitest, [
+    {
+      code: "const itNever = it.skipIf(true);\nitNever('fills a limit order', () => {});",
+      errors: [{ ...missing('skip', 'SKIP'), line: 2 }],
+    },
     // An annotation ticket under `meta` is checked like the tickets in a marker.
     {
       code: "test.skip('fills a limit order', { meta: { issue: 'nope' } }, () => {});",
@@ -330,6 +334,7 @@ runRule('marker-matches-state (Vitest)', markerMatchesState, {
 
 runRule('no-orphaned-marker (Vitest)', noOrphanedMarker, {
   valid: withOptions(vitest, [
+    "const describeIfDocker = describe.runIf(hasDocker);\n// SKIP: TRADE-1\ndescribeIfDocker('order store', () => {});\ntest('cancels an order', () => {});",
     // An options object from another file may skip the test, so its marker may well be right.
     "import { orderOptions } from './options';\n// SKIP: TRADE-1\ntest('fills a limit order', orderOptions, () => {});",
     {

@@ -91,6 +91,21 @@ runRule('require-ticket (Jest)', requireTicket, {
       code: "test.skip('fills a limit order', () => {});",
       errors: [{ ...missing('skip', 'SKIP'), line: 1, column: 1, endColumn: 32 }],
     },
+    // A constant that holds a test function built from a table, or one declared inside a describe.
+    {
+      code: "const itSkip = it.skip.each([[1], [2]]);\nitSkip('buys %i shares', () => {});",
+      errors: [{ ...missing('skip', 'SKIP'), line: 2 }],
+    },
+    {
+      code: "describe('order book', () => {\n  const itSkip = it.skip;\n  itSkip('shows the best bid', () => {});\n});",
+      errors: [{ ...missing('skip', 'SKIP'), line: 3 }],
+    },
+    // A constant whose test function a condition picks skips sometimes, like `test.skip(isCI)`.
+    {
+      code: "const itUnlessWindows = isWindows ? it.skip : it;\nitUnlessWindows('fills a limit order', () => {});",
+      settings: settings({ framework: 'jest', requireTicketForConditional: true }),
+      errors: [{ ...missing('skip', 'SKIP'), line: 2 }],
+    },
     { code: "it.skip('fills a limit order', () => {});", errors: [missing('skip', 'SKIP')] },
     { code: "xit('fills a limit order', () => {});", errors: [missing('skip', 'SKIP')] },
     { code: "xtest('fills a limit order', () => {});", errors: [missing('skip', 'SKIP')] },
@@ -248,6 +263,8 @@ runRule('no-orphaned-marker (Jest)', noOrphanedMarker, {
     // A marker above a test or describe whose function a condition picks belongs to it.
     "// SKIP: TRADE-1\n(process.env.CI ? describe.skip : describe)('order book', () => {\n  it('shows the best bid', () => {});\n});",
     "const symbol = 'AAPL'\n// SKIP: TRADE-1\n;(process.env.CI ? describe : describe.skip)('order book', () => {})",
+    // A marker above a test whose function a constant picks with a condition belongs to it.
+    "const itUnlessWindows = process.platform === 'win32' ? it.skip : it;\n// SKIP: TRADE-1\nitUnlessWindows('fills a limit order', () => {});\ntest('cancels an order', () => {});",
     // An `eslint-disable` region directly above a describe or a test covers the skipped tests after it.
     "/* eslint-disable no-console -- SKIP: TRADE-1 */\ndescribe('order book', () => {\n  it('shows the best bid', () => {});\n  it.skip('shows the best ask', () => {});\n});",
     "/* eslint-disable no-console -- SKIP: TRADE-1 */\ntest('fills a limit order', () => {});\ntest.skip('fills a partial order', () => {});\n/* eslint-enable no-console */",
