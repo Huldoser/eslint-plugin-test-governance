@@ -38,6 +38,9 @@ export interface TicketMatcher {
 
 export const DEFAULT_PLACEHOLDERS = ['TODO', 'TBD', 'XXX-*', '0'];
 
+/** The `numeric` preset's `maxLength` when it isn't set. */
+export const NUMERIC_MAX_LENGTH = 20;
+
 // Every pattern below is anchored and has no nested or overlapping quantifiers, so matching is
 // linear in the token length. URLs are parsed with `new URL` rather than a regex.
 const KEY_RE = /^([A-Z][A-Z0-9_]+)-\d+$/;
@@ -51,9 +54,9 @@ const JIRA_PATH_RE = /\/browse\/([A-Z][A-Z0-9_]+-\d+)\/?$/;
 // Gitea, Forgejo and Codeberg write a pull request as `/pulls/N`, GitHub as `/pull/N`.
 const GITHUB_PATH_RE = /^\/[^/]+\/[^/]+\/(?:issues|pulls?)\/(\d+)\/?$/;
 const GITLAB_PATH_RE = /\/-\/(?:issues|merge_requests|work_items)\/(\d+)\/?$/;
-const LINEAR_PATH_RE = /^\/[^/]+\/issue\/([A-Z][A-Z0-9]*-\d+)(?:\/[^/]*)?$/;
+const LINEAR_PATH_RE = /^\/[^/]+\/issue\/([A-Z][A-Z0-9]*-\d+)(?:\/[^/]+)?\/?$/;
 const AZURE_PATH_RE = /\/_workitems\/edit\/(\d+)\/?$/;
-const TRELLO_PATH_RE = /^\/c\/([A-Za-z0-9]{8})(?:\/[^/]*)?$/;
+const TRELLO_PATH_RE = /^\/c\/([A-Za-z0-9]{8})(?:\/[^/]+)?\/?$/;
 // A Notion page ID is 32 hex digits, plain or dashed as a UUID, at the end of the page's last path segment.
 const NOTION_ID = '[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const NOTION_PAGE_RE = new RegExp(`(?:^|-)(${NOTION_ID})$`);
@@ -73,10 +76,10 @@ const MONDAY_PATH_RE = /^\/boards\/\d+\/pulses\/(\d+)(?:\/.*)?$/;
 // YouTrack project IDs may start with a digit (4DM-12) but can't be digits only.
 const YOUTRACK_KEY_RE = /^([A-Z0-9_]+)-\d+$/;
 // `/issue/KT-1` and the newer `/projects/KT/issues/KT-1`, with an optional title after the key.
-const YOUTRACK_PATH_RE = /\/(?:issue|projects\/[^/]+\/issues)\/([A-Z0-9_]+-\d+)(?:\/[^/]*)?$/;
+const YOUTRACK_PATH_RE = /\/(?:issue|projects\/[^/]+\/issues)\/([A-Z0-9_]+-\d+)(?:\/[^/]+)?\/?$/;
 const BASECAMP_PATH_RE = /^\/\d+\/buckets\/\d+\/(?:todos|card_tables\/cards)\/(\d+)\/?$/;
 const SHORTCUT_REF_RE = /^(?:sc-(\d+)|\[sc-(\d+)\])$/i;
-const SHORTCUT_PATH_RE = /^\/[^/]+\/story\/(\d+)(?:\/[^/]*)?$/;
+const SHORTCUT_PATH_RE = /^\/[^/]+\/story\/(\d+)(?:\/[^/]+)?\/?$/;
 // OpenProject work packages: the canonical `/projects/<identifier>/work_packages/<id or AGILE-1>` with any
 // tab path after it, and the `/wp/<id>` short form its changelog links use.
 const OPENPROJECT_PATH_RE = /\/projects\/[^/]+\/work_packages\/([A-Z][A-Z0-9_]+-\d+|\d+)(?:\/.*)?\/?$/;
@@ -114,7 +117,7 @@ interface CompiledPreset {
 }
 
 function parseUrl(ticket: string): URL | undefined {
-  if (!/^https?:\/\//.test(ticket)) return undefined;
+  if (!/^https?:\/\//i.test(ticket)) return undefined;
   try {
     return new URL(ticket);
   } catch {
@@ -168,15 +171,18 @@ function keyId(key: string | null | undefined, ok: (key: string) => boolean): st
 
 /**
  * A link's ID when the preset doesn't know the tracker: the keys in its path, `#/route` or query (Jira's
- * `?selectedIssue=TRADE-1`) and the number its path or route ends in. A zero among them makes the link a
- * placeholder, as in 0.9.0; with none, the link itself stands for the ID.
+ * `?selectedIssue=TRADE-1`), the number its path or route ends in, and its `id` query (Wrike's
+ * `?id=4821`). A zero among them makes the link a placeholder, as in 0.9.0; with none, the link itself
+ * stands for the ID.
  */
 function linkId(url: URL): string {
   const route = /^#!?\//.test(url.hash) ? url.hash.replace(/^#!?/, '') : '';
-  const parts = [...url.pathname.split('/'), ...route.split('/'), ...[...url.searchParams.values()].map(trimSlash)];
+  const query = [...url.searchParams].map(([key, value]) => [key, trimSlash(value)]);
+  const parts = [...url.pathname.split('/'), ...route.split('/'), ...query.map(([, value]) => value)];
   const keys = parts.filter((part) => KEY_RE.test(part));
   const ends = [url.pathname, route].flatMap((path) => LINK_NUMBER_RE.exec(path)?.[1] ?? []);
-  const numbers = [...keys, ...ends].map(numberOf);
+  const ids = query.flatMap(([key, value]) => (key.toLowerCase() === 'id' && DIGITS_RE.test(value) ? [value] : []));
+  const numbers = [...keys, ...ends, ...ids].map(numberOf);
   return numbers.find((id) => ZERO_RE.test(id)) ?? numbers.at(0) ?? url.href;
 }
 
@@ -188,6 +194,16 @@ function orList(list: string[]): string {
 /** ` in project TRADE or RISK` for `describeList('in project', ['TRADE', 'RISK'])`. */
 function describeList(words: string, list: string[] | undefined): string {
   return list === undefined ? '' : ` ${words} ${orList(list)}`;
+}
+
+/** The regex a `pattern` spec matches whole tickets with. Throws a SyntaxError when the pattern or flags are invalid. */
+export function ticketPattern(pattern: string, flags: string | undefined): RegExp {
+  // `g` and `y` make `test()` resume from the last match, so the same ticket would pass and fail
+  // in turn. A ticket is matched whole, so they never change what matches; drop them.
+  const kept = flags?.replace(/[gy]/g, '');
+  // Compiled alone first: a stray `)` in it would otherwise close the anchoring group and match anything.
+  new RegExp(pattern, kept);
+  return new RegExp(`^(?:${pattern})$`, kept);
 }
 
 function compilePreset(spec: TicketSpec): CompiledPreset {
@@ -519,10 +535,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
     }
     case 'numeric': {
       const min = spec.minLength ?? 1;
-      const max = spec.maxLength ?? 20;
-      if (min > max) {
-        throw new ConfigError(`numeric ticket minLength (${min}) is greater than maxLength (${max}).`);
-      }
+      const max = spec.maxLength ?? NUMERIC_MAX_LENGTH;
       return {
         find: (t) => (DIGITS_RE.test(t) && t.length >= min && t.length <= max ? t : undefined),
         expected: min === max ? `a ${min}-digit number` : `a number with ${min} to ${max} digits`,
@@ -536,12 +549,7 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
       }
       let re: RegExp;
       try {
-        // `g` and `y` make `test()` resume from the last match, so the same ticket would pass and fail
-        // in turn. A ticket is matched whole, so they never change what matches; drop them.
-        const flags = spec.flags?.replace(/[gy]/g, '');
-        // Compiled alone first: a stray `)` in it would otherwise close the anchoring group and match anything.
-        new RegExp(spec.pattern, flags);
-        re = new RegExp(`^(?:${spec.pattern})$`, flags);
+        re = ticketPattern(spec.pattern, spec.flags);
       } catch (error) {
         throw new ConfigError(`invalid ticket pattern "${spec.pattern}": ${(error as Error).message}`);
       }
@@ -589,10 +597,11 @@ function matchesGlob(glob: string, value: string): boolean {
 
 export function compileTicketSpec(specs: TicketSpec[], placeholders: string[]): TicketMatcher {
   const presets = specs.map(compilePreset);
+  const globs = placeholders.map((glob) => glob.replace(/^#/, ''));
   return {
     check(ticket) {
       const bare = ticket.replace(/^#/, '');
-      if (placeholders.some((glob) => matchesGlob(glob, ticket) || matchesGlob(glob, bare))) return 'placeholder';
+      if (globs.some((glob) => matchesGlob(glob, ticket) || matchesGlob(glob, bare))) return 'placeholder';
       for (const generic of [false, true]) {
         const ids = presets.flatMap((preset) =>
           Boolean(preset.generic) === generic ? (preset.find(ticket) ?? []) : [],

@@ -19,6 +19,9 @@ const tables: Record<string, Table> = {
       'group/sub/project#7',
       'https://example.com/x',
       'http://jira/browse/TRADE-1',
+      // A URL scheme is case-insensitive.
+      'HTTPS://example.com/x',
+      'Http://jira/browse/TRADE-1',
     ],
     rejects: [
       'trade-123',
@@ -43,6 +46,7 @@ const tables: Record<string, Table> = {
       // Jira Server and Data Center under a path.
       'https://issues.example.com/jira/browse/TRADE-123',
       'https://tools.example.com/tracking/jira/browse/TRADE-123/',
+      'HTTPS://acme.atlassian.net/browse/TRADE-123',
     ],
     rejects: [
       '#4821',
@@ -84,6 +88,7 @@ const tables: Record<string, Table> = {
       'acme/trading-engine.js#1',
       'https://github.com/acme/trading-engine/issues/4821',
       'https://github.com/acme/trading-engine/pull/7/',
+      'Https://github.com/acme/trading-engine/issues/4821',
     ],
     rejects: [
       'TRADE-1',
@@ -131,6 +136,7 @@ const tables: Record<string, Table> = {
       'ENG-123',
       'https://linear.app/acme/issue/ENG-123',
       'https://linear.app/acme/issue/ENG-123/fix-stop-loss',
+      'https://linear.app/acme/issue/ENG-123/fix-stop-loss/',
     ],
     rejects: [
       'OPS-1',
@@ -139,6 +145,8 @@ const tables: Record<string, Table> = {
       'https://example.com/acme/issue/ENG-1',
       'https://linear.app/x/acme/issue/ENG-1',
       'https://linear.app/acme/issue/ENG-123x',
+      'https://linear.app/acme/issue/ENG-123//',
+      'https://linear.app/acme/issue/ENG-123/fix-stop-loss//',
     ],
   },
   'azure-devops': {
@@ -178,6 +186,7 @@ const tables: Record<string, Table> = {
       'https://trello.com/c/nqPiDKmw',
       'https://trello.com/c/nqPiDKmw/',
       'https://trello.com/c/nqPiDKmw/9-fix-stop-loss-rounding',
+      'https://trello.com/c/nqPiDKmw/9-fix-stop-loss-rounding/',
       'https://trello.com./c/nqPiDKmw',
     ],
     rejects: [
@@ -187,6 +196,7 @@ const tables: Record<string, Table> = {
       'https://trello.com/c/nqPiDKm',
       'https://trello.com/c/nqPiDKmw1',
       'https://trello.com/c/nqPiDKmw/9-slug/extra',
+      'https://trello.com/c/nqPiDKmw/9-slug//',
       'https://example.com/c/nqPiDKmw',
     ],
   },
@@ -351,10 +361,12 @@ const tables: Record<string, Table> = {
       'PRJ_ROAD-7',
       'https://youtrack.jetbrains.com/issue/KT-11468',
       'https://youtrack.jetbrains.com/issue/KT-11468/Fix-stop-loss-rounding',
+      'https://youtrack.jetbrains.com/issue/KT-11468/Fix-stop-loss-rounding/',
       'https://acme.youtrack.cloud/issue/TRADE-1/',
       'https://acme.myjetbrains.com/youtrack/issue/TRADE-1',
       'https://youtrack.jetbrains.com/projects/KT/issues/KT-15984',
       'https://youtrack.jetbrains.com/projects/IJPL/issues/IJPL-204613/Losing-comments-on-Gitlab-merge-requests',
+      'https://youtrack.jetbrains.com/projects/IJPL/issues/IJPL-204613/Losing-comments-on-Gitlab-merge-requests/',
       'https://youtrack.jetbrains.com/issue/KT-14652/slug#focus=Comments-27-1234.0-0',
     ],
     rejects: [
@@ -364,6 +376,7 @@ const tables: Record<string, Table> = {
       'https://youtrack.jetbrains.com/projects/KT/issues',
       'https://youtrack.jetbrains.com/projects/KT/issues/KT-1/slug/extra',
       'https://youtrack.jetbrains.com/issue/KT-1/slug/extra',
+      'https://youtrack.jetbrains.com/issue/KT-1/slug/extra/',
       'https://youtrack.jetbrains.com/issue/kt-1',
       'https://youtrack.example.com/issue/KT-1',
       'https://jetbrains.com/issue/KT-1',
@@ -403,6 +416,7 @@ const tables: Record<string, Table> = {
       '[sc-27971]',
       'https://app.shortcut.com/acme/story/27971',
       'https://app.shortcut.com/acme/story/27971/fix-stop-loss-rounding',
+      'https://app.shortcut.com/acme/story/27971/fix-stop-loss-rounding/',
       'https://app.clubhouse.io/acme/story/27971',
     ],
     rejects: [
@@ -414,6 +428,7 @@ const tables: Record<string, Table> = {
       'https://app.shortcut.com/acme/epic/27971',
       'https://app.shortcut.com/acme/iteration/27971',
       'https://app.shortcut.com/acme/story/new',
+      'https://app.shortcut.com/acme/story/27971/slug/extra',
       'https://example.com/acme/story/27971',
     ],
   },
@@ -635,6 +650,13 @@ describe('placeholders', () => {
     assert.equal(custom.check('#1234'), 'ok');
   });
 
+  it('ignores a leading # on a placeholder in the list', () => {
+    const custom = compileTicketSpec([{ preset: 'any' }], ['#TBD']);
+    assert.equal(custom.check('TBD'), 'placeholder');
+    assert.equal(custom.check('#TBD'), 'placeholder');
+    assert.equal(compileTicketSpec([{ preset: 'any' }], DEFAULT_PLACEHOLDERS).check('#TBD'), 'placeholder');
+  });
+
   it('matches a wildcard placeholder without backtracking', () => {
     const matcher = compileTicketSpec([{ preset: 'any' }], ['*a*a*a*a*b']);
     assert.equal(matcher.check(`${'a'.repeat(50)}b`), 'placeholder');
@@ -729,6 +751,22 @@ describe('placeholders', () => {
     },
     { specs: [{ preset: 'any' }], ticket: 'https://tracker.example.com/search?page=0', result: 'ok' },
     { specs: [{ preset: 'any' }], ticket: '[TRADE-0]', result: 'placeholder' },
+    // An `id` query of zeros is a zero ID, as in Wrike's links; other zero queries, and a 0 inside the path, are not.
+    {
+      specs: [{ preset: 'url', hosts: ['www.wrike.com'] }],
+      ticket: 'https://www.wrike.com/open.htm?id=0',
+      result: 'placeholder',
+    },
+    {
+      specs: [{ preset: 'url', hosts: ['www.wrike.com'] }],
+      ticket: 'https://www.wrike.com/open.htm?id=4821',
+      result: 'ok',
+    },
+    { specs: [{ preset: 'any' }], ticket: 'https://tracker.example.com/a?id=0', result: 'placeholder' },
+    { specs: [{ preset: 'any' }], ticket: 'https://tracker.example.com/a?ID=000/', result: 'placeholder' },
+    { specs: [{ preset: 'any' }], ticket: 'https://tracker.example.com/issues/4821?page=0&tab=0', result: 'ok' },
+    { specs: [{ preset: 'any' }], ticket: 'https://tracker.example.com/item/0/edit', result: 'ok' },
+    { specs: [{ preset: 'jira' }], ticket: 'HTTPS://tracker.example.com/a?id=0', result: 'placeholder' },
     {
       specs: [{ preset: 'url', hosts: ['tracker.acme.io'] }],
       ticket: 'https://tracker.acme.io/#/tasks/0',

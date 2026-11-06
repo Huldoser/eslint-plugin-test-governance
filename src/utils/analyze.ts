@@ -199,6 +199,11 @@ export interface Subject {
    * Vitest's option states when its options object can't. Includes those of enclosing describes.
    */
   unknownStates: Set<string>;
+  /**
+   * States of other subjects whose comment block is this one's, as a test that is the arrow body of a
+   * describe, `describe('d', () => test.skip(...))`, so a marker for them isn't left over here.
+   */
+  sharedStates: Set<string>;
   /** True when this node is skipped or fixme'd by any means, whether or not those states are on. */
   skipped: boolean;
   ownSkip: boolean;
@@ -557,7 +562,7 @@ const ALIAS_VALUES = new Set([
 
 const STATEMENT_CONTAINERS = new Set(['Program', 'BlockStatement', 'StaticBlock', 'SwitchCase', 'TSModuleBlock']);
 
-/** The statement a call belongs to; its marker block sits above that statement. */
+/** The statement a call, or a value, belongs to; its marker block sits above that statement. */
 /**
  * The declaration a call makes through `Function.prototype.call`, `apply` or `bind`, read as if it were
  * written plainly: `it.skip.call(null, 'title', fn)`, `it.skip.apply(null, ['title', fn])` and
@@ -600,7 +605,7 @@ function throughFunctionMethods(original: TSESTree.CallExpression): TSESTree.Cal
   return call;
 }
 
-function anchorOf(call: TSESTree.CallExpression): Node {
+function anchorOf(call: Node): Node {
   let node: Node = call;
   // A call always sits inside a statement container, so the walk stops before it runs out of parents.
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
@@ -1187,9 +1192,14 @@ const OPTION_VALUES = new Set([
  * Whether a runtime call always applies: it has no condition, or `true`, or with `notes` only a note, as
  * Vitest's `context.skip('Broker sandbox is down')`, and nothing around it makes it conditional.
  */
-function isUnconditional(call: TSESTree.CallExpression, notes: boolean): boolean {
+function isUnconditional(call: TSESTree.CallExpression, framework: Framework): boolean {
   const first = call.arguments.at(0);
-  const always = first === undefined || booleanOf(first) === true || (notes && isStaticText(first));
+  const always =
+    first === undefined ||
+    booleanOf(first) === true ||
+    // node:test's `t.skip(message)` and Jasmine's `pending(message)` take no condition, so any argument is a note.
+    framework.reasonArgument === 'only' ||
+    (framework.skipNotes && isStaticText(first));
   return always && !isGuarded(call);
 }
 
@@ -1503,6 +1513,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       inheritedTags,
       unreadTags: tagInfo.unread,
       unknownStates,
+      sharedStates: new Set(),
       skipped: ownSkip || (kind !== 'runtime' && parent?.skipped === true),
       ownSkip,
       markers: block.flatMap((comment) => (regionComments.has(comment) ? [] : parseMarkers(comment, states))),
@@ -1709,9 +1720,34 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     return value && ALIAS_VALUES.has(unwrap(value).type) ? value : undefined;
   };
 
+  /**
+   * Whether the declaration of a constant that holds a test function says why above it or at the end of its
+   * line, as `// no symlinks on Windows` above `const posixTest = isWindows ? test.skip : test`.
+   */
+  const aliasCommented = (value: Node): boolean => {
+    const statement = anchorOf(value);
+    const block = commentBlock(sourceCode, statement, options.allowBlankLine);
+    return (
+      block.some((c) => !commentedOut.comments.has(c) && !regionComments.has(c) && hasText(c)) ||
+      trailingText(statement)
+    );
+  };
+
   const visitCall = (original: TSESTree.CallExpression): { subject?: Subject; infos?: InfoName[] } => {
+    const alias = aliasValue(throughFunctionMethods(original).callee);
+    const visited = visitDeclaredCall(original, alias);
+    if (alias && visited.subject && aliasCommented(alias)) {
+      for (const source of visited.subject.states) if (source.reasoned === false) source.reasoned = true;
+    }
+    return visited;
+  };
+
+  const visitDeclaredCall = (
+    original: TSESTree.CallExpression,
+    alias: Node | undefined,
+  ): { subject?: Subject; infos?: InfoName[] } => {
     const call = throughFunctionMethods(original);
-    const written = aliasValue(call.callee) ?? call.callee;
+    const written = alias ?? call.callee;
     const callee = target(chainOf(written, framework.factories));
     if (callee === undefined) {
       return subtestOf(call) ?? pickedDeclaration(call, written) ?? { subject: runtimeCall(call) ?? retryCall(call) };
@@ -1719,14 +1755,12 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     usesTest = true;
     const args = call.arguments;
     const { path } = callee;
-    if (framework.retryCall === 'describe.configure' && path.join('.') === 'describe.configure') {
-      const options = args.at(0);
-      const object = options && unwrap(options);
-      const count =
-        object?.type === 'ObjectExpression'
-          ? object.properties.find((p) => p.type === 'Property' && propertyName(p) === 'retries')
-          : undefined;
-      return { subject: retrySubject(call, count?.type === 'Property' ? count.value : undefined, 'configure') };
+    // `test.describe.configure(...)`, or `describe.configure(...)` with `const { describe } = test`.
+    const configure =
+      path.join('.') === 'describe.configure' || (callee.root === DESCRIBE && path.join('.') === 'configure');
+    if (framework.retryCall === 'describe.configure' && configure) {
+      const count = detailsOf(sourceCode, call, true).entries.findLast(([key]) => key === 'retries');
+      return { subject: retrySubject(call, count?.[1], 'configure') };
     }
     const declaration = declarationOf(callee);
     // Vitest's `beforeEach((context) => context.skip())` and Mocha's `before(function () { this.skip(); })`
@@ -1883,7 +1917,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     call: TSESTree.CallExpression,
     modifier: string,
     step?: Subject,
-    always = isUnconditional(call, framework.skipNotes),
+    always = isUnconditional(call, framework),
   ): Subject | undefined => {
     if (!states.some((s) => s.modifier === modifier)) return undefined;
     const subject = makeSubject(
@@ -1928,6 +1962,18 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     .filter((comment) => !claimed.has(comment))
     .flatMap((comment) => parseMarkers(comment, states))
     .filter(isStateMarker);
+
+  const byAnchor = new Map<Node, Subject[]>();
+  for (const subject of subjects) byAnchor.set(subject.anchor, [...(byAnchor.get(subject.anchor) ?? []), subject]);
+  for (const subject of subjects) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- every subject's anchor is a key
+    for (const other of byAnchor.get(subject.anchor)!) {
+      if (other === subject) continue;
+      for (const marker of subject.markers) {
+        if (marker.state && appliesTo(other, marker.state.name)) subject.sharedStates.add(marker.state.name);
+      }
+    }
+  }
 
   const idleRegionMarkers = regions
     .flatMap((region) => region.markers)
@@ -2059,7 +2105,14 @@ function isWorkComment(marker: Marker, options: ResolvedOptions): boolean {
 export function strayMarkers(subject: Subject, options: ResolvedOptions): StateMarker[] {
   return subject.markers.flatMap((marker): StateMarker[] => {
     const state = marker.state ?? (marker.tickets.at(0)?.result === 'ok' ? marker.caseOf : undefined);
-    if (state === undefined || appliesTo(subject, state.name) || subject.unknownStates.has(state.name)) return [];
+    if (
+      state === undefined ||
+      appliesTo(subject, state.name) ||
+      subject.unknownStates.has(state.name) ||
+      subject.sharedStates.has(state.name)
+    ) {
+      return [];
+    }
     return isWorkComment(marker, options) ? [] : [{ ...marker, state }];
   });
 }

@@ -26,6 +26,7 @@ export default createRule({
     const checkedTags = [...options.states.filter(isTagState).map((s) => s.tag), ...options.knownTags];
     const newTag = options.states.find((s) => s.name === 'new')?.tag;
     const quarantinedTag = options.states.find((s) => s.name === 'quarantined')?.tag;
+    const spelled = new Set<string>();
 
     for (const subject of analysis.subjects) {
       for (const occurrence of subject.tags) checkSpelling(occurrence);
@@ -56,6 +57,10 @@ export default createRule({
 
     function checkSpelling(occurrence: TagOccurrence): void {
       const { tag, range } = occurrence;
+      // A constant used in several titles, as `` `buys ${TAG}` ``, is one place to fix, so one report.
+      const key = `${occurrence.node.range[0]}:${range?.[0]}:${tag}`;
+      if (spelled.has(key)) return;
+      spelled.add(key);
       // A Vitest tag name is written without its `@`, so show it, and fix it, the same way.
       const written = (name: string): string => (occurrence.plain ? name.slice(1) : name);
       if (checkedTags.includes(tag)) return;

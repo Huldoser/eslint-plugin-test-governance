@@ -8,8 +8,15 @@ import {
 } from './constants.ts';
 import { ConfigError } from './errors.ts';
 import { FRAMEWORKS, type Framework, type Modifier } from './frameworks.ts';
-import { optionsSchema } from './schema.ts';
-import { compileTicketSpec, DEFAULT_PLACEHOLDERS, type TicketMatcher, type TicketSpec } from './tickets.ts';
+import { optionsSchema, PROJECT_PATTERN } from './schema.ts';
+import {
+  compileTicketSpec,
+  DEFAULT_PLACEHOLDERS,
+  NUMERIC_MAX_LENGTH,
+  ticketPattern,
+  type TicketMatcher,
+  type TicketSpec,
+} from './tickets.ts';
 import { validate } from './validate.ts';
 
 export const SETTINGS_KEY = 'test-governance';
@@ -40,15 +47,17 @@ export interface GovernanceOptions {
   framework: FrameworkName;
   /**
    * Names that are treated as the framework's `test` function. Defaults to `['test']` for Playwright,
-   * `['test', 'it']` for Jest and Vitest, and `['it', 'specify', 'test']` for Mocha, Cypress and
-   * WebdriverIO. Your list replaces the default one, so include those names if you still need them.
+   * `['test', 'it']` for Jest, Vitest and node:test, `['it', 'specify', 'test']` for Mocha, Cypress and
+   * WebdriverIO, and `['it']` for Jasmine. Your list replaces the default one, so include those names if you
+   * still need them.
    */
   testFunctions?: string[];
   /** Accepted ticket formats. Defaults to `{ preset: 'any' }`. */
   ticket?: TicketSpec | TicketSpec[];
   /**
-   * Tickets that are rejected as placeholders. `*` matches any characters. Your list replaces the default
-   * one (`TODO`, `TBD`, `XXX-*`, ...); tickets numbered 0 are always rejected.
+   * Tickets that are rejected as placeholders. `*` matches any characters. Case-insensitive, and a leading `#`
+   * on the ticket or the placeholder is ignored. Your list replaces the default one (`TODO`, `TBD`, `XXX-*`,
+   * ...); tickets numbered 0 are always rejected.
    */
   placeholders?: string[];
   /** Turns on the `@new` and `@quarantined` states. */
@@ -233,14 +242,17 @@ const STRICT_HOST_PRESETS = new Set<TicketSpec['preset']>([
   'plane',
 ]);
 
+const PROJECT_RE = new RegExp(PROJECT_PATTERN);
+
 /** Option values the schema allows for every preset but this one can't use. */
 function ownOptionProblems(spec: TicketSpec, at: string): string[] {
   const problems: string[] = [];
   // The schema lets YouTrack's `4DM` through; Jira and Plane keys start with a letter and match nothing else.
+  // A key the schema rejects, such as a lowercase one, is reported there.
   if ((spec.preset === 'jira' || spec.preset === 'plane') && Array.isArray(spec.projects)) {
     const tracker = spec.preset === 'jira' ? 'Jira' : 'Plane';
     for (const [i, key] of spec.projects.entries()) {
-      if (typeof key !== 'string' || !/^[A-Z][A-Z0-9_]+$/.test(key)) {
+      if (typeof key === 'string' && PROJECT_RE.test(key) && !/^[A-Z][A-Z0-9_]+$/.test(key)) {
         problems.push(
           `${at}.projects[${i}] must start with a letter and have at least two characters, as ${tracker} keys do (got "${key}")`,
         );
@@ -260,6 +272,26 @@ function ownOptionProblems(spec: TicketSpec, at: string): string[] {
     problems.push(
       `${at}.prefixes is required by the "servicenow" preset: the record-number prefixes it accepts, such as STRY`,
     );
+  }
+  if (spec.preset === 'numeric') {
+    const { minLength, maxLength = NUMERIC_MAX_LENGTH } = spec as { minLength?: unknown; maxLength?: unknown };
+    if (typeof minLength === 'number' && typeof maxLength === 'number' && minLength > maxLength) {
+      problems.push(
+        spec.maxLength === undefined
+          ? `${at}.minLength (${minLength}) is greater than the default maxLength (${maxLength}); set maxLength as well`
+          : `${at}.minLength (${minLength}) is greater than maxLength (${maxLength})`,
+      );
+    }
+  }
+  if (spec.preset === 'pattern') {
+    const { pattern, flags } = spec as { pattern?: unknown; flags?: unknown };
+    if (typeof pattern === 'string' && (flags === undefined || typeof flags === 'string')) {
+      try {
+        ticketPattern(pattern, flags);
+      } catch (error) {
+        problems.push(`${at}.pattern is not a valid regex: ${(error as Error).message}`);
+      }
+    }
   }
   return problems;
 }
@@ -348,13 +380,11 @@ export function compileOptions(options: GovernanceOptions): ResolvedOptions {
     const raw = overrides[name];
     const override: StateOverride = typeof raw === 'boolean' ? { enabled: raw } : (raw ?? {});
     const enabled = override.enabled ?? (def.lifecycle ? (options.lifecycleTags ?? def.enabled) : def.enabled);
+    // Compiled even for a state that is off, so a mistake in its ticket format shows before it is turned on.
+    const ticket = override.ticket === undefined ? defaultMatcher : compile(override.ticket);
     // A state the framework has no way to enter, such as `fixme` in Jest, stays off.
     if (!enabled || !framework.states.has(name)) continue;
-    const base = {
-      name,
-      marker: override.marker ?? def.marker,
-      ticket: override.ticket === undefined ? defaultMatcher : compile(override.ticket),
-    };
+    const base = { name, marker: override.marker ?? def.marker, ticket };
     states.push(
       def.modifier === undefined ? { ...base, tag: override.tag ?? def.tag } : { ...base, modifier: def.modifier },
     );

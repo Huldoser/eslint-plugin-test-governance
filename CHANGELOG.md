@@ -45,6 +45,30 @@ All notable changes to this project are documented here. The format follows
   `['annotation']`.
 - The suggestion to add a marker uses the file's own line breaks, so it no longer leaves a bare line feed in a
   file with CRLF line endings.
+- Playwright's `test.describe.configure({ retries })` is read, with `states: { retry: true }`, when the options
+  sit in a constant or a spread, and when `describe` comes from `const { describe } = test`.
+- A marker above `test.describe('orders', () => test.skip(...))`, whose arrow body is the test, belongs to the test
+  as well, so `no-orphaned-marker` no longer calls it left over on the describe.
+- node:test's `t.skip(message)` and `t.todo(message)` and Jasmine's `pending(message)` take no condition, so they
+  need a ticket whatever the message is, also one held in a name or built in a template. A message in a name was
+  read as a condition.
+- A tag constant used in several titles, as `` `buys ${TAG}` ``, is reported once, where it is written.
+- The example in the `missingReason` message is written on one line, also when the call is split over lines.
+- With `requireReasonForConditional`, a comment above the declaration of a constant that picks a test function,
+  as `const posixTest = isWindows ? test.skip : test`, or at the end of its line, is the reason for every test
+  that uses it.
+- A link whose `id` query is zero, such as `https://www.wrike.com/open.htm?id=0`, is a placeholder, as any ticket
+  numbered 0 is. Other zero queries, such as `?page=0`, are left alone.
+- A placeholder written with a leading `#`, such as `#TBD`, also matches `TBD`: a leading `#` is ignored on both
+  the ticket and the placeholder.
+- A link whose scheme isn't in lowercase, such as `HTTPS://...`, is read as a link.
+- Linear, Trello, Shortcut and YouTrack links that end in a slash after the title, as
+  `.../ENG-1/fix-rounding/`, are accepted.
+- A lowercase Jira or Plane project in `projects` is reported once instead of twice.
+- `numeric` with a `minLength` above its `maxLength`, and a `pattern` or `flags` that isn't a valid regex, are
+  reported in the list of invalid options. Without `maxLength`, the message names its default of 20.
+- The ticket format of a state that is off, or that the framework doesn't have, such as `states.fixme.ticket`
+  with Jest, is checked too, so a mistake in it shows up at once.
 
 ## [0.13.0] - 2026-11-05
 

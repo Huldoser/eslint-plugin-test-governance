@@ -89,6 +89,14 @@ runRule('no-conflicting-states', rule, {
       settings: lifecycle,
       errors: [{ messageId: 'tagCase', data: { found: '@New', expected: '@new' }, line: 2, column: 32, endColumn: 40 }],
     },
+    // A constant in two titles is reported once, where it is written.
+    {
+      code: "const TAG = '@New';\ntest(`places an order ${TAG}`, async () => {});\ntest(`cancels an order ${TAG}`, async () => {});",
+      settings: lifecycle,
+      output:
+        "const TAG = '@new';\ntest(`places an order ${TAG}`, async () => {});\ntest(`cancels an order ${TAG}`, async () => {});",
+      errors: [{ messageId: 'tagCase', data: { found: '@New', expected: '@new' }, line: 1 }],
+    },
     {
       code: "test('places a market order @new @quarantined', async () => {});",
       settings: lifecycle,
