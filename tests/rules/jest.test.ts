@@ -91,6 +91,21 @@ runRule('require-ticket (Jest)', requireTicket, {
       code: "test.skip('fills a limit order', () => {});",
       errors: [{ ...missing('skip', 'SKIP'), line: 1, column: 1, endColumn: 32 }],
     },
+    // A constant that holds a test function built from a table, or one declared inside a describe.
+    {
+      code: "const itSkip = it.skip.each([[1], [2]]);\nitSkip('buys %i shares', () => {});",
+      errors: [{ ...missing('skip', 'SKIP'), line: 2 }],
+    },
+    {
+      code: "describe('order book', () => {\n  const itSkip = it.skip;\n  itSkip('shows the best bid', () => {});\n});",
+      errors: [{ ...missing('skip', 'SKIP'), line: 3 }],
+    },
+    // A constant whose test function a condition picks skips sometimes, like `test.skip(isCI)`.
+    {
+      code: "const itUnlessWindows = isWindows ? it.skip : it;\nitUnlessWindows('fills a limit order', () => {});",
+      settings: settings({ framework: 'jest', requireTicketForConditional: true }),
+      errors: [{ ...missing('skip', 'SKIP'), line: 2 }],
+    },
     { code: "it.skip('fills a limit order', () => {});", errors: [missing('skip', 'SKIP')] },
     { code: "xit('fills a limit order', () => {});", errors: [missing('skip', 'SKIP')] },
     { code: "xtest('fills a limit order', () => {});", errors: [missing('skip', 'SKIP')] },
@@ -210,7 +225,11 @@ runRule('require-ticket (Jest)', requireTicket, {
 });
 
 runRule('marker-matches-state (Jest)', markerMatchesState, {
-  valid: withOptions(jest, ["// TODO: TRADE-1\ntest.todo('fills a partial order');"]),
+  valid: withOptions(jest, [
+    "// TODO: TRADE-1\ntest.todo('fills a partial order');",
+    // An `eslint-disable` region's marker covers every test up to its `eslint-enable`, not only the first.
+    "/* eslint-disable no-console -- SKIP: TRADE-1 */\ntest.todo('fills a partial order');\ntest.skip('fills a limit order', () => {});",
+  ]),
   invalid: withOptions(jest, [
     {
       code: "// SKIP: TRADE-1\ntest.todo('fills a partial order');",
@@ -244,6 +263,11 @@ runRule('no-orphaned-marker (Jest)', noOrphanedMarker, {
     // A marker above a test or describe whose function a condition picks belongs to it.
     "// SKIP: TRADE-1\n(process.env.CI ? describe.skip : describe)('order book', () => {\n  it('shows the best bid', () => {});\n});",
     "const symbol = 'AAPL'\n// SKIP: TRADE-1\n;(process.env.CI ? describe : describe.skip)('order book', () => {})",
+    // A marker above a test whose function a constant picks with a condition belongs to it.
+    "const itUnlessWindows = process.platform === 'win32' ? it.skip : it;\n// SKIP: TRADE-1\nitUnlessWindows('fills a limit order', () => {});\ntest('cancels an order', () => {});",
+    // An `eslint-disable` region directly above a describe or a test covers the skipped tests after it.
+    "/* eslint-disable no-console -- SKIP: TRADE-1 */\ndescribe('order book', () => {\n  it('shows the best bid', () => {});\n  it.skip('shows the best ask', () => {});\n});",
+    "/* eslint-disable no-console -- SKIP: TRADE-1 */\ntest('fills a limit order', () => {});\ntest.skip('fills a partial order', () => {});\n/* eslint-enable no-console */",
   ]),
   invalid: withOptions(jest, [
     // A todo marker under its own keyword is still checked.
@@ -287,6 +311,9 @@ runRule('require-ticket-in-comments (Jest)', requireTicketInComments, {
     "// todo: fills need a quote feed\ntest.todo('fills a partial order');",
     // Files without Jest tests are not checked.
     'export function fillOrder() {\n  // TODO: later\n}',
+    // A todo marker in an `eslint-disable` region belongs to require-ticket too, which reports its note.
+    "/* eslint-disable no-console -- TODO: TRADE-1 rewrite after the API change */\nimport { test } from '@jest/globals';\n\ntest.todo('fills a partial order');",
+    "/* eslint-disable no-console -- TODO: TRADE-1 rewrite after the API change */\ntest.todo('fills a partial order');",
   ]),
   invalid: withOptions(jest, [
     {

@@ -1,27 +1,31 @@
 import type { TSESLint, TSESTree } from '@typescript-eslint/utils';
-import { directiveOf, isFunction, type Marker } from './analyze.ts';
+import { commentLines, directiveOf, isFunction, type Marker } from './analyze.ts';
 
 type SourceCode = Readonly<TSESLint.SourceCode>;
 
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/** Range of `keyword` where it is used as a marker (`KEYWORD:`) inside `comment`. */
-export function keywordRange(sourceCode: SourceCode, comment: TSESTree.Comment, keyword: string): TSESTree.Range {
-  const text = sourceCode.getText(comment);
-  // Only called with a keyword that was parsed from this comment, so it always matches.
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
-  const match = new RegExp(`(^|[^\\w-])(${escapeRegExp(keyword)})\\s*:`).exec(text)!;
-  const start = comment.range[0] + match.index + match[1].length;
-  return [start, start + keyword.length];
+/** Range of a marker's keyword on the marker's own line. */
+export function keywordRange(marker: Marker): TSESTree.Range {
+  return [marker.keywordStart, marker.keywordStart + marker.keyword.length];
 }
 
 /**
- * Removes a marker comment, and its whole line when nothing else is on it. From an ESLint directive it
- * removes only the description, so the directive keeps working.
+ * Removes a marker. From a comment that says more, it removes only the marker's line. Otherwise it removes
+ * the comment, and its whole line when nothing else is on it, or from an ESLint directive only the
+ * description, so the directive keeps working.
  */
-export function removeMarkerComment(sourceCode: SourceCode, comment: TSESTree.Comment): TSESLint.RuleFix {
+export function removeMarkerComment(sourceCode: SourceCode, marker: Marker): TSESLint.RuleFix {
+  const { comment, line: index } = marker;
+  const lines = commentLines(comment);
+  if (lines.some(({ text }, i) => i !== index && /[^\s*]/.test(text))) {
+    const { start, text } = lines[index];
+    if (index === 0) {
+      // A JSDoc comment keeps the `*` of its `/**`.
+      return { range: [start + text.search(/[^*]/), start + text.length], text: '' };
+    }
+    const previous = lines[index - 1];
+    const end = index === lines.length - 1 ? text.trimEnd().length : text.length;
+    return { range: [previous.start + previous.text.length, start + end], text: '' };
+  }
   const description = directiveOf(comment)?.description;
   if (description) {
     // `//` and `/*` are both two characters; a block comment keeps the space before its `*/`.
@@ -35,6 +39,13 @@ export function removeMarkerComment(sourceCode: SourceCode, comment: TSESTree.Co
   const aloneOnLine =
     text.slice(lineStart, comment.range[0]).trim() === '' && text.slice(comment.range[1], lineEnd).trim() === '';
   return { range: aloneOnLine ? [lineStart, lineEnd] : comment.range, text: '' };
+}
+
+/** The line break that ends the line `comment` ends on. */
+export function lineBreakAfter(sourceCode: SourceCode, comment: TSESTree.Comment): string {
+  // A line comment above a test always ends at a line break.
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
+  return /^(?:\r\n|[\r\n\u2028\u2029])/.exec(sourceCode.text.slice(comment.range[1]))![0];
 }
 
 /** Indentation of the line `comment` starts on. */
@@ -78,15 +89,18 @@ export function moveToAnnotation(
   // Vitest's `test.skip('title')` has no second argument.
   const details = call.arguments.at(1);
   if (isFunction(title)) return undefined;
-  const remove = removeMarkerComment(sourceCode, comment);
+  const remove = removeMarkerComment(sourceCode, marker);
   if (isFunction(details)) {
+    // Vitest reads a timeout or options after the function only as the third argument.
+    if (call.arguments.length > 2) return undefined;
     return (fixer) => [remove, fixer.insertTextAfter(title, `, { ${property} }`)];
   }
   if (details?.type !== 'ObjectExpression') return undefined;
   const taken = details.properties.some(
     (prop) =>
       prop.type === 'SpreadElement' ||
-      (!prop.computed && (prop.key.type === 'Identifier' ? prop.key.name : String(prop.key.value)) === source.key),
+      prop.computed ||
+      (prop.key.type === 'Identifier' ? prop.key.name : String(prop.key.value)) === source.key,
   );
   if (taken) return undefined;
   const last = details.properties.at(-1);

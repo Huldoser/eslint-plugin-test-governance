@@ -21,6 +21,9 @@ runRule('require-ticket-for-commented-out-tests', rule, {
     `// expect(price).toBe(101.5);${TEST}`,
     // A sentence that goes on with a parenthesis after "it" or "test": code has no space before a call's `(`.
     `// test (see the setup above) for the margin case.${TEST}`,
+    // Calls that configure tests or change one at runtime declare none.
+    "test('places an order', async ({ page }) => {\n  // test.slow();\n  // test.skip();\n  await page.goto('/');\n});",
+    `// test.use({ viewport: { width: 1280, height: 720 } });\n// test.describe.configure({ mode: 'serial' });\n// test.beforeEach(async ({ page }) => {});${TEST}`,
     `/**\n * @example\n * test('places an order', async () => {});\n */\nexport function placeOrder() {}${TEST}`,
     // A file that doesn't use the framework is not a test file.
     "// test('places an order', async () => {});\nexport const price = 1;",
@@ -41,6 +44,11 @@ runRule('require-ticket-for-commented-out-tests', rule, {
   ],
   invalid: [
     { code: `// test('places an order', async () => {});${TEST}`, errors: [{ ...missing(), line: 1, column: 4 }] },
+    { code: `// test.describe.serial.only('orders', () => {});${TEST}`, errors: [missing()] },
+    {
+      code: "test('places an order', async () => {\n  // await test.step('fills the order', async () => {});\n});",
+      errors: [{ ...missing(), line: 2 }],
+    },
     // One report for a block of commented-out code, at its first test line.
     {
       code: `test('cancels an order', async () => {});\n// test.describe('orders', () => {\n//   test('places an order', async () => {});\n// });`,
@@ -82,6 +90,10 @@ runRule('require-ticket-for-commented-out-tests', rule, {
     },
     ...withOptions({ framework: 'jest' }, [
       { code: "// xit('places an order', () => {});\ntest('cancels an order', () => {});", errors: [missing()] },
+      {
+        code: "// it.each([[1]])('buys %i shares', () => {});\ntest('cancels an order', () => {});",
+        errors: [missing()],
+      },
     ]),
     ...withOptions({ framework: 'mocha' }, [
       { code: "// context('orders', function () {});\nit('cancels an order', () => {});", errors: [missing()] },
@@ -105,7 +117,10 @@ runRule('no-orphaned-marker (commented-out tests)', noOrphanedMarker, {
 });
 
 runRule('require-ticket (commented-out tests)', requireTicket, {
-  valid: [],
+  // A commented-out call that declares no test leaves the marker to the test below it.
+  valid: [
+    "// SKIP: TRADE-1\n// test.describe.configure({ mode: 'serial' });\ntest.skip('cancels an order', async () => {});",
+  ],
   // A skipped test below a commented-out one still needs its own marker.
   invalid: [
     {

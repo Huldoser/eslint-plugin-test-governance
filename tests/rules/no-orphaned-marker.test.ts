@@ -58,8 +58,28 @@ runRule('no-orphaned-marker', rule, {
     "// Skip:\ntest('places an order', async () => {});",
     // A region's marker covers the tests in that state and leaves the others alone.
     "/* eslint-disable no-console -- SKIP: TRADE-1 */\ntest.skip('places an order', async () => {});\ntest('cancels an order', async () => {});",
+    "/* eslint-disable no-console -- SKIP: TRADE-1 */\ntest('places an order', async () => {});\ntest.skip('cancels an order', async () => {});",
+    "/* eslint-disable no-console -- TODO: TRADE-1 */\ntest('places an order', async () => {});",
   ],
   invalid: [
+    // A region's marker that no test up to its `eslint-enable` uses is left over.
+    {
+      code: "/* eslint-disable no-console -- SKIP: TRADE-1 */\ntest('places an order', async () => {});\n/* eslint-enable no-console */\ntest.skip('cancels an order', async () => {});",
+      errors: [
+        {
+          messageId: 'orphanedRegion',
+          data: { marker: 'SKIP', state: 'skip', subject: '' },
+          line: 1,
+          suggestions: [
+            {
+              messageId: 'removeMarker',
+              output:
+                "/* eslint-disable no-console */\ntest('places an order', async () => {});\n/* eslint-enable no-console */\ntest.skip('cancels an order', async () => {});",
+            },
+          ],
+        },
+      ],
+    },
     // An annotation that satisfies the state leaves the wrong marker a leftover, not a hint.
     {
       code: "// FIXME: TRADE-1\ntest.skip('places a limit order', { annotation: { type: 'issue', description: 'TRADE-123' } }, async () => {});",
@@ -308,6 +328,96 @@ runRule('no-orphaned-marker', rule, {
               messageId: 'removeMarker',
               output:
                 "/* eslint-disable no-console */\nconst broker = connectBroker();\n/* eslint-enable no-console */\ntest('places an order', async () => {});",
+            },
+          ],
+        },
+      ],
+    },
+    // In a block comment that says more, only the marker's line goes.
+    {
+      code: "/* FIXME: TRADE-2\n   SKIP: TRADE-1 */\ntest.fixme('cancels an order', async () => {});",
+      errors: [
+        {
+          messageId: 'orphaned',
+          data: { marker: 'SKIP', state: 'skip', subject: 'this test' },
+          suggestions: [
+            {
+              messageId: 'removeMarker',
+              output: "/* FIXME: TRADE-2 */\ntest.fixme('cancels an order', async () => {});",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: "/**\n * Checks the cancel flow.\n * SKIP: TRADE-1\n */\ntest('cancels an order', async () => {});",
+      errors: [
+        {
+          messageId: 'orphaned',
+          suggestions: [
+            {
+              messageId: 'removeMarker',
+              output: "/**\n * Checks the cancel flow.\n */\ntest('cancels an order', async () => {});",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: "/** SKIP: TRADE-1\n * Checks the cancel flow.\n */\ntest('cancels an order', async () => {});",
+      errors: [
+        {
+          messageId: 'orphaned',
+          suggestions: [
+            {
+              messageId: 'removeMarker',
+              output: "/**\n * Checks the cancel flow.\n */\ntest('cancels an order', async () => {});",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: "/* eslint-disable no-console -- logs are needed for debugging\n   SKIP: TRADE-1 */\ntest('places an order', async () => {});",
+      errors: [
+        {
+          messageId: 'orphanedRegion',
+          suggestions: [
+            {
+              messageId: 'removeMarker',
+              output:
+                "/* eslint-disable no-console -- logs are needed for debugging */\ntest('places an order', async () => {});",
+            },
+          ],
+        },
+      ],
+    },
+    // A block comment that holds nothing but the marker goes whole.
+    {
+      code: "/*\n * SKIP: TRADE-1\n */\ntest('places an order', async () => {});",
+      errors: [
+        {
+          messageId: 'orphaned',
+          suggestions: [{ messageId: 'removeMarker', output: "test('places an order', async () => {});" }],
+        },
+      ],
+    },
+    // Each marker removes its own line, even when the keyword is the same.
+    {
+      code: "/*\n * SKIP: TRADE-1\n * SKIP:\n */\ntest('places an order', async () => {});",
+      errors: [
+        {
+          messageId: 'orphaned',
+          suggestions: [
+            { messageId: 'removeMarker', output: "/*\n * SKIP:\n */\ntest('places an order', async () => {});" },
+          ],
+        },
+        {
+          messageId: 'orphaned',
+          suggestions: [
+            {
+              messageId: 'removeMarker',
+              output: "/*\n * SKIP: TRADE-1\n */\ntest('places an order', async () => {});",
             },
           ],
         },

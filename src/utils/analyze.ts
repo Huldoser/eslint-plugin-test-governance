@@ -35,6 +35,10 @@ export interface Marker {
   tickets: MarkerTicket[];
   /** Text after the last ticket, such as a note or a stray separator, with its source range. */
   extra?: { text: string; range: TSESTree.Range };
+  /** The index of the marker's line in `commentLines(comment)`. */
+  line: number;
+  /** Where the keyword starts in the source. */
+  keywordStart: number;
 }
 
 /** A marker whose keyword is exactly a state's marker. */
@@ -70,18 +74,21 @@ export function directiveOf(comment: Comment): Directive | undefined {
 }
 
 // A call at the start of a comment line, as `test('...'`, `test.describe.skip(` or `await test.step(`. Code has
-// no space before a call's `(`, and a sentence such as `// it (see above) ...` has one.
-const COMMENTED_CALL_RE = /^(\s*\*?\s*)(?:await\s+)?([A-Za-z_$][\w$]*)(?:\.[A-Za-z_$][\w$]*)*\(/;
+// no space before a call's `(`, and a sentence such as `// it (see above) ...` has one. An empty call, as
+// `test.skip()`, changes a test at runtime and declares none.
+const COMMENTED_CALL_RE = /^(\s*\*?\s*)(?:await\s+)?([A-Za-z_$][\w$]*)((?:\.[A-Za-z_$][\w$]*)*)\((?!\))/;
 
 /**
  * Blocks of comments that hold a test or describe written out as code: comments on consecutive lines with
- * no code before them, one of whose lines starts with a call of `names`. A JSDoc comment is documentation,
- * so a test in its example doesn't count.
+ * no code before them, one of whose lines starts with a call of `names` whose members all declare tests,
+ * as `test.describe.skip(`, unlike `test.use(`. A JSDoc comment is documentation, so a test in its example
+ * doesn't count.
  */
 function findCommentedOutTests(
   sourceCode: SourceCode,
   comments: Comment[],
   names: ReadonlySet<string>,
+  members: ReadonlySet<string>,
   states: StateDef[],
 ): { found: CommentedOutTest[]; comments: Set<Comment> } {
   const blocks: Comment[][] = [];
@@ -100,7 +107,14 @@ function findCommentedOutTests(
       .flatMap(commentLines)
       .flatMap(({ text, start }): TSESTree.Range[] => {
         const match = COMMENTED_CALL_RE.exec(text);
-        return match && names.has(match[2]) ? [[start + match[1].length, start + text.trimEnd().length]] : [];
+        const declares =
+          match !== null &&
+          names.has(match[2]) &&
+          match[3]
+            .split('.')
+            .slice(1)
+            .every((member) => members.has(member));
+        return declares ? [[start + match[1].length, start + text.trimEnd().length]] : [];
       })
       .at(0);
     if (range === undefined) continue;
@@ -212,6 +226,8 @@ export interface Analysis {
   subjects: Subject[];
   /** Markers that are not in the comment block of any test, describe or runtime call. */
   detachedMarkers: StateMarker[];
+  /** Markers of `eslint-disable` regions that cover tests, none of them in the marker's state. */
+  idleRegionMarkers: StateMarker[];
   /** Commented-out tests; their comments are left out of the comment blocks of the tests around them. */
   commentedOutTests: CommentedOutTest[];
   /** Whether the file uses the test framework at all: an import from it or a call to a test function. */
@@ -531,6 +547,14 @@ function isLocalVariable(sourceCode: SourceCode, id: TSESTree.Identifier): boole
   return false;
 }
 
+/** Values a constant can hold a test function in: `it.skip`, `it.skipIf(...)`, `` it.each`...` `` or `a ? b : c`. */
+const ALIAS_VALUES = new Set([
+  'MemberExpression',
+  'CallExpression',
+  'TaggedTemplateExpression',
+  'ConditionalExpression',
+]);
+
 const STATEMENT_CONTAINERS = new Set(['Program', 'BlockStatement', 'StaticBlock', 'SwitchCase', 'TSModuleBlock']);
 
 /** The statement a call belongs to; its marker block sits above that statement. */
@@ -659,18 +683,19 @@ export function commentLines(comment: Comment): { text: string; start: number }[
 
 function parseMarkers(comment: Comment, states: StateDef[]): Marker[] {
   const markers: Marker[] = [];
-  for (const { text, start } of commentLines(comment)) {
+  for (const [line, { text, start }] of commentLines(comment).entries()) {
     const match = MARKER_LINE_RE.exec(text);
     if (!match) continue;
     const [, keyword, rest] = match;
     const restOffset = start + match[0].length - rest.length;
+    const at = { comment, keyword, line, keywordStart: start + text.indexOf(keyword) };
     const state = states.find((s) => s.marker === keyword);
     if (state) {
-      markers.push({ comment, keyword, state, ...parseTickets(rest, restOffset, state.ticket) });
+      markers.push({ ...at, state, ...parseTickets(rest, restOffset, state.ticket) });
       continue;
     }
     const caseOf = states.find((s) => s.marker === keyword.toUpperCase());
-    if (caseOf) markers.push({ comment, keyword, caseOf, ...parseTickets(rest, restOffset, caseOf.ticket) });
+    if (caseOf) markers.push({ ...at, caseOf, ...parseTickets(rest, restOffset, caseOf.ticket) });
   }
   return markers;
 }
@@ -1187,9 +1212,13 @@ function saysWhy(sourceCode: SourceCode, node: Node): boolean {
   return value.type !== 'Literal' && !(value.type === 'Identifier' && value.name === 'undefined');
 }
 
-/** Whether `node` is text that isn't blank. */
+/**
+ * Whether `node` is text that isn't blank, or a template with values in it, as `` `${browserName} has no
+ * clipboard` ``, which is taken on trust.
+ */
 function isReasonText(sourceCode: SourceCode, node: Node): boolean {
-  return Boolean(staticText(sourceCode, node)?.trim());
+  const text = staticText(sourceCode, node);
+  return text === undefined ? unwrap(node).type === 'TemplateLiteral' : text.trim() !== '';
 }
 
 /** Whether a runtime call gives the reason for its state where its framework takes one (see `reasonArgument`). */
@@ -1202,7 +1231,9 @@ function callReason(
   const second = call.arguments.at(1);
   if (where === 'only') return first !== undefined && saysWhy(sourceCode, first);
   // Vitest's `context.skip(isMobile)` takes a condition, so only text first is a reason.
-  if (where === 'either' && first !== undefined && staticText(sourceCode, first) !== undefined) {
+  const text =
+    first !== undefined && (staticText(sourceCode, first) !== undefined || unwrap(first).type === 'TemplateLiteral');
+  if (where === 'either' && text) {
     return isReasonText(sourceCode, first);
   }
   return second !== undefined && saysWhy(sourceCode, second);
@@ -1334,10 +1365,15 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       ...options.testFunctions,
       ...[...framework.exports, ...framework.globals].flatMap(([name, root]) => (root.kind === 'hook' ? [] : [name])),
     ]),
+    new Set(
+      [...framework.testMembers, ...framework.describeMembers, 'describe', 'step'].map((m) => m.replace('()', '')),
+    ),
     states,
   );
   const comments = allComments.filter((comment) => !commentedOut.comments.has(comment));
   const regions = disableRegions(comments, states);
+  // A region's marker covers every test up to its `eslint-enable`, so it is never the own marker of the first.
+  const regionComments = new Set(regions.map((r) => r.comment));
   // `test.skip(...); // eslint-disable-line rule -- SKIP: TRADE-1` holds its marker on the test's own line.
   const lineDirectives = new Map<number, Comment[]>();
   for (const comment of comments) {
@@ -1356,14 +1392,14 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   const suiteBodies = new Set<Node>();
 
   /**
-   * Whether a statement around `anchor` has a comment that says something above it, as `// why` above an `if`,
-   * up to `owner`, the test or describe the call acts on. The walk goes on through a callback passed to another
+   * Whether `anchor` or a statement around it has a comment that says something above it or at the end of its
+   * first line, as `// why` above an `if` or after its `{`, up to `owner`, the test or describe the call acts on. The walk goes on through a callback passed to another
    * call, such as a hook's or a step's, but stops at a function declared some other way.
    */
   const commentedAround = (anchor: Node, owner: Node | undefined): boolean => {
-    for (let node = anchor.parent; node; node = node.parent) {
+    for (let node: Node | undefined = anchor; node; node = node.parent) {
       if (FUNCTIONS.has(node.type)) {
-        const call = node.parent;
+        const call: Node | undefined = node.parent;
         if (call?.type !== 'CallExpression' || call === owner || !(call.arguments as Node[]).includes(node)) {
           return false;
         }
@@ -1372,7 +1408,10 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       const container = node.parent;
       if (!container || !STATEMENT_CONTAINERS.has(container.type)) continue;
       const block = commentBlock(sourceCode, node, options.allowBlankLine);
-      if (block.some((comment) => !commentedOut.comments.has(comment) && hasText(comment))) return true;
+      if (block.some((c) => !commentedOut.comments.has(c) && !regionComments.has(c) && hasText(c))) return true;
+      // `if (isMobile) { // why`: a comment at the end of the line the statement starts on.
+      const first = sourceCode.getCommentsInside(node).at(0);
+      if (first?.loc.start.line === node.loc.start.line && hasText(first)) return true;
     }
     return false;
   };
@@ -1405,19 +1444,18 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       );
     }
     block.push(...(lineDirectives.get(call.loc.start.line) ?? []));
-    const inRegions = regions.filter(
-      (r) => r.start <= call.range[0] && call.range[0] < r.end && !block.includes(r.comment),
-    );
+    const inRegions = regions.filter((r) => r.start <= call.range[0] && call.range[0] < r.end);
     for (const comment of [...block, ...inRegions.map((r) => r.comment)]) claimed.add(comment);
-    const commented = [...block, ...inRegions.map((r) => r.comment)].some(hasText);
-    // A runtime call can also say why above the statements around it in its function, above its test, or in
-    // its arguments.
+    // A region's description says why a rule is off, not why a test is skipped; its marker's ticket counts.
+    const commented = block.some((comment) => !regionComments.has(comment) && hasText(comment));
+    // A comment at the end of the line also says why. A runtime call can also say why above the statements
+    // around it in its function, above its test, or in its arguments.
     const reasonedCall = (): boolean =>
-      kind === 'runtime' &&
-      ((framework.reasonArgument !== undefined && callReason(sourceCode, call, framework.reasonArgument)) ||
-        parent?.commented === true ||
-        trailingText(anchor) ||
-        commentedAround(anchor, parent?.node));
+      trailingText(anchor) ||
+      (kind === 'runtime' &&
+        ((framework.reasonArgument !== undefined && callReason(sourceCode, call, framework.reasonArgument)) ||
+          parent?.commented === true ||
+          commentedAround(anchor, parent?.node)));
     const ownTags = new Set(tagInfo.tags.map((t) => t.tag));
     const sources: StateSource[] = [];
     for (const state of states) {
@@ -1467,7 +1505,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       unknownStates,
       skipped: ownSkip || (kind !== 'runtime' && parent?.skipped === true),
       ownSkip,
-      markers: block.flatMap((comment) => parseMarkers(comment, states)),
+      markers: block.flatMap((comment) => (regionComments.has(comment) ? [] : parseMarkers(comment, states))),
       regionMarkers: inRegions.flatMap((r) => r.markers),
       annotationTickets: tagInfo.annotations,
       unreadTickets: tagInfo.unreadAnnotations,
@@ -1585,8 +1623,11 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
    * `(isCI ? describe.skip : describe)('order entry', ...)`: a test or describe whose function is picked by
    * a condition. A state that only one side has depends on the condition, like `test.skip(isCI)`.
    */
-  const pickedDeclaration = (call: TSESTree.CallExpression): { subject: Subject; infos: InfoName[] } | undefined => {
-    const callee = unwrap(call.callee);
+  const pickedDeclaration = (
+    call: TSESTree.CallExpression,
+    picker: Node,
+  ): { subject: Subject; infos: InfoName[] } | undefined => {
+    const callee = unwrap(picker);
     if (callee.type !== 'ConditionalExpression') return undefined;
     const [yes, no] = [callee.consequent, callee.alternate].map((side) => {
       const picked = target(chainOf(unwrap(side), framework.factories));
@@ -1657,11 +1698,23 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       : undefined;
   };
 
+  /**
+   * The value of a constant that holds a test function the collected names can't: one a condition picks, as
+   * `const itIf = isCI ? it.skip : it`, one a factory builds, as `const d = describe.runIf(hasDocker)`, or any
+   * declared inside a function.
+   */
+  const aliasValue = (callee: Node): Node | undefined => {
+    if (callee.type !== 'Identifier' || testNames.roots.has(callee.name)) return undefined;
+    const value = declaredValue(sourceCode, callee);
+    return value && ALIAS_VALUES.has(unwrap(value).type) ? value : undefined;
+  };
+
   const visitCall = (original: TSESTree.CallExpression): { subject?: Subject; infos?: InfoName[] } => {
     const call = throughFunctionMethods(original);
-    const callee = target(chainOf(call.callee, framework.factories));
+    const written = aliasValue(call.callee) ?? call.callee;
+    const callee = target(chainOf(written, framework.factories));
     if (callee === undefined) {
-      return subtestOf(call) ?? pickedDeclaration(call) ?? { subject: runtimeCall(call) ?? retryCall(call) };
+      return subtestOf(call) ?? pickedDeclaration(call, written) ?? { subject: runtimeCall(call) ?? retryCall(call) };
     }
     usesTest = true;
     const args = call.arguments;
@@ -1876,7 +1929,25 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     .flatMap((comment) => parseMarkers(comment, states))
     .filter(isStateMarker);
 
-  return { subjects, detachedMarkers, commentedOutTests: commentedOut.found, isTestFile: usesTest };
+  const idleRegionMarkers = regions
+    .flatMap((region) => region.markers)
+    .filter(isStateMarker)
+    .filter((marker) => {
+      const covered = subjects.filter((subject) => subject.regionMarkers.includes(marker));
+      return (
+        covered.length > 0 &&
+        !isWorkComment(marker, options) &&
+        !covered.some((s) => appliesTo(s, marker.state.name) || s.unknownStates.has(marker.state.name))
+      );
+    });
+
+  return {
+    subjects,
+    detachedMarkers,
+    idleRegionMarkers,
+    commentedOutTests: commentedOut.found,
+    isTestFile: usesTest,
+  };
 }
 
 /** Whether `subject` is in `stateName` at all, required or not, including inherited and runtime states. */
@@ -1906,7 +1977,7 @@ function candidateMarkers(subject: Subject, state: StateDef): Marker[] {
 export function evaluate(subject: Subject, state: StateDef): Evaluation {
   const markers = candidateMarkers(subject, state);
   if (markers.length === 0) {
-    const marker = subject.markers.find((m) => m.caseOf === state);
+    const marker = [...subject.markers, ...subject.regionMarkers].find((m) => m.caseOf === state);
     return marker ? { kind: 'case', marker } : { kind: 'missing' };
   }
   const isValid = (m: Marker): boolean => m.tickets.length > 0 && m.tickets.every((t) => t.result === 'ok');

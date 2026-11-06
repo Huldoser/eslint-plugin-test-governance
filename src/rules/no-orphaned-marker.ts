@@ -14,6 +14,8 @@ export default createRule({
     schema: [],
     messages: {
       orphaned: "`{{marker}}:` is left over: {{subject}} is not in the '{{state}}' state.",
+      orphanedRegion:
+        "`{{marker}}:` is left over: no test up to the `eslint-enable` of this comment is in the '{{state}}' state.",
       detached: '`{{marker}}:` is not directly above a test, describe or skip call, so it has no effect.',
       removeMarker: 'Remove this comment.',
     },
@@ -22,21 +24,26 @@ export default createRule({
     // Files without tests, such as application code, have no markers to check.
     if (!analysis.isTestFile) return;
     const { sourceCode } = context;
-    const markers: { marker: StateMarker; messageId: 'orphaned' | 'detached'; subject: string }[] = [];
+    const markers: { marker: StateMarker; messageId: 'orphaned' | 'orphanedRegion' | 'detached'; subject: string }[] =
+      [];
     for (const marker of analysis.detachedMarkers) {
       // `// FIXME: TRADE-12` above a helper is a tracked work comment, checked by require-ticket-in-comments.
       if (options.workCommentKeywords.has(marker.keyword)) continue;
       markers.push({ marker, messageId: 'detached', subject: '' });
+    }
+    // TODO is the everyday work-comment keyword, so `// TODO: TRADE-12` above a test that isn't a todo
+    // is a tracked note about it far more often than a todo test's forgotten marker.
+    const trackedNote = (marker: StateMarker): boolean =>
+      marker.state.name === 'todo' && options.workCommentKeywords.has(marker.keyword.toUpperCase());
+    for (const marker of analysis.idleRegionMarkers) {
+      if (!trackedNote(marker)) markers.push({ marker, messageId: 'orphanedRegion', subject: '' });
     }
     for (const subject of analysis.subjects) {
       // A stray marker next to a missing one is a mismatch, reported by marker-matches-state.
       if (missingStates(subject, options).length > 0) continue;
       const name = describeSubject(subject).replace(/^This/, 'this');
       for (const marker of strayMarkers(subject, options)) {
-        // TODO is the everyday work-comment keyword, so `// TODO: TRADE-12` above a test that isn't a todo
-        // is a tracked note about it far more often than a todo test's forgotten marker.
-        if (marker.state.name === 'todo' && options.workCommentKeywords.has(marker.keyword.toUpperCase())) continue;
-        markers.push({ marker, messageId: 'orphaned', subject: name });
+        if (!trackedNote(marker)) markers.push({ marker, messageId: 'orphaned', subject: name });
       }
     }
     for (const { marker, messageId, subject } of markers) {
@@ -46,7 +53,7 @@ export default createRule({
         loc: marker.comment.loc,
         messageId,
         data: { marker: marker.keyword, state: marker.state.name, subject },
-        suggest: [{ messageId: 'removeMarker', fix: () => removeMarkerComment(sourceCode, marker.comment) }],
+        suggest: [{ messageId: 'removeMarker', fix: () => removeMarkerComment(sourceCode, marker) }],
       });
     }
   },

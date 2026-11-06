@@ -23,6 +23,8 @@ How comments are read:
 
 - A commented-out test is a comment line that starts with a call of a test or describe function of the
   framework, such as `test(`, `test.describe(`, `it.skip(` or `xit(`, after any `*` of a block comment.
+  A call that declares no test, such as `test.use({ ... })`, `test.describe.configure(...)` or an empty
+  `test.slow()`, doesn't count.
 - Comments on consecutive lines, with no code before them on their line, form one block. The block is
   reported once, at its first test line, and a `SKIP:` marker anywhere in it covers it. A blank line starts a
   new block.

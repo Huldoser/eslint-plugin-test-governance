@@ -20,6 +20,31 @@ All notable changes to this project are documented here. The format follows
   since no other key can match.
 - An option named like a built-in object member, such as `customStates: { constructor: ... }`, is checked like
   any other.
+- A marker in an `eslint-disable` comment, as in `/* eslint-disable jest/no-disabled-tests -- SKIP: TRADE-1 */`,
+  covers every test up to the `eslint-enable`, also when the comment sits directly above a describe or a test that
+  isn't skipped. `no-orphaned-marker` called it left over there, and its suggestion removed the marker the
+  skipped tests below relied on. Such a marker is now reported only when none of the tests it covers is in its
+  state, and `require-ticket-in-comments` no longer reports its note a second time.
+- `require-ticket-for-commented-out-tests` counts only a call that declares a test, describe or step. Everyday
+  lines such as `// test.slow();`, `// test.use({ ... })` and `// test.describe.configure({ ... })` were reported,
+  and in a comment block above a skipped test they took that test's marker, so `require-ticket` reported it too,
+  even with the commented-out rule off.
+- A test function kept in a constant is read when a condition picks it, as
+  `const itUnlessWindows = isWindows ? it.skip : it`, when a call builds it, as `describe.runIf(hasDocker)`,
+  `it.skipIf(true)` or `it.skip.each(table)`, and when the constant is declared inside a describe. A marker above
+  such a test was reported as not directly above a test.
+- With `requireReasonForConditional`, the description of an `eslint-disable` comment that covers a stretch of the
+  file no longer counts as the reason for every conditional skip in it. A reason written as a template literal
+  counts in Vitest's `context.skip(...)` and in node:test's `skip` option, and so does a comment at the end of a
+  one-line `test.skipIf(isMobile)(...)` or after an `if`'s opening line, as `if (isMobile) { // why`.
+- Suggestions edit only the marker's own line: removing a leftover marker from a block comment that says more,
+  such as a doc comment, another marker or an ESLint directive's description, keeps the rest of the comment, and
+  renaming a marker no longer renames the same word in prose above it.
+- With `annotations: { only: true }`, there is no suggestion to move a ticket into the details when it would break
+  the call: a Vitest test with a timeout or options after its function, or details with a computed key such as
+  `['annotation']`.
+- The suggestion to add a marker uses the file's own line breaks, so it no longer leaves a bare line feed in a
+  file with CRLF line endings.
 
 ## [0.13.0] - 2026-11-05
 

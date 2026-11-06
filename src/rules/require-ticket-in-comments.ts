@@ -40,7 +40,7 @@ export default createRule({
     // in the wrong case.
     const owned = new Set<TSESTree.Comment>();
     for (const subject of analysis.subjects) {
-      for (const marker of subject.markers) {
+      for (const marker of [...subject.markers, ...subject.regionMarkers]) {
         const state = marker.state ?? marker.caseOf;
         if (state && appliesTo(subject, state.name)) owned.add(marker.comment);
       }
