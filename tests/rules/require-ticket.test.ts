@@ -788,6 +788,11 @@ runRule('require-ticket', rule, {
       code: "// Fixme: TRADE-1\ntest.fixme('places an order', async () => {});",
       errors: [{ messageId: 'markerCase', data: { marker: 'FIXME', found: 'Fixme' } }],
     },
+    // In an `eslint-disable` region, for every test it covers.
+    {
+      code: "/* eslint-disable no-console -- skip: TRADE-1 */\ntest.skip('places an order', async () => {});\ntest.skip('cancels an order', async () => {});",
+      errors: [{ messageId: 'markerCase', data: { marker: 'SKIP', found: 'skip' }, line: 1 }],
+    },
     // A blank line breaks the block.
     {
       code: "// SKIP: TRADE-1\n\ntest.skip('places an order', async () => {});",

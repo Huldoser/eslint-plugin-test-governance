@@ -1338,6 +1338,8 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   );
   const comments = allComments.filter((comment) => !commentedOut.comments.has(comment));
   const regions = disableRegions(comments, states);
+  // A region's marker covers every test up to its `eslint-enable`, so it is never the own marker of the first.
+  const regionComments = new Set(regions.map((r) => r.comment));
   // `test.skip(...); // eslint-disable-line rule -- SKIP: TRADE-1` holds its marker on the test's own line.
   const lineDirectives = new Map<number, Comment[]>();
   for (const comment of comments) {
@@ -1405,9 +1407,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       );
     }
     block.push(...(lineDirectives.get(call.loc.start.line) ?? []));
-    const inRegions = regions.filter(
-      (r) => r.start <= call.range[0] && call.range[0] < r.end && !block.includes(r.comment),
-    );
+    const inRegions = regions.filter((r) => r.start <= call.range[0] && call.range[0] < r.end);
     for (const comment of [...block, ...inRegions.map((r) => r.comment)]) claimed.add(comment);
     const commented = [...block, ...inRegions.map((r) => r.comment)].some(hasText);
     // A runtime call can also say why above the statements around it in its function, above its test, or in
@@ -1467,7 +1467,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       unknownStates,
       skipped: ownSkip || (kind !== 'runtime' && parent?.skipped === true),
       ownSkip,
-      markers: block.flatMap((comment) => parseMarkers(comment, states)),
+      markers: block.flatMap((comment) => (regionComments.has(comment) ? [] : parseMarkers(comment, states))),
       regionMarkers: inRegions.flatMap((r) => r.markers),
       annotationTickets: tagInfo.annotations,
       unreadTickets: tagInfo.unreadAnnotations,
@@ -1906,7 +1906,7 @@ function candidateMarkers(subject: Subject, state: StateDef): Marker[] {
 export function evaluate(subject: Subject, state: StateDef): Evaluation {
   const markers = candidateMarkers(subject, state);
   if (markers.length === 0) {
-    const marker = subject.markers.find((m) => m.caseOf === state);
+    const marker = [...subject.markers, ...subject.regionMarkers].find((m) => m.caseOf === state);
     return marker ? { kind: 'case', marker } : { kind: 'missing' };
   }
   const isValid = (m: Marker): boolean => m.tickets.length > 0 && m.tickets.every((t) => t.result === 'ok');
