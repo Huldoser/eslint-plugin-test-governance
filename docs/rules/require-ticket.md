@@ -119,6 +119,8 @@ to guess later why it doesn't run. Any of these counts:
   Commented-out code, a marker keyword alone such as `// SKIP:`, and an `eslint-disable` comment without a
   description after `--` say nothing, so they don't count. The description of an `eslint-disable` block
   comment that turns a rule off for a stretch of the file says why the rule is off, so it doesn't count either;
+- for a test or describe whose function a constant picks, as `const posixTest = isWindows ? test.skip : test`,
+  a comment above that declaration or at the end of its line, which says why once for every test that uses it;
 - the reason its call takes, where the runner has one: Playwright's `test.skip(condition, 'why')` and
   `testInfo.skip(condition, 'why')`, Vitest's `context.skip(condition, 'why')` or `context.skip('why')`,
   node:test's `t.skip('why')` and Jasmine's `pending('why')`. A reason held in a name or built in a

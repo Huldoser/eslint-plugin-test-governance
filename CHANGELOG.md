@@ -54,6 +54,9 @@ All notable changes to this project are documented here. The format follows
   read as a condition.
 - A tag constant used in several titles, as `` `buys ${TAG}` ``, is reported once, where it is written.
 - The example in the `missingReason` message is written on one line, also when the call is split over lines.
+- With `requireReasonForConditional`, a comment above the declaration of a constant that picks a test function,
+  as `const posixTest = isWindows ? test.skip : test`, or at the end of its line, is the reason for every test
+  that uses it.
 - A link whose `id` query is zero, such as `https://www.wrike.com/open.htm?id=0`, is a placeholder, as any ticket
   numbered 0 is. Other zero queries, such as `?page=0`, are left alone.
 - A placeholder written with a leading `#`, such as `#TBD`, also matches `TBD`: a leading `#` is ignored on both

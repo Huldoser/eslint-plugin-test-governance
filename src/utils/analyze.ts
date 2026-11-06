@@ -562,7 +562,7 @@ const ALIAS_VALUES = new Set([
 
 const STATEMENT_CONTAINERS = new Set(['Program', 'BlockStatement', 'StaticBlock', 'SwitchCase', 'TSModuleBlock']);
 
-/** The statement a call belongs to; its marker block sits above that statement. */
+/** The statement a call, or a value, belongs to; its marker block sits above that statement. */
 /**
  * The declaration a call makes through `Function.prototype.call`, `apply` or `bind`, read as if it were
  * written plainly: `it.skip.call(null, 'title', fn)`, `it.skip.apply(null, ['title', fn])` and
@@ -605,7 +605,7 @@ function throughFunctionMethods(original: TSESTree.CallExpression): TSESTree.Cal
   return call;
 }
 
-function anchorOf(call: TSESTree.CallExpression): Node {
+function anchorOf(call: Node): Node {
   let node: Node = call;
   // A call always sits inside a statement container, so the walk stops before it runs out of parents.
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
@@ -1720,9 +1720,34 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     return value && ALIAS_VALUES.has(unwrap(value).type) ? value : undefined;
   };
 
+  /**
+   * Whether the declaration of a constant that holds a test function says why above it or at the end of its
+   * line, as `// no symlinks on Windows` above `const posixTest = isWindows ? test.skip : test`.
+   */
+  const aliasCommented = (value: Node): boolean => {
+    const statement = anchorOf(value);
+    const block = commentBlock(sourceCode, statement, options.allowBlankLine);
+    return (
+      block.some((c) => !commentedOut.comments.has(c) && !regionComments.has(c) && hasText(c)) ||
+      trailingText(statement)
+    );
+  };
+
   const visitCall = (original: TSESTree.CallExpression): { subject?: Subject; infos?: InfoName[] } => {
+    const alias = aliasValue(throughFunctionMethods(original).callee);
+    const visited = visitDeclaredCall(original, alias);
+    if (alias && visited.subject && aliasCommented(alias)) {
+      for (const source of visited.subject.states) if (source.reasoned === false) source.reasoned = true;
+    }
+    return visited;
+  };
+
+  const visitDeclaredCall = (
+    original: TSESTree.CallExpression,
+    alias: Node | undefined,
+  ): { subject?: Subject; infos?: InfoName[] } => {
     const call = throughFunctionMethods(original);
-    const written = aliasValue(call.callee) ?? call.callee;
+    const written = alias ?? call.callee;
     const callee = target(chainOf(written, framework.factories));
     if (callee === undefined) {
       return subtestOf(call) ?? pickedDeclaration(call, written) ?? { subject: runtimeCall(call) ?? retryCall(call) };

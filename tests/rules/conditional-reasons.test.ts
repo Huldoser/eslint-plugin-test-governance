@@ -29,6 +29,9 @@ runRule('require-ticket (conditional reasons, Playwright)', requireTicket, {
       "test('hovers', async ({ isMobile }) => {\n  if (isMobile) // Touch screens have no hover.\n    test.skip();\n});",
       "// Touch screens have no hover.\ntest('hovers', async ({ isMobile }) => {\n  test.skip(isMobile);\n});",
       "// Touch screens have no hover.\n(isMobile ? test.skip : test)('hovers', async () => {});",
+      // A constant that picks the test function says why once, above its declaration.
+      "// Touch screens have no hover.\nconst desktopTest = isMobile ? test.skip : test;\ndesktopTest('hovers', async () => {});\ndesktopTest('drags', async () => {});",
+      "const desktopTest = isMobile ? test.skip : test; // Touch screens have no hover.\ndesktopTest('hovers', async () => {});",
       // A ticket says why as well, from a marker, a marker on a describe around it, or an annotation.
       '// SKIP: TRADE-1\ntest.skip(isMobile);',
       "// SKIP: TRADE-1\ntest.describe('orders', () => {\n  test('hovers', async ({ isMobile }) => {\n    if (isMobile) test.skip();\n  });\n});",
@@ -66,6 +69,10 @@ runRule('require-ticket (conditional reasons, Playwright)', requireTicket, {
       {
         code: "(isMobile ? test.skip : test)('hovers', async () => {});",
         errors: [missingReason('This test')],
+      },
+      {
+        code: "// eslint-disable-next-line no-console\nconst desktopTest = isMobile ? test.skip : test;\ndesktopTest('hovers', async () => {});",
+        errors: [{ ...missingReason('This test'), line: 3 }],
       },
       // The example is written on one line, however the call is.
       {
