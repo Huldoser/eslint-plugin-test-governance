@@ -101,6 +101,12 @@ const tables: Record<string, Table> = {
     accepts: ['https://git.acme.io/acme/trading-engine/issues/1'],
     rejects: ['https://github.com/acme/trading-engine/issues/1'],
   },
+  // Gitea, Forgejo and Codeberg put pull requests at /pulls/N.
+  codeberg: {
+    spec: { preset: 'github', host: 'codeberg.org' },
+    accepts: ['https://codeberg.org/acme/trading-engine/issues/1', 'https://codeberg.org/acme/trading-engine/pulls/2'],
+    rejects: ['https://codeberg.org/acme/trading-engine/pulls', 'https://codeberg.org/acme/trading-engine/pulls/2x'],
+  },
   gitlab: {
     spec: { preset: 'gitlab' },
     accepts: [
@@ -482,6 +488,11 @@ const tables: Record<string, Table> = {
       'TA0001',
       'US0042',
       'TC0001',
+      // A prefix alone is a word, as in "US date format", not a ticket.
+      'US',
+      'DE',
+      'TA',
+      'TC',
       'us4821',
       'US-4821',
       'TS4821',
@@ -983,6 +994,13 @@ describe('messages', () => {
 
   it('rejects an invalid custom pattern', () => {
     assert.throws(() => compileTicketSpec([{ preset: 'pattern', pattern: '(' }], []), /invalid ticket pattern "\("/);
+  });
+
+  it('rejects a custom pattern whose stray parenthesis would close the anchoring group', () => {
+    assert.throws(
+      () => compileTicketSpec([{ preset: 'pattern', pattern: 'TRADE-\\d+)|(.*' }], []),
+      /invalid ticket pattern "TRADE-\\d\+\)\|\(\.\*": .*Unmatched '\)'/,
+    );
   });
 
   it('rejects a servicenow preset without usable prefixes', () => {

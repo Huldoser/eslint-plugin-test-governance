@@ -131,7 +131,7 @@ export function validate(value: unknown, schema: Schema, path = ''): string[] {
     }
     for (const [key, item] of Object.entries(object)) {
       if (item === undefined) continue;
-      const propertySchema = properties[key] ?? schema.additionalProperties;
+      const propertySchema = Object.hasOwn(properties, key) ? properties[key] : schema.additionalProperties;
       if (typeof propertySchema === 'object') {
         problems.push(...validate(item, propertySchema, join(path, key)));
       } else if (schema.renamed && Object.hasOwn(schema.renamed, key)) {

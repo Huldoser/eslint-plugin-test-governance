@@ -236,11 +236,13 @@ const STRICT_HOST_PRESETS = new Set<TicketSpec['preset']>([
 /** Option values the schema allows for every preset but this one can't use. */
 function ownOptionProblems(spec: TicketSpec, at: string): string[] {
   const problems: string[] = [];
-  if (spec.preset === 'jira' && Array.isArray(spec.projects)) {
+  // The schema lets YouTrack's `4DM` through; Jira and Plane keys start with a letter and match nothing else.
+  if ((spec.preset === 'jira' || spec.preset === 'plane') && Array.isArray(spec.projects)) {
+    const tracker = spec.preset === 'jira' ? 'Jira' : 'Plane';
     for (const [i, key] of spec.projects.entries()) {
       if (typeof key !== 'string' || !/^[A-Z][A-Z0-9_]+$/.test(key)) {
         problems.push(
-          `${at}.projects[${i}] must start with a letter and have at least two characters, as Jira keys do (got "${key}")`,
+          `${at}.projects[${i}] must start with a letter and have at least two characters, as ${tracker} keys do (got "${key}")`,
         );
       }
     }

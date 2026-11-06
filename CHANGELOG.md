@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The `rally` preset no longer takes a prefix with no number, such as `US` or `TC`, as a ticket, so
+  `// SKIP: TC` and, with `allowNotes`, a note that starts with "US" or "DE" need a real ticket.
+- A second `configure()` for some of the same files, such as `{ preset: 'github' }` for a legacy folder after
+  `{ preset: 'jira', projects: ['TRADE'] }` for all files, replaces the earlier ticket format. ESLint merged the
+  two key by key, so linting failed with "ticket.projects is not an option of the github preset".
+- The `github` preset reads Gitea's, Forgejo's and Codeberg's pull request links, `/<owner>/<repo>/pulls/12`.
+- A `pattern` with an unmatched `)`, such as `TRADE-\d+)|(.*`, is a configuration error. It used to close the
+  group that anchors the pattern, so every ticket passed.
+- `plane` checks its `projects` as `jira` does: a key must start with a letter and have two or more characters,
+  since no other key can match.
+- An option named like a built-in object member, such as `customStates: { constructor: ... }`, is checked like
+  any other.
+
 ## [0.13.0] - 2026-11-05
 
 ### Added

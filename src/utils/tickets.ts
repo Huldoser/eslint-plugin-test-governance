@@ -48,7 +48,8 @@ const AZURE_REF_RE = /^AB#\d+$/;
 const DIGITS_RE = /^\d+$/;
 // Jira Server and Data Center can run under a path, as in https://issues.example.com/jira/browse/TRADE-1.
 const JIRA_PATH_RE = /\/browse\/([A-Z][A-Z0-9_]+-\d+)\/?$/;
-const GITHUB_PATH_RE = /^\/[^/]+\/[^/]+\/(?:issues|pull)\/(\d+)\/?$/;
+// Gitea, Forgejo and Codeberg write a pull request as `/pulls/N`, GitHub as `/pull/N`.
+const GITHUB_PATH_RE = /^\/[^/]+\/[^/]+\/(?:issues|pulls?)\/(\d+)\/?$/;
 const GITLAB_PATH_RE = /\/-\/(?:issues|merge_requests|work_items)\/(\d+)\/?$/;
 const LINEAR_PATH_RE = /^\/[^/]+\/issue\/([A-Z][A-Z0-9]*-\d+)(?:\/[^/]*)?$/;
 const AZURE_PATH_RE = /\/_workitems\/edit\/(\d+)\/?$/;
@@ -89,7 +90,7 @@ const PHABRICATOR_PATH_RE = /^\/T(\d+)\/?$/;
 // Rally numbers its work items per workspace from 1 without padding (US42, US41048), so a zero-padded ID is
 // no Rally ticket: it is how MITRE ATT&CK writes its technique IDs (TA0001 to TA0043), which security suites
 // put above tests. An all-zero ID such as TA0000 is a placeholder, as in every preset.
-const RALLY_REF_RE = /^(?:US|DE|TA|TC)([1-9]\d*|0*)$/;
+const RALLY_REF_RE = /^(?:US|DE|TA|TC)([1-9]\d*|0+)$/;
 // Plane work items: `/<workspace>/<project>/issues/<WEB-142 or uuid>`, unanchored for a self-hosted path.
 const PLANE_PATH_RE =
   /\/[^/]+\/[^/]+\/issues\/([A-Z][A-Z0-9_]+-\d+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/;
@@ -537,7 +538,10 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
       try {
         // `g` and `y` make `test()` resume from the last match, so the same ticket would pass and fail
         // in turn. A ticket is matched whole, so they never change what matches; drop them.
-        re = new RegExp(`^(?:${spec.pattern})$`, spec.flags?.replace(/[gy]/g, ''));
+        const flags = spec.flags?.replace(/[gy]/g, '');
+        // Compiled alone first: a stray `)` in it would otherwise close the anchoring group and match anything.
+        new RegExp(spec.pattern, flags);
+        re = new RegExp(`^(?:${spec.pattern})$`, flags);
       } catch (error) {
         throw new ConfigError(`invalid ticket pattern "${spec.pattern}": ${(error as Error).message}`);
       }
