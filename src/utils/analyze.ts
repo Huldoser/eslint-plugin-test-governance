@@ -70,18 +70,21 @@ export function directiveOf(comment: Comment): Directive | undefined {
 }
 
 // A call at the start of a comment line, as `test('...'`, `test.describe.skip(` or `await test.step(`. Code has
-// no space before a call's `(`, and a sentence such as `// it (see above) ...` has one.
-const COMMENTED_CALL_RE = /^(\s*\*?\s*)(?:await\s+)?([A-Za-z_$][\w$]*)(?:\.[A-Za-z_$][\w$]*)*\(/;
+// no space before a call's `(`, and a sentence such as `// it (see above) ...` has one. An empty call, as
+// `test.skip()`, changes a test at runtime and declares none.
+const COMMENTED_CALL_RE = /^(\s*\*?\s*)(?:await\s+)?([A-Za-z_$][\w$]*)((?:\.[A-Za-z_$][\w$]*)*)\((?!\))/;
 
 /**
  * Blocks of comments that hold a test or describe written out as code: comments on consecutive lines with
- * no code before them, one of whose lines starts with a call of `names`. A JSDoc comment is documentation,
- * so a test in its example doesn't count.
+ * no code before them, one of whose lines starts with a call of `names` whose members all declare tests,
+ * as `test.describe.skip(`, unlike `test.use(`. A JSDoc comment is documentation, so a test in its example
+ * doesn't count.
  */
 function findCommentedOutTests(
   sourceCode: SourceCode,
   comments: Comment[],
   names: ReadonlySet<string>,
+  members: ReadonlySet<string>,
   states: StateDef[],
 ): { found: CommentedOutTest[]; comments: Set<Comment> } {
   const blocks: Comment[][] = [];
@@ -100,7 +103,14 @@ function findCommentedOutTests(
       .flatMap(commentLines)
       .flatMap(({ text, start }): TSESTree.Range[] => {
         const match = COMMENTED_CALL_RE.exec(text);
-        return match && names.has(match[2]) ? [[start + match[1].length, start + text.trimEnd().length]] : [];
+        const declares =
+          match !== null &&
+          names.has(match[2]) &&
+          match[3]
+            .split('.')
+            .slice(1)
+            .every((member) => members.has(member));
+        return declares ? [[start + match[1].length, start + text.trimEnd().length]] : [];
       })
       .at(0);
     if (range === undefined) continue;
@@ -1334,6 +1344,9 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       ...options.testFunctions,
       ...[...framework.exports, ...framework.globals].flatMap(([name, root]) => (root.kind === 'hook' ? [] : [name])),
     ]),
+    new Set(
+      [...framework.testMembers, ...framework.describeMembers, 'describe', 'step'].map((m) => m.replace('()', '')),
+    ),
     states,
   );
   const comments = allComments.filter((comment) => !commentedOut.comments.has(comment));
