@@ -69,6 +69,13 @@ export function removeMarkerComment(sourceCode: SourceCode, marker: Marker): TSE
   return { range: aloneOnLine ? [lineStart, lineEnd] : comment.range, text: '' };
 }
 
+/** The line break that ends the line `comment` ends on. */
+export function lineBreakAfter(sourceCode: SourceCode, comment: TSESTree.Comment): string {
+  // A line comment above a test always ends at a line break.
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
+  return /^(?:\r\n|[\r\n\u2028\u2029])/.exec(sourceCode.text.slice(comment.range[1]))![0];
+}
+
 /** Indentation of the line `comment` starts on. */
 export function indentOf(sourceCode: SourceCode, comment: TSESTree.Comment): string {
   const line = sourceCode.lines[comment.loc.start.line - 1];

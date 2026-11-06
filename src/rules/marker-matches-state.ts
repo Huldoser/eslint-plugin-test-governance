@@ -7,7 +7,7 @@ import {
   strayMarkers,
 } from '../utils/analyze.ts';
 import { createRule } from '../utils/create-rule.ts';
-import { indentOf, keywordRange } from '../utils/fix.ts';
+import { indentOf, keywordRange, lineBreakAfter } from '../utils/fix.ts';
 
 export default createRule({
   meta: {
@@ -85,10 +85,12 @@ export default createRule({
                   {
                     messageId: 'addMarker' as const,
                     data: { expected: state.marker, tickets },
-                    fix: (fixer) =>
-                      directive
-                        ? fixer.insertTextBeforeRange(present.comment.range, `${added}\n${indent}`)
-                        : fixer.insertTextAfterRange(present.comment.range, `\n${indent}${added}`),
+                    fix: (fixer) => {
+                      const lineBreak = lineBreakAfter(sourceCode, present.comment);
+                      return directive
+                        ? fixer.insertTextBeforeRange(present.comment.range, `${added}${lineBreak}${indent}`)
+                        : fixer.insertTextAfterRange(present.comment.range, `${lineBreak}${indent}${added}`);
+                    },
                   },
                 ]
               : [],

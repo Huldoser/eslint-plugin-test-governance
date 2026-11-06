@@ -287,5 +287,38 @@ runRule('marker-matches-state', rule, {
         },
       ],
     },
+    // An added marker uses the file's own line breaks.
+    {
+      code: "test.describe('risk limits', () => {\r\n\t// SKIP: TRADE-1\r\n\ttest.skip('rejects an order @quarantined', async () => {});\r\n});\r\n",
+      settings: lifecycle,
+      errors: [
+        {
+          messageId: 'sharedMarker',
+          suggestions: [
+            {
+              messageId: 'addMarker',
+              output:
+                "test.describe('risk limits', () => {\r\n\t// SKIP: TRADE-1\r\n\t// QUARANTINED: TRADE-1\r\n\ttest.skip('rejects an order @quarantined', async () => {});\r\n});\r\n",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: "test.describe('risk limits', () => {\r\n\t// eslint-disable-next-line no-console -- SKIP: TRADE-1\r\n\ttest.skip('rejects an order @quarantined', async () => {});\r\n});\r\n",
+      settings: lifecycle,
+      errors: [
+        {
+          messageId: 'sharedMarker',
+          suggestions: [
+            {
+              messageId: 'addMarker',
+              output:
+                "test.describe('risk limits', () => {\r\n\t// QUARANTINED: TRADE-1\r\n\t// eslint-disable-next-line no-console -- SKIP: TRADE-1\r\n\ttest.skip('rejects an order @quarantined', async () => {});\r\n});\r\n",
+            },
+          ],
+        },
+      ],
+    },
   ],
 });
