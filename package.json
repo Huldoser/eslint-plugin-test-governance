@@ -1,6 +1,6 @@
 {
   "name": "eslint-plugin-test-governance",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "description": "ESLint rules that require a ticket for skipped, fixme, todo, retried, tagged and commented-out Playwright, Jest, Vitest, Mocha, Cypress, WebdriverIO, node:test and Jasmine tests.",
   "keywords": [
     "eslint",
