@@ -729,6 +729,21 @@ describe('placeholders', () => {
     },
     { specs: [{ preset: 'any' }], ticket: 'https://tracker.example.com/search?page=0', result: 'ok' },
     { specs: [{ preset: 'any' }], ticket: '[TRADE-0]', result: 'placeholder' },
+    // An `id` query of zeros is a zero ID, as in Wrike's links; other zero queries, and a 0 inside the path, are not.
+    {
+      specs: [{ preset: 'url', hosts: ['www.wrike.com'] }],
+      ticket: 'https://www.wrike.com/open.htm?id=0',
+      result: 'placeholder',
+    },
+    {
+      specs: [{ preset: 'url', hosts: ['www.wrike.com'] }],
+      ticket: 'https://www.wrike.com/open.htm?id=4821',
+      result: 'ok',
+    },
+    { specs: [{ preset: 'any' }], ticket: 'https://tracker.example.com/a?id=0', result: 'placeholder' },
+    { specs: [{ preset: 'any' }], ticket: 'https://tracker.example.com/a?ID=000/', result: 'placeholder' },
+    { specs: [{ preset: 'any' }], ticket: 'https://tracker.example.com/issues/4821?page=0&tab=0', result: 'ok' },
+    { specs: [{ preset: 'any' }], ticket: 'https://tracker.example.com/item/0/edit', result: 'ok' },
     {
       specs: [{ preset: 'url', hosts: ['tracker.acme.io'] }],
       ticket: 'https://tracker.acme.io/#/tasks/0',

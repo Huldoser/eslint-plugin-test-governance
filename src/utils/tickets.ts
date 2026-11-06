@@ -168,15 +168,18 @@ function keyId(key: string | null | undefined, ok: (key: string) => boolean): st
 
 /**
  * A link's ID when the preset doesn't know the tracker: the keys in its path, `#/route` or query (Jira's
- * `?selectedIssue=TRADE-1`) and the number its path or route ends in. A zero among them makes the link a
- * placeholder, as in 0.9.0; with none, the link itself stands for the ID.
+ * `?selectedIssue=TRADE-1`), the number its path or route ends in, and its `id` query (Wrike's
+ * `?id=4821`). A zero among them makes the link a placeholder, as in 0.9.0; with none, the link itself
+ * stands for the ID.
  */
 function linkId(url: URL): string {
   const route = /^#!?\//.test(url.hash) ? url.hash.replace(/^#!?/, '') : '';
-  const parts = [...url.pathname.split('/'), ...route.split('/'), ...[...url.searchParams.values()].map(trimSlash)];
+  const query = [...url.searchParams].map(([key, value]) => [key, trimSlash(value)]);
+  const parts = [...url.pathname.split('/'), ...route.split('/'), ...query.map(([, value]) => value)];
   const keys = parts.filter((part) => KEY_RE.test(part));
   const ends = [url.pathname, route].flatMap((path) => LINK_NUMBER_RE.exec(path)?.[1] ?? []);
-  const numbers = [...keys, ...ends].map(numberOf);
+  const ids = query.flatMap(([key, value]) => (key.toLowerCase() === 'id' && DIGITS_RE.test(value) ? [value] : []));
+  const numbers = [...keys, ...ends, ...ids].map(numberOf);
   return numbers.find((id) => ZERO_RE.test(id)) ?? numbers.at(0) ?? url.href;
 }
 

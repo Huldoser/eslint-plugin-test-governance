@@ -330,8 +330,9 @@ run on their own servers.
 
 For a tracker without a preset, use `url` with its host, for example
 `{ preset: 'url', hosts: ['www.wrike.com'] }` for Wrike links such as
-`https://www.wrike.com/open.htm?id=4821`. It works the same for Microsoft Planner (`tasks.office.com`),
-Airtable (`airtable.com`), Smartsheet (`app.smartsheet.com`) and trackers of your own. For another
+`https://www.wrike.com/open.htm?id=4821`; a link with `?id=0`, or a path that ends in `/0`, is a
+placeholder. It works the same for Microsoft Planner (`tasks.office.com`), Airtable (`airtable.com`),
+Smartsheet (`app.smartsheet.com`) and trackers of your own. For another
 tracker's keys, such as `WEB-12`, `any` or `pattern` works. Gitea, Forgejo and Codeberg use GitHub's link layout,
 so the `github` preset with their `host` covers them. Bitbucket has no issue tracker since August 2026,
 so it has no preset.
