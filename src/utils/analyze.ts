@@ -260,6 +260,8 @@ interface Chain {
  */
 type InfoName = {
   name: string;
+  /** The parameter binding, so a nested variable with the same name isn't a test context. */
+  binding?: TSESTree.Identifier;
   /** The step a `TestStepInfo` belongs to. Unset for the others, which act on the whole test. */
   step?: Subject;
   /** For a runtime function, its own name, as `pending` also when imported as `pend`, and how it is reached. */
@@ -268,12 +270,14 @@ type InfoName = {
 
 /** The names a parameter gives to runtime info: `testInfo`, or `skip` in `({ skip }) => ...`. */
 function infoNames(param: TSESTree.Parameter | undefined, methods: ReadonlySet<string>, step?: Subject): InfoName[] {
-  if (param?.type === 'Identifier') return [{ name: param.name, methods, step }];
+  if (param?.type === 'Identifier') return [{ name: param.name, binding: param, methods, step }];
   if (param?.type !== 'ObjectPattern') return [];
   return param.properties.flatMap((prop): InfoName[] => {
     if (prop.type !== 'Property' || prop.value.type !== 'Identifier') return [];
     const method = propertyName(prop);
-    return method !== undefined && methods.has(method) ? [{ name: prop.value.name, method, step }] : [];
+    return method !== undefined && methods.has(method)
+      ? [{ name: prop.value.name, binding: prop.value, method, step }]
+      : [];
   });
 }
 
@@ -792,9 +796,10 @@ function constantValue(sourceCode: SourceCode, node: Node): Node | undefined {
   if (owner.type === 'ObjectExpression') return propertyValue(owner, key);
   if (owner.type === 'ArrayExpression') {
     const index = Number(key);
-    if (!Number.isInteger(index)) return undefined;
-    const element = owner.elements[index];
-    return element !== null && element.type !== 'SpreadElement' ? element : undefined;
+    if (!Number.isInteger(index) || index < 0 || String(index) !== key) return undefined;
+    if (owner.elements.slice(0, index + 1).some((element) => element?.type === 'SpreadElement')) return undefined;
+    const element = owner.elements.at(index);
+    return element !== undefined && element !== null && element.type !== 'SpreadElement' ? element : undefined;
   }
   if (owner.type !== 'TSEnumDeclaration') return undefined;
   const member = owner.body.members.find((m) => (m.id.type === 'Identifier' ? m.id.name : m.id.value) === key);
@@ -869,19 +874,36 @@ function detailKey(sourceCode: SourceCode, prop: TSESTree.Property, unread: Node
  * The plain-keyed properties of a details object, following spread objects declared in this file and
  * collecting the ones that can't be read.
  */
-function objectDetails(sourceCode: SourceCode, object: TSESTree.ObjectExpression, unread: Node[]): [string, Node][] {
-  return object.properties.flatMap((prop): [string, Node][] => {
+function objectDetails(
+  sourceCode: SourceCode,
+  object: TSESTree.ObjectExpression,
+  unread: Node[],
+  path: readonly Node[] = [],
+): [string, Node][] {
+  if (path.includes(object)) {
+    unread.push(object);
+    return [];
+  }
+  const entries = new Map<string, Node>();
+  for (const prop of object.properties) {
     if (prop.type === 'SpreadElement') {
       const argument = unwrap(prop.argument);
       const value = argument.type === 'ObjectExpression' ? argument : constantValue(sourceCode, argument);
       const spread = value && unwrap(value);
-      if (spread?.type === 'ObjectExpression') return objectDetails(sourceCode, spread, unread);
-      unread.push(prop.argument);
-      return [];
+      const before = unread.length;
+      const values =
+        spread?.type === 'ObjectExpression' ? objectDetails(sourceCode, spread, unread, [...path, object]) : [];
+      if (spread?.type !== 'ObjectExpression') unread.push(prop.argument);
+      // An unread spread may replace any earlier property; later known properties still win.
+      if (unread.length > before) entries.clear();
+      for (const [key, value] of values) entries.set(key, value);
+      continue;
     }
     const key = detailKey(sourceCode, prop, unread);
-    return key === undefined ? [] : [[key, prop.value]];
-  });
+    if (key === undefined) entries.clear();
+    else entries.set(key, prop.value);
+  }
+  return [...entries];
 }
 
 /**
@@ -977,13 +999,17 @@ function collectAnnotations(
     }
     tickets.push({ text, node: description[1] });
   };
-  const readValue = (value: Node): void => {
+  const readValue = (value: Node, path: readonly Node[] = []): void => {
     const carrier = annotationCarrier(sourceCode, value);
     if (carrier === 'unread') {
       unread.push(value);
       return;
     }
     if (carrier === undefined) return;
+    if (path.includes(carrier)) {
+      unread.push(value);
+      return;
+    }
     if (source.shape === 'meta') {
       if (carrier.type === 'ObjectExpression') {
         const unreadKeys: Node[] = [];
@@ -1001,7 +1027,11 @@ function collectAnnotations(
     if (carrier.type === 'ObjectExpression') readPlaywright(carrier);
     else {
       for (const element of carrier.elements) {
-        if (element === null || element.type === 'SpreadElement') continue;
+        if (element === null) continue;
+        if (element.type === 'SpreadElement') {
+          readValue(element.argument, [...path, carrier]);
+          continue;
+        }
         const inner = annotationCarrier(sourceCode, element);
         if (inner === 'unread') unread.push(element);
         else if (inner?.type === 'ObjectExpression') readPlaywright(inner);
@@ -1339,7 +1369,10 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
    * `['describe', 'skip']` for `test.describe.skip` or `pw.test.describe.skip`. Undefined when the callee
    * isn't one of the framework's test functions.
    */
-  const target = (chain: Chain | undefined): { root: Root; path: string[]; args: Chain['args'] } | undefined => {
+  const target = (
+    chain: Chain | undefined,
+    seen: readonly Node[] = [],
+  ): { root: Root; path: string[]; args: Chain['args'] } | undefined => {
     if (chain === undefined) return undefined;
     const { root, path, args } = chain;
     // `require('node:test').test.skip(...)`: the require call stands for the module, with its exports.
@@ -1360,7 +1393,11 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       base = member;
       rest = path.slice(1);
     }
-    return base !== undefined && !isLocalVariable(sourceCode, root) ? { root: base, path: rest, args } : undefined;
+    if (base !== undefined && !isLocalVariable(sourceCode, root)) return { root: base, path: rest, args };
+    const value = declaredValue(sourceCode, root);
+    if (value === undefined || seen.includes(value)) return undefined;
+    const alias = target(chainOf(unwrap(value), framework.factories), [...seen, value]);
+    return alias && { root: alias.root, path: [...alias.path, ...path], args: new Map([...alias.args, ...args]) };
   };
   let usesTest = sourceCode.ast.body.some(
     (statement) => statement.type === 'ImportDeclaration' && framework.ownsModule(statement.source.value),
@@ -1392,6 +1429,13 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   }
   const stack: Subject[] = [];
   const infos: InfoName[] = [];
+  const infoOf = (id: TSESTree.Identifier): InfoName | undefined => {
+    const info = infos.findLast((entry) => entry.name === id.name);
+    return info?.binding !== undefined &&
+      declaredVariable(sourceCode, id) !== declaredVariable(sourceCode, info.binding)
+      ? undefined
+      : info;
+  };
   const keys = sourceCode.visitorKeys as Record<string, readonly string[] | undefined>;
   /** States an options object can put a test in, such as `skip` for Vitest's `{ skip: true }`. */
   const optionModifiers = new Set<string>(framework.optionEffects.values());
@@ -1499,7 +1543,10 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       for (const tag of parent.inheritedTags) inheritedTags.add(tag);
       for (const tag of parent.tags) inheritedTags.add(tag.tag);
     }
-    const ownSkip = [...modifiers].some(([modifier, always]) => always && SKIPPING_MODIFIERS.has(modifier));
+    const ownSkip = [...modifiers].some(
+      ([modifier, always]) =>
+        always && SKIPPING_MODIFIERS.has(modifier) && !(modifier === 'todo' && framework.name === 'node-test'),
+    );
     const subject: Subject = {
       kind,
       node: call,
@@ -1702,7 +1749,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const { callee } = call;
     if (!framework.subtests || callee.type !== 'MemberExpression' || memberName(callee) !== 'test') return undefined;
     const { object } = callee;
-    if (object.type !== 'Identifier' || !infos.findLast((info) => info.name === object.name)?.methods) return undefined;
+    if (object.type !== 'Identifier' || !infoOf(object)?.methods) return undefined;
     const declaration: Declaration = { kind: 'test', members: [], written: [], args: new Map() };
     return declares(declaration, call.arguments)
       ? declare(call, declaration, bodyInfos(call.arguments, []))
@@ -1716,8 +1763,15 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
    */
   const aliasValue = (callee: Node): Node | undefined => {
     if (callee.type !== 'Identifier' || testNames.roots.has(callee.name)) return undefined;
-    const value = declaredValue(sourceCode, callee);
-    return value && ALIAS_VALUES.has(unwrap(value).type) ? value : undefined;
+    const seen = new Set<Node>();
+    let value = declaredValue(sourceCode, callee);
+    while (value !== undefined && !seen.has(value)) {
+      seen.add(value);
+      const expression = unwrap(value);
+      if (expression.type !== 'Identifier') return ALIAS_VALUES.has(expression.type) ? value : undefined;
+      value = declaredValue(sourceCode, expression);
+    }
+    return undefined;
   };
 
   /**
@@ -1799,14 +1853,12 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
    */
   const runtimeCall = (call: TSESTree.CallExpression): Subject | undefined => {
     const { callee } = call;
-    // The innermost parameter with a name is the one the call uses.
-    const innermost = (name: string): InfoName | undefined => infos.findLast((info) => info.name === name);
     /**
      * What a name stands for: a context in scope, or a local constant that keeps one of its methods, as
      * `const skip = testInfo.skip`, `const { skip } = t` or `const p = pending`.
      */
     const resolveInfo = (id: TSESTree.Identifier): InfoName | undefined => {
-      const direct = innermost(id.name);
+      const direct = infoOf(id);
       if (direct !== undefined) return direct;
       const definition = declaredVariable(sourceCode, id)?.defs.find((def) => def.type === 'Variable');
       const declarator = definition?.node;
@@ -1822,11 +1874,11 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
               ? { name: id.name, method: name }
               : undefined;
           }
-          const object = init.object.type === 'Identifier' ? innermost(init.object.name) : undefined;
+          const object = init.object.type === 'Identifier' ? infoOf(init.object) : undefined;
           return object?.methods?.has(name) ? { name: id.name, method: name, step: object.step } : undefined;
         }
         if (init.type !== 'Identifier') return undefined;
-        const source = innermost(init.name);
+        const source = infoOf(init);
         if (source === undefined) return undefined;
         const fn = source.runtimeFunction;
         if (fn && declaredWhere(sourceCode, init) !== (fn.imported ? 'top' : 'global')) return undefined;
@@ -1834,7 +1886,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
         return { name: id.name, methods: source.methods, step: source.step };
       }
       if (declarator.id.type !== 'ObjectPattern' || init.type !== 'Identifier') return undefined;
-      const source = innermost(init.name);
+      const source = infoOf(init);
       if (source?.methods === undefined) return undefined;
       const property = declarator.id.properties.find(
         (prop) => prop.type === 'Property' && prop.value.type === 'Identifier' && prop.value.name === id.name,
@@ -1920,6 +1972,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     always = isUnconditional(call, framework),
   ): Subject | undefined => {
     if (!states.some((s) => s.modifier === modifier)) return undefined;
+    if (framework.reasonArgument !== 'only' && booleanOf(call.arguments.at(0)) === false) return undefined;
     const subject = makeSubject(
       'runtime',
       call,

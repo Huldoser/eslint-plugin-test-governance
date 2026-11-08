@@ -8,6 +8,14 @@ interface Table {
   rejects: string[];
 }
 
+it('matches the whole ticket with multiline pattern flags', () => {
+  const matcher = compileTicketSpec([{ preset: 'pattern', pattern: 'PROJ-\\d+', flags: 'm' }], []);
+  assert.equal(matcher.check('PROJ-1'), 'ok');
+  for (const ticket of ['junk\nPROJ-1', 'PROJ-1\njunk', 'junk\nPROJ-1\njunk', 'PROJ-1\n']) {
+    assert.equal(matcher.check(ticket), 'format', JSON.stringify(ticket));
+  }
+});
+
 const tables: Record<string, Table> = {
   any: {
     spec: { preset: 'any' },

@@ -6,6 +6,29 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Local aliases such as `const check = it; check.skip(...)`, and aliases of conditional test functions,
+  are checked like the functions they keep.
+- A helper's parameter or block variable named like a test context no longer makes its `skip()` or
+  `test()` calls count as runtime skips or subtests.
+- Runtime calls with a literal `false` condition, such as Playwright's `test.skip(false)`, need neither
+  a ticket nor a reason.
+- Details, options and annotations use the last value of a property, including values from object
+  spreads. An unread spread or computed key no longer leaves an earlier value treated as certain.
+- A tag read beyond an array's bounds no longer crashes linting. An index after a spread, or a string
+  such as `'01'` that isn't an array index, is left unread instead of using the wrong tag.
+- Circular object spreads no longer overflow the stack during analysis.
+- Playwright annotation arrays read tickets from spreads of arrays declared in the same file, and
+  report unread spreads with `reportUnreadableTags`.
+- A ticket marker in a block comment no longer hides unrelated `TODO` or `FIXME` work comments on
+  other lines of that block.
+- The `pattern` preset matches the whole ticket even with the multiline flag, and no longer accepts
+  trailing line breaks outside the pattern.
+- Moving a ticket into an annotation preserves comments inside an empty details object.
+- node:test's `todo` state no longer makes `no-conflicting-states` call a new test skipped: Node still
+  runs its body.
+
 ## [0.13.1] - 2026-11-06
 
 ### Fixed

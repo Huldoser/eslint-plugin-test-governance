@@ -26,6 +26,14 @@ runRule('require-ticket (annotations.only, Playwright)', rule, {
   ]),
   invalid: withOptions(only, [
     {
+      code: "// SKIP: TRADE-1\ntest.skip('places an order', {/* keep this explanation */}, async () => {});",
+      errors: [
+        useAnnotation(
+          `test.skip('places an order', {/* keep this explanation */ annotation: ${issue('TRADE-1')} }, async () => {});`,
+        ),
+      ],
+    },
+    {
       code: "// SKIP: TRADE-1\ntest.skip('places an order', async () => {});",
       errors: [
         {

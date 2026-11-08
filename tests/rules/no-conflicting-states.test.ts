@@ -8,6 +8,11 @@ const known = settings({ knownTags: ['@smoke', '@regression', '@e2e'] });
 
 runRule('no-conflicting-states', rule, {
   valid: [
+    ...[
+      "import { test } from 'node:test'; test('fills @new', { todo: true }, () => {});",
+      "import { test } from 'node:test'; test('fills @new', t => { t.todo('needs the fixture'); });",
+      "import { describe, test } from 'node:test'; describe('orders @new', { todo: true }, () => { test('fills', () => {}); });",
+    ].map((code) => ({ code, settings: settings({ framework: 'node-test', lifecycleTags: true }) })),
     "test('places an order @New @quarantiend', async () => {});",
     { code: "test('places a limit order @new', async () => {});", settings: lifecycle },
     { code: "test('shows live prices @quarantined @smoke @news @neww', async () => {});", settings: lifecycle },

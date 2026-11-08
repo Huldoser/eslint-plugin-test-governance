@@ -106,6 +106,8 @@ export function moveToAnnotation(
   const last = details.properties.at(-1);
   return (fixer) => [
     remove,
-    last === undefined ? fixer.replaceText(details, `{ ${property} }`) : fixer.insertTextAfter(last, `, ${property}`),
+    last === undefined
+      ? fixer.insertTextBeforeRange([details.range[1] - 1, details.range[1]], ` ${property} `)
+      : fixer.insertTextAfter(last, `, ${property}`),
   ];
 }
