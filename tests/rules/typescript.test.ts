@@ -9,6 +9,11 @@ const lifecycle = settings({ lifecycleTags: true });
 
 tester.run('require-ticket (TypeScript syntax)', rule as never, {
   valid: [
+    {
+      code: "test('fills', () => { test.skip(false as boolean); });",
+      name: 'a false runtime condition remains false through a type assertion',
+      settings: settings({ requireReasonForConditional: true }),
+    },
     "// SKIP: TRADE-1\ntest.skip('places an order', async ({ page }: { page: Page }) => {});",
     // AVA's typed test function is not Playwright's.
     "import anyTest, { type TestFn } from 'ava';\nconst test = anyTest as TestFn<{ broker: string }>;\ntest.skip('shows live prices', async (t) => {});",

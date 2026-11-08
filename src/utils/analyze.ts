@@ -262,6 +262,8 @@ type InfoName = {
   name: string;
   /** The parameter binding, so a nested variable with the same name isn't a test context. */
   binding?: TSESTree.Identifier;
+  /** Arguments supplied before the call by a bound runtime method. */
+  boundArgs?: TSESTree.CallExpressionArgument[];
   /** The step a `TestStepInfo` belongs to. Unset for the others, which act on the whole test. */
   step?: Subject;
   /** For a runtime function, its own name, as `pending` also when imported as `pend`, and how it is reached. */
@@ -270,14 +272,15 @@ type InfoName = {
 
 /** The names a parameter gives to runtime info: `testInfo`, or `skip` in `({ skip }) => ...`. */
 function infoNames(param: TSESTree.Parameter | undefined, methods: ReadonlySet<string>, step?: Subject): InfoName[] {
-  if (param?.type === 'Identifier') return [{ name: param.name, binding: param, methods, step }];
-  if (param?.type !== 'ObjectPattern') return [];
-  return param.properties.flatMap((prop): InfoName[] => {
-    if (prop.type !== 'Property' || prop.value.type !== 'Identifier') return [];
+  const target = param?.type === 'AssignmentPattern' ? param.left : param;
+  if (target?.type === 'Identifier') return [{ name: target.name, binding: target, methods, step }];
+  if (target?.type !== 'ObjectPattern') return [];
+  return target.properties.flatMap((prop): InfoName[] => {
+    if (prop.type !== 'Property') return [];
+    const value = prop.value.type === 'AssignmentPattern' ? prop.value.left : prop.value;
+    if (value.type !== 'Identifier') return [];
     const method = propertyName(prop);
-    return method !== undefined && methods.has(method)
-      ? [{ name: prop.value.name, binding: prop.value, method, step }]
-      : [];
+    return method !== undefined && methods.has(method) ? [{ name: value.name, binding: value, method, step }] : [];
   });
 }
 
@@ -540,6 +543,19 @@ function declaredVariable(sourceCode: SourceCode, id: TSESTree.Identifier): TSES
   return undefined;
 }
 
+const reassignedBindings = new WeakMap<TSESLint.Scope.Variable, boolean>();
+
+/** Whether the binding has writes beyond its initial declaration. */
+function isReassigned(sourceCode: SourceCode, id: TSESTree.Identifier): boolean {
+  const variable = declaredVariable(sourceCode, id);
+  if (variable === undefined) return false;
+  const cached = reassignedBindings.get(variable);
+  if (cached !== undefined) return cached;
+  const written = variable.references.some((reference) => reference.isWrite() && !reference.init);
+  reassignedBindings.set(variable, written);
+  return written;
+}
+
 /**
  * Whether `id` refers to a variable or function declared inside a function or block, such as a local
  * helper that happens to be called `test`. Top-level variables, imports, parameters and globals still count.
@@ -716,24 +732,62 @@ interface FoundText {
   text: Text;
   /** The name the text was reached through, such as `Tags.NEW`. Unset when the call itself holds the text. */
   via?: Node;
+  /** The rest of a template around this text, so tag boundaries use its rendered title. */
+  before?: string;
+  after?: string;
+  /** Text inside an interpolation is part of its outer tag value, not a separate plain tag. */
+  embedded?: true;
 }
 
-function scanTags(source: string, { text: node, via }: FoundText, out: TagOccurrence[]): void {
+/** Rendered template text and the offsets of its alternating literal and expression parts. */
+function templateText(
+  sourceCode: SourceCode,
+  node: TSESTree.TemplateLiteral,
+): { parts: string[]; text: string; offsets: number[] } {
+  const parts = node.quasis.flatMap((quasi, i) => [
+    // `cooked` is null only in tagged templates, which are not read as title or tag text.
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
+    quasi.value.cooked!,
+    ...(i < node.expressions.length ? [staticText(sourceCode, node.expressions[i]) ?? ' '] : []),
+  ]);
+  let offset = 0;
+  const offsets = parts.map((part) => {
+    const start = offset;
+    offset += part.length;
+    return start;
+  });
+  return { parts, text: parts.join(''), offsets };
+}
+
+function scanTags(sourceCode: SourceCode, found: FoundText, out: TagOccurrence[]): void {
+  const { text: node, via, before = '', after = '' } = found;
+  const source = sourceCode.text;
   // Each piece of text with where it starts in the source, after its opening quote, backtick or `}`.
-  const parts =
-    node.type === 'Literal'
-      ? [{ text: node.value, start: node.range[0] + 1 }]
-      : node.quasis.map((quasi) => ({
-          // `cooked` is only null in tagged templates, which are never titles.
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
-          text: quasi.value.cooked!,
-          start: quasi.range[0] + 1,
-        }));
-  for (const { text, start } of parts) {
-    for (const match of text.matchAll(TAG_RE)) {
-      const end = match.index + match[0].length;
-      const written = via === undefined && source.slice(start, start + end) === text.slice(0, end);
-      out.push({ tag: match[0], node: via ?? node, ...(written && { range: [start + match.index, start + end] }) });
+  let parts: { text: string; start: number; before: string; after: string }[];
+  if (node.type === 'Literal') parts = [{ text: node.value, start: node.range[0] + 1, before, after }];
+  else {
+    const rendered = templateText(sourceCode, node);
+    parts = node.quasis.map((quasi, i) => ({
+      // `cooked` is only null in tagged templates, which are never titles.
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
+      text: quasi.value.cooked!,
+      start: quasi.range[0] + 1,
+      before: rendered.offsets[i * 2] === 0 ? before : rendered.text.charAt(rendered.offsets[i * 2] - 1),
+      after: rendered.text.slice(rendered.offsets[i * 2] + rendered.parts[i * 2].length) + after,
+    }));
+  }
+  for (const { text, start, before, after } of parts) {
+    const prefix = before.slice(-1);
+    const tagStart = text.lastIndexOf('@');
+    const continuation =
+      tagStart >= 0 && /^[\w-]*$/.test(text.slice(tagStart + 1)) ? (/^[\w-]+/.exec(after)?.[0] ?? '') : '';
+    for (const match of (prefix + text + continuation).matchAll(TAG_RE)) {
+      const index = match.index - prefix.length;
+      if (index < 0 || index >= text.length) continue;
+      const end = index + match[0].length;
+      const written =
+        via === undefined && end <= text.length && source.slice(start, start + end) === text.slice(0, end);
+      out.push({ tag: match[0], node: via ?? node, ...(written && { range: [start + index, start + end] }) });
     }
   }
 }
@@ -741,12 +795,14 @@ function scanTags(source: string, { text: node, via }: FoundText, out: TagOccurr
 const PLAIN_TAG_RE = /^[\w-]+$/;
 
 /** A Vitest tag name such as `'flaky'` in `tags`, which stands for the `@flaky` tag. */
-function plainTag(source: string, { text, via }: FoundText): TagOccurrence | undefined {
-  if (text.type !== 'Literal' || !PLAIN_TAG_RE.test(text.value)) return undefined;
+function plainTag(sourceCode: SourceCode, { text, via, embedded }: FoundText): TagOccurrence | undefined {
+  if (embedded) return undefined;
+  const value = staticText(sourceCode, text);
+  if (value === undefined || !PLAIN_TAG_RE.test(value)) return undefined;
   const start = text.range[0] + 1;
-  const end = start + text.value.length;
-  const written = via === undefined && source.slice(start, end) === text.value;
-  return { tag: `@${text.value}`, node: via ?? text, plain: true, ...(written && { range: [start, end] }) };
+  const end = start + value.length;
+  const written = via === undefined && sourceCode.text.slice(start, end) === value;
+  return { tag: `@${value}`, node: via ?? text, plain: true, ...(written && { range: [start, end] }) };
 }
 
 function isStaticText(node: Node): node is Text {
@@ -775,7 +831,7 @@ function declaredValue(sourceCode: SourceCode, id: TSESTree.Identifier): Node | 
 function propertyValue(object: TSESTree.ObjectExpression, key: string): Node | undefined {
   for (let i = object.properties.length - 1; i >= 0; i--) {
     const prop = object.properties[i];
-    if (prop.type === 'SpreadElement') return undefined;
+    if (prop.type === 'SpreadElement' || (prop.computed && propertyName(prop) === undefined)) return undefined;
     if (propertyName(prop) === key) return prop.value;
   }
   return undefined;
@@ -786,24 +842,37 @@ function propertyValue(object: TSESTree.ObjectExpression, key: string): Node | u
  * after `const NEW = '@new'`, or of `Tags.NEW` after `const Tags = { NEW: '@new' }` or
  * `enum Tags { NEW = '@new' }`.
  */
-function constantValue(sourceCode: SourceCode, node: Node): Node | undefined {
-  if (node.type === 'Identifier') return declaredValue(sourceCode, node);
+function constantValue(sourceCode: SourceCode, node: Node, seen: readonly Node[] = []): Node | undefined {
+  if (seen.includes(node)) return undefined;
+  const path = [...seen, node];
+  const follow = (value: Node | undefined): Node | undefined => {
+    if (value === undefined) return undefined;
+    const target = unwrap(value);
+    return target.type === 'Identifier' || target.type === 'MemberExpression'
+      ? constantValue(sourceCode, target, path)
+      : target;
+  };
+  if (node.type === 'Identifier') return follow(declaredValue(sourceCode, node));
   if (node.type !== 'MemberExpression') return undefined;
   const key = memberKey(node);
-  const value = constantValue(sourceCode, unwrap(node.object));
+  const object = unwrap(node.object);
+  const value =
+    object.type === 'ObjectExpression' || object.type === 'ArrayExpression'
+      ? object
+      : constantValue(sourceCode, object, path);
   const owner = value && unwrap(value);
   if (key === undefined || owner === undefined) return undefined;
-  if (owner.type === 'ObjectExpression') return propertyValue(owner, key);
+  if (owner.type === 'ObjectExpression') return follow(propertyValue(owner, key));
   if (owner.type === 'ArrayExpression') {
     const index = Number(key);
     if (!Number.isInteger(index) || index < 0 || String(index) !== key) return undefined;
     if (owner.elements.slice(0, index + 1).some((element) => element?.type === 'SpreadElement')) return undefined;
     const element = owner.elements.at(index);
-    return element !== undefined && element !== null && element.type !== 'SpreadElement' ? element : undefined;
+    return element !== undefined && element !== null && element.type !== 'SpreadElement' ? follow(element) : undefined;
   }
   if (owner.type !== 'TSEnumDeclaration') return undefined;
   const member = owner.body.members.find((m) => (m.id.type === 'Identifier' ? m.id.name : m.id.value) === key);
-  return member?.initializer;
+  return follow(member?.initializer);
 }
 
 /**
@@ -817,30 +886,56 @@ function readTexts(
   out: { texts: FoundText[]; unread: Set<Node> },
   via?: Node,
   path: readonly Node[] = [],
+  context: Pick<FoundText, 'before' | 'after' | 'embedded'> = {},
 ): void {
   const target = unwrap(node);
+  if (path.includes(target)) {
+    out.unread.add(via ?? target);
+    return;
+  }
   if (isStaticText(target)) {
-    out.texts.push({ text: target, via });
+    out.texts.push({ text: target, via, ...context });
     // A template that holds a constant, as in `` `${TAG}` ``, reads the constant's text too.
     if (target.type === 'TemplateLiteral') {
-      for (const expression of target.expressions) {
-        const value = constantValue(sourceCode, unwrap(expression));
+      const rendered = templateText(sourceCode, target);
+      for (const [i, expression] of target.expressions.entries()) {
+        const own = unwrap(expression);
+        const value = isStaticText(own) ? own : constantValue(sourceCode, own);
         const resolved = value && unwrap(value);
-        if (resolved !== undefined && isStaticText(resolved)) out.texts.push({ text: resolved, via });
+        if (resolved !== undefined && isStaticText(resolved)) {
+          readTexts(sourceCode, resolved, out, via, [...path, target], {
+            before:
+              rendered.offsets[i * 2 + 1] === 0
+                ? (context.before ?? '')
+                : rendered.text.charAt(rendered.offsets[i * 2 + 1] - 1),
+            after:
+              rendered.text.slice(rendered.offsets[i * 2 + 1] + rendered.parts[i * 2 + 1].length) +
+              (context.after ?? ''),
+            embedded: true,
+          });
+        }
       }
     }
     return;
   }
   if (target.type === 'ArrayExpression') {
     for (const item of target.elements) {
-      if (item) readTexts(sourceCode, item.type === 'SpreadElement' ? item.argument : item, out, via, path);
+      if (item)
+        readTexts(
+          sourceCode,
+          item.type === 'SpreadElement' ? item.argument : item,
+          out,
+          via,
+          [...path, target],
+          context,
+        );
     }
     return;
   }
   const value = constantValue(sourceCode, target);
   // `path` holds the constants already followed, so `const a = b; const b = a;` ends.
   if (value === undefined || path.includes(value)) out.unread.add(via ?? target);
-  else readTexts(sourceCode, value, out, via ?? target, [...path, value]);
+  else readTexts(sourceCode, value, out, via ?? target, [...path, target], context);
 }
 
 interface Details {
@@ -927,14 +1022,18 @@ function detailsOf(sourceCode: SourceCode, call: TSESTree.CallExpression, option
   return { entries: objectDetails(sourceCode, object, unread), unread };
 }
 
-/** The static text a value gives: a string literal, a template with no expressions, or one of those held in a constant declared in this file. */
-function staticText(sourceCode: SourceCode, node: Node): string | undefined {
+/** Static string text, including templates whose expressions resolve to strings in this file. */
+function staticText(sourceCode: SourceCode, node: Node, seen: readonly Node[] = []): string | undefined {
+  if (seen.includes(node)) return undefined;
+  const path = [...seen, node];
   const read = (value: Node): string | undefined => {
     if (value.type === 'Literal') return typeof value.value === 'string' ? value.value : undefined;
-    if (value.type !== 'TemplateLiteral' || value.expressions.length !== 0) return undefined;
+    if (value.type !== 'TemplateLiteral') return undefined;
+    const expressions = value.expressions.map((expression) => staticText(sourceCode, unwrap(expression), path));
+    if (expressions.some((text) => text === undefined)) return undefined;
     // `cooked` is only null in tagged templates, which no annotation value is.
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
-    return value.quasis[0].value.cooked!;
+    return value.quasis.map((quasi, i) => quasi.value.cooked! + (expressions[i] ?? '')).join('');
   };
   const target = unwrap(node);
   const own = read(target);
@@ -1077,20 +1176,19 @@ function collectTags(
   framework: Framework,
   details: Details,
 ): Omit<TagInfo, 'reasonedOptions'> {
-  const source = sourceCode.text;
   const tags: TagOccurrence[] = [];
   const title = { texts: [] as FoundText[], unread: new Set<Node>() };
   // node:test's `test({ tags: ['db'] }, fn)` has no title, only options.
   if (hasTitle) readTexts(sourceCode, call.arguments[0], title);
-  for (const found of title.texts) scanTags(source, found, tags);
+  for (const found of title.texts) scanTags(sourceCode, found, tags);
   const values = { texts: [] as FoundText[], unread: new Set<Node>() };
   for (const [key, value] of details.entries) {
     if (key === framework.tagKey) readTexts(sourceCode, value, values);
   }
   for (const found of values.texts) {
-    const plain = framework.plainTags ? plainTag(source, found) : undefined;
+    const plain = framework.plainTags ? plainTag(sourceCode, found) : undefined;
     if (plain) tags.push(plain);
-    else scanTags(source, found, tags);
+    else scanTags(sourceCode, found, tags);
   }
   const unread = [...values.unread];
   if (details.unread.length > 0 && framework.tagKey !== undefined) unread.push(...details.unread);
@@ -1172,7 +1270,8 @@ function thisFunction(node: Node): Node | undefined {
 
 /** The value of a `true` or `false` literal; undefined for anything else. */
 function booleanOf(node: Node | undefined): boolean | undefined {
-  return node?.type === 'Literal' && typeof node.value === 'boolean' ? node.value : undefined;
+  const value = node === undefined ? undefined : unwrap(node);
+  return value?.type === 'Literal' && typeof value.value === 'boolean' ? value.value : undefined;
 }
 
 /**
@@ -1300,6 +1399,7 @@ function exits(statement: TSESTree.Statement): boolean {
 
 /** `if (ready) return;` or `if (!ok) { throw error; }`: code after it only runs on some paths. */
 function isEarlyExit(statement: TSESTree.Statement): boolean {
+  if (statement.type === 'BlockStatement') return statement.body.some(isEarlyExit);
   return (
     statement.type === 'IfStatement' &&
     (exits(statement.consequent) || (statement.alternate !== null && exits(statement.alternate)))
@@ -1307,7 +1407,7 @@ function isEarlyExit(statement: TSESTree.Statement): boolean {
 }
 
 /**
- * Whether the call only runs on some paths of its function: under an `if`, a `switch` case, a ternary,
+ * Whether the call only runs on some paths of its function: under an `if`, a `switch` case, a ternary or a loop,
  * the right side of `&&`, `||` or `??`, in a `catch` block, after other code in a `try` block that has a
  * `catch`, or after an early exit such as `if (ready) return;`. `if (!enabled) test.skip()` is the same as `test.skip(!enabled)`, and
  * `catch { test.skip(true, 'service is down') }` only skips when the service is down.
@@ -1315,9 +1415,18 @@ function isEarlyExit(statement: TSESTree.Statement): boolean {
 function isGuarded(call: TSESTree.CallExpression): boolean {
   let child: Node = call;
   for (let node: Node | undefined = call.parent; node && !FUNCTIONS.has(node.type); child = node, node = node.parent) {
-    if ((node.type === 'IfStatement' || node.type === 'ConditionalExpression') && child !== node.test) return true;
-    if (node.type === 'SwitchCase' && child !== node.test) return true;
-    if (node.type === 'LogicalExpression' && child === node.right) return true;
+    const same = (other: Node): boolean => child.range[0] === other.range[0] && child.range[1] === other.range[1];
+    if ((node.type === 'IfStatement' || node.type === 'ConditionalExpression') && !same(node.test)) return true;
+    if (node.type === 'SwitchCase' && (node.test === null || !same(node.test))) return true;
+    if (node.type === 'LogicalExpression' && same(node.right)) return true;
+    if (
+      ((node.type === 'WhileStatement' || node.type === 'ForStatement') &&
+        node.test !== null &&
+        booleanOf(node.test) !== true &&
+        child === node.body) ||
+      ((node.type === 'ForInStatement' || node.type === 'ForOfStatement') && child === node.body)
+    )
+      return true;
     if (node.type === 'CatchClause') return true;
     if (node.type === 'BlockStatement') {
       const index = node.body.indexOf(child as TSESTree.Statement);
@@ -1364,6 +1473,19 @@ export function analyze(sourceCode: SourceCode, options: ResolvedOptions): Analy
 function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis {
   const { states, framework } = options;
   const testNames = collectTestNames(sourceCode.ast, framework, options.testFunctions);
+  /** Whole-module imports or requires, including constant aliases of them. */
+  const moduleOf = (node: Node, seen: readonly Node[] = []): boolean => {
+    const value = unwrap(node);
+    if (seen.includes(value)) return false;
+    if (value.type === 'Identifier') {
+      if (isReassigned(sourceCode, value)) return false;
+      if (testNames.modules.has(value.name) && declaredWhere(sourceCode, value) === 'top') return true;
+      const alias = declaredValue(sourceCode, value);
+      return alias !== undefined && moduleOf(alias, [...seen, value]);
+    }
+    const source = requireSource(value);
+    return source !== undefined && framework.ownsModule(source);
+  };
   /**
    * The test function a callee starts from and the members after it, such as `test` and
    * `['describe', 'skip']` for `test.describe.skip` or `pw.test.describe.skip`. Undefined when the callee
@@ -1382,18 +1504,38 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       const exported = framework.exports.get(path[0]);
       return exported === undefined ? undefined : { root: exported, path: path.slice(1), args };
     }
+    if (isReassigned(sourceCode, root)) return undefined;
     let base = testNames.roots.get(root.name);
     let rest = path;
     // `pw.test.skip`, or node:test's `test.describe`, whose module is also its `test` even when
     // `test` was imported by name.
-    const moduleLike =
-      testNames.modules.has(root.name) || (framework.defaultExport !== undefined && base === framework.defaultExport);
+    const moduleLike = moduleOf(root) || (framework.defaultExport !== undefined && base === framework.defaultExport);
     const member = moduleLike ? framework.exports.get(path[0]) : undefined;
     if (member !== undefined || base === undefined) {
       base = member;
       rest = path.slice(1);
     }
     if (base !== undefined && !isLocalVariable(sourceCode, root)) return { root: base, path: rest, args };
+    const definition = declaredVariable(sourceCode, root)?.defs.find((def) => def.type === 'Variable');
+    const declarator = definition?.node;
+    if (
+      declarator?.type === 'VariableDeclarator' &&
+      declarator.id.type === 'ObjectPattern' &&
+      declarator.init !== null
+    ) {
+      if (seen.includes(declarator)) return undefined;
+      const property = declarator.id.properties.find(
+        (prop) => prop.type === 'Property' && prop.value.type === 'Identifier' && prop.value.name === root.name,
+      );
+      const key = property?.type === 'Property' ? propertyName(property) : undefined;
+      const init = chainOf(unwrap(declarator.init), framework.factories);
+      return key === undefined || init === undefined
+        ? undefined
+        : target({ ...init, path: [...init.path, key, ...path], args: new Map([...init.args, ...args]) }, [
+            ...seen,
+            declarator,
+          ]);
+    }
     const value = declaredValue(sourceCode, root);
     if (value === undefined || seen.includes(value)) return undefined;
     const alias = target(chainOf(unwrap(value), framework.factories), [...seen, value]);
@@ -1410,6 +1552,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     allComments,
     new Set([
       ...options.testFunctions,
+      ...[...testNames.roots].flatMap(([name, root]) => (root.kind === 'hook' ? [] : [name])),
       ...[...framework.exports, ...framework.globals].flatMap(([name, root]) => (root.kind === 'hook' ? [] : [name])),
     ]),
     new Set(
@@ -1687,25 +1830,39 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   ): { subject: Subject; infos: InfoName[] } | undefined => {
     const callee = unwrap(picker);
     if (callee.type !== 'ConditionalExpression') return undefined;
-    const [yes, no] = [callee.consequent, callee.alternate].map((side) => {
-      const picked = target(chainOf(unwrap(side), framework.factories));
-      return picked && declarationOf(picked);
-    });
+    const choices = (node: Node): Declaration[] | undefined => {
+      const value = unwrap(node);
+      if (value.type === 'ConditionalExpression') {
+        const yes = choices(value.consequent);
+        const no = choices(value.alternate);
+        return yes === undefined || no === undefined ? undefined : [...yes, ...no];
+      }
+      const picked = target(chainOf(value, framework.factories));
+      const declaration = picked && declarationOf(picked);
+      return declaration && [declaration];
+    };
+    const alternatives = choices(callee);
     const args = call.arguments;
-    if (yes === undefined || no === undefined) return undefined;
-    if (yes.kind !== no.kind || !declares(yes, args) || !declares(no, args)) return undefined;
+    if (alternatives === undefined) return undefined;
+    const [first] = alternatives;
+    if (!alternatives.every((choice) => choice.kind === first.kind && declares(choice, args))) return undefined;
     usesTest = true;
     const { details, tagInfo } = headOf(call);
-    const [ifYes, ifNo] = [yes, no].map(({ members, args: conditions }) =>
-      declarationModifiers(yes.kind, args, modifiersOf(members, details.entries, conditions)),
+    const branches = alternatives.map(({ members, args: conditions }) =>
+      declarationModifiers(first.kind, args, modifiersOf(members, details.entries, conditions)),
     );
-    if (yes.kind === 'test') addThisBody(args);
+    if (first.kind === 'test') addThisBody(args);
+    const body = args.findLast(isFunction);
+    if (first.kind === 'describe' && body?.type === 'FunctionExpression') suiteBodies.add(body);
     const modifiers = new Map<string, boolean>();
-    for (const modifier of new Set([...ifYes.keys(), ...ifNo.keys()])) {
-      modifiers.set(modifier, ifYes.get(modifier) === true && ifNo.get(modifier) === true);
+    for (const modifier of new Set(branches.flatMap((branch) => [...branch.keys()]))) {
+      modifiers.set(
+        modifier,
+        branches.every((branch) => branch.get(modifier) === true),
+      );
     }
-    const infos = yes.kind === 'test' ? bodyInfos(args, yes.members) : [];
-    return { subject: makeSubject(yes.kind, call, modifiers, tagInfo), infos };
+    const infos = first.kind === 'test' ? bodyInfos(args, first.members) : [];
+    return { subject: makeSubject(first.kind, call, modifiers, tagInfo), infos };
   };
 
   /** The details, tags and annotations of a declaration; node:test lets it leave out its title. */
@@ -1744,12 +1901,59 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     return { subject: makeSubject(kind, call, modifiers, tagInfo), infos };
   };
 
+  /** A context or runtime method, following stable local aliases and bound methods. */
+  const resolveInfo = (node: Node, seen: readonly Node[] = []): InfoName | undefined => {
+    const value = unwrap(node);
+    if (seen.includes(value)) return undefined;
+    const path = [...seen, value];
+    if (value.type === 'CallExpression') {
+      const bind = unwrap(value.callee);
+      if (bind.type !== 'MemberExpression' || memberName(bind) !== 'bind') return undefined;
+      const source = resolveInfo(bind.object, path);
+      return source?.method === undefined
+        ? undefined
+        : { ...source, boundArgs: [...(source.boundArgs ?? []), ...value.arguments.slice(1)] };
+    }
+    if (value.type === 'MemberExpression') {
+      const name = memberName(value);
+      if (name === undefined) return undefined;
+      if (value.object.type === 'ThisExpression') {
+        const owner = thisFunction(value);
+        return owner !== undefined && thisBodies.has(owner) && framework.thisMethods.has(name)
+          ? { name, method: name }
+          : undefined;
+      }
+      const object = resolveInfo(value.object, path);
+      return object?.methods?.has(name) ? { name, method: name, step: object.step } : undefined;
+    }
+    if (value.type !== 'Identifier' || isReassigned(sourceCode, value)) return undefined;
+    const direct = infoOf(value);
+    if (direct !== undefined) {
+      const fn = direct.runtimeFunction;
+      return fn && declaredWhere(sourceCode, value) !== (fn.imported ? 'top' : 'global') ? undefined : direct;
+    }
+    const definition = declaredVariable(sourceCode, value)?.defs.find((def) => def.type === 'Variable');
+    const declarator = definition?.node;
+    if (declarator?.type !== 'VariableDeclarator' || declarator.init === null) return undefined;
+    const source = resolveInfo(declarator.init, path);
+    if (source === undefined) return undefined;
+    if (declarator.id.type === 'Identifier') return { ...source, name: value.name, runtimeFunction: undefined };
+    if (declarator.id.type !== 'ObjectPattern' || source.methods === undefined) return undefined;
+    const property = declarator.id.properties.find(
+      (prop) => prop.type === 'Property' && prop.value.type === 'Identifier' && prop.value.name === value.name,
+    );
+    const name = property?.type === 'Property' ? propertyName(property) : undefined;
+    return name !== undefined && source.methods.has(name)
+      ? { name: value.name, method: name, step: source.step }
+      : undefined;
+  };
+
   /** node:test's `t.test('title', fn)`: a subtest declared through the context of the test around it. */
   const subtestOf = (call: TSESTree.CallExpression): { subject: Subject; infos: InfoName[] } | undefined => {
     const { callee } = call;
     if (!framework.subtests || callee.type !== 'MemberExpression' || memberName(callee) !== 'test') return undefined;
     const { object } = callee;
-    if (object.type !== 'Identifier' || !infoOf(object)?.methods) return undefined;
+    if (object.type !== 'Identifier' || !resolveInfo(object)?.methods) return undefined;
     const declaration: Declaration = { kind: 'test', members: [], written: [], args: new Map() };
     return declares(declaration, call.arguments)
       ? declare(call, declaration, bodyInfos(call.arguments, []))
@@ -1800,8 +2004,14 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     original: TSESTree.CallExpression,
     alias: Node | undefined,
   ): { subject?: Subject; infos?: InfoName[] } => {
-    const call = throughFunctionMethods(original);
-    const written = alias ?? call.callee;
+    const normalized = throughFunctionMethods(original);
+    const expanded =
+      alias === undefined
+        ? normalized
+        : throughFunctionMethods({ ...normalized, callee: alias as TSESTree.Expression });
+    const call =
+      expanded.arguments === normalized.arguments ? normalized : { ...normalized, arguments: expanded.arguments };
+    const written = expanded.callee;
     const callee = target(chainOf(written, framework.factories));
     if (callee === undefined) {
       return subtestOf(call) ?? pickedDeclaration(call, written) ?? { subject: runtimeCall(call) ?? retryCall(call) };
@@ -1853,58 +2063,15 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
    */
   const runtimeCall = (call: TSESTree.CallExpression): Subject | undefined => {
     const { callee } = call;
-    /**
-     * What a name stands for: a context in scope, or a local constant that keeps one of its methods, as
-     * `const skip = testInfo.skip`, `const { skip } = t` or `const p = pending`.
-     */
-    const resolveInfo = (id: TSESTree.Identifier): InfoName | undefined => {
-      const direct = infoOf(id);
-      if (direct !== undefined) return direct;
-      const definition = declaredVariable(sourceCode, id)?.defs.find((def) => def.type === 'Variable');
-      const declarator = definition?.node;
-      if (declarator?.type !== 'VariableDeclarator' || declarator.init === null) return undefined;
-      const init = unwrap(declarator.init);
-      if (declarator.id.type === 'Identifier') {
-        if (init.type === 'MemberExpression') {
-          const name = memberName(init);
-          if (name === undefined) return undefined;
-          if (init.object.type === 'ThisExpression') {
-            const owner = thisFunction(declarator);
-            return owner !== undefined && thisBodies.has(owner) && framework.thisMethods.has(name)
-              ? { name: id.name, method: name }
-              : undefined;
-          }
-          const object = init.object.type === 'Identifier' ? infoOf(init.object) : undefined;
-          return object?.methods?.has(name) ? { name: id.name, method: name, step: object.step } : undefined;
-        }
-        if (init.type !== 'Identifier') return undefined;
-        const source = infoOf(init);
-        if (source === undefined) return undefined;
-        const fn = source.runtimeFunction;
-        if (fn && declaredWhere(sourceCode, init) !== (fn.imported ? 'top' : 'global')) return undefined;
-        if (source.method !== undefined) return { name: id.name, method: source.method, step: source.step };
-        return { name: id.name, methods: source.methods, step: source.step };
-      }
-      if (declarator.id.type !== 'ObjectPattern' || init.type !== 'Identifier') return undefined;
-      const source = infoOf(init);
-      if (source?.methods === undefined) return undefined;
-      const property = declarator.id.properties.find(
-        (prop) => prop.type === 'Property' && prop.value.type === 'Identifier' && prop.value.name === id.name,
-      );
-      if (property?.type !== 'Property') return undefined;
-      const name = propertyName(property);
-      return name !== undefined && source.methods.has(name)
-        ? { name: id.name, method: name, step: source.step }
-        : undefined;
-    };
     if (callee.type === 'Identifier') {
       const info = resolveInfo(callee);
       if (info?.method === undefined) return undefined;
       // A global such as Jasmine's `pending` counts unless the file declares the name itself; an import of
       // one counts unless a function or block declares the name again.
       const fn = info.runtimeFunction;
-      if (fn && declaredWhere(sourceCode, callee) !== (fn.imported ? 'top' : 'global')) return undefined;
-      const subject = runtimeSubject(call, info.method, info.step);
+      const applied =
+        info.boundArgs === undefined ? call : { ...call, arguments: [...info.boundArgs, ...call.arguments] };
+      const subject = runtimeSubject(applied, info.method, info.step);
       if (subject) subject.functionName = fn?.name;
       return subject;
     }
@@ -1943,16 +2110,26 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       const ownsThis = owner !== undefined && (thisBodies.has(owner) || suiteBodies.has(owner));
       return ownsThis ? retrySubject(call, call.arguments.at(0), name) : undefined;
     }
-    if (framework.retryCall !== 'jest.retryTimes' || name !== 'retryTimes' || object.type !== 'Identifier') {
+    if (framework.retryCall !== 'jest.retryTimes' || name !== 'retryTimes') {
       return undefined;
     }
-    const def = declaredVariable(sourceCode, object)?.defs.at(0);
-    const isJest =
-      object.name === 'jest' &&
-      (def === undefined ||
-        (def.type === 'ImportBinding' &&
+    const isJestObject = (value: Node, seen: readonly Node[] = []): boolean => {
+      if (seen.includes(value)) return false;
+      if (value.type === 'MemberExpression') return memberName(value) === 'jest' && moduleOf(value.object);
+      if (value.type !== 'Identifier' || isReassigned(sourceCode, value)) return false;
+      const def = declaredVariable(sourceCode, value)?.defs.at(0);
+      if (def === undefined) return value.name === 'jest';
+      if (def.type === 'ImportBinding')
+        return (
+          def.node.type === 'ImportSpecifier' &&
+          importedName(def.node) === 'jest' &&
           def.parent.type === 'ImportDeclaration' &&
-          framework.ownsModule(def.parent.source.value)));
+          framework.ownsModule(def.parent.source.value)
+        );
+      const alias = declaredValue(sourceCode, value);
+      return alias !== undefined && isJestObject(unwrap(alias), [...seen, value]);
+    };
+    const isJest = isJestObject(object);
     return isJest ? retrySubject(call, call.arguments.at(0), name) : undefined;
   };
 
@@ -2182,7 +2359,10 @@ export function headLoc(subject: Subject): TSESTree.SourceLocation {
   // todo test has only a title.
   const [first] = node.arguments;
   const title = isFunction(first) || first.type === 'ObjectExpression' ? undefined : first;
-  return { start: node.callee.loc.start, end: (title ?? node.callee).loc.end };
+  return {
+    start: node.callee.loc.start,
+    end: (title && title.range[1] > node.callee.range[1] ? title : node.callee).loc.end,
+  };
 }
 
 export function describeSubject(subject: Subject): string {

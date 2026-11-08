@@ -130,11 +130,6 @@ export default createRule({
           if (options.requireReasonForConditional && reasoned === false) reportReason(subject, state);
           continue;
         }
-        if (annotationOnly) {
-          reportAnnotationOnly(subject, state, annotationOnly);
-          continue;
-        }
-        const result = evaluate(subject, state);
         // Annotations are checked whenever a ticket is needed, whatever the markers say.
         for (const ticket of annotationTicketsOf(subject)) {
           if (state.ticket.check(ticket.text) !== 'ok' && reportOnce(`annotation:${ticket.node.range[0]}`)) {
@@ -145,6 +140,11 @@ export default createRule({
             });
           }
         }
+        if (annotationOnly) {
+          reportAnnotationOnly(subject, state, annotationOnly);
+          continue;
+        }
+        const result = evaluate(subject, state);
         if (result.kind === 'missing' && hasAnnotationTicket(subject, state, options)) continue;
         if (
           result.kind !== 'ok' &&

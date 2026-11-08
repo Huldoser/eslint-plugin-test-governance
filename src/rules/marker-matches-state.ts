@@ -80,7 +80,10 @@ export default createRule({
             subject: subjectName,
           },
           suggest:
-            present.comment.type === 'Line' && tickets !== '' && directive?.kind !== 'eslint-disable-line'
+            present.comment.type === 'Line' &&
+            tickets !== '' &&
+            present.tickets.every((ticket) => state.ticket.check(ticket.text) === 'ok') &&
+            directive?.kind !== 'eslint-disable-line'
               ? [
                   {
                     messageId: 'addMarker' as const,

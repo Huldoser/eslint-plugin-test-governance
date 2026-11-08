@@ -176,3 +176,12 @@ for (const [name, framework] of Object.entries(specs)) {
     assert.ok(largeMs / smallMs < 8, `took ${Math.round(largeMs)} ms, ${(largeMs / smallMs).toFixed(1)} times as long`);
   });
 }
+
+it('lints four times the fragments in a long title template in about four times the rule time', async () => {
+  const title = (count: number): string => 'test(`fills ' + "${'x '}".repeat(count) + ' @new`, () => {});';
+  const options = { framework: 'playwright', lifecycleTags: true } as const;
+  await ruleTime(options, title(500), 1);
+  const smallMs = await ruleTime(options, title(500), 5);
+  const largeMs = await ruleTime(options, title(2000), 5);
+  assert.ok(largeMs / smallMs < 8, `template fragments took ${(largeMs / smallMs).toFixed(1)} times as long`);
+});
