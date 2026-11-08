@@ -34,9 +34,9 @@ export default createRule({
         context.report({ loc, messageId: 'missingMarker', data });
         continue;
       }
-      const valid = own.find((m) => m.tickets.length > 0 && m.tickets.every((t) => t.result === 'ok'));
-      if (valid) {
-        const { extra } = valid;
+      const broken = own.find((m) => m.tickets.length === 0 || m.tickets.some((t) => t.result !== 'ok'));
+      if (broken === undefined) {
+        const extra = own.find((marker) => marker.extra !== undefined)?.extra;
         if (extra === undefined || options.allowNotes) continue;
         context.report({
           loc: { start: sourceCode.getLocFromIndex(extra.range[0]), end: sourceCode.getLocFromIndex(extra.range[1]) },
@@ -52,7 +52,7 @@ export default createRule({
         });
         continue;
       }
-      const [marker] = own;
+      const marker = broken;
       const bad = marker.tickets.find((t) => t.result !== 'ok');
       if (bad === undefined) {
         context.report({ loc: marker.comment.loc, messageId: 'missingTicket', data });

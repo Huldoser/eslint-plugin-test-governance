@@ -564,6 +564,8 @@ function isReassigned(sourceCode: SourceCode, id: TSESTree.Identifier): boolean 
 
 const mutatedBindings = new WeakMap<TSESLint.Scope.Variable, boolean>();
 const ARRAY_MUTATORS = new Set(['copyWithin', 'fill', 'pop', 'push', 'reverse', 'shift', 'sort', 'splice', 'unshift']);
+const OBJECT_MUTATORS = new Set(['assign', 'defineProperty', 'defineProperties']);
+const REFLECT_MUTATORS = new Set(['set', 'deleteProperty', 'defineProperty']);
 
 /** Whether a binding's object is written through a property, an array mutator or a local alias. */
 function isMutated(
@@ -578,19 +580,39 @@ function isMutated(
   const written = variable.references.some((reference) => {
     let value: Node = reference.identifier;
     let parent = value.parent;
-    if (parent.type === 'VariableDeclarator' && parent.init === value && parent.id.type === 'Identifier') {
-      return isMutated(sourceCode, parent.id, [...seen, variable]);
-    }
-    while (parent.type === 'MemberExpression' && parent.object === value) {
+    while (
+      parent.type !== 'Program' &&
+      ((parent.type === 'MemberExpression' && parent.object === value) || unwrap(parent) === value)
+    ) {
       value = parent;
       parent = value.parent;
     }
-    if (value.type !== 'MemberExpression') return false;
+    if (parent.type === 'VariableDeclarator' && parent.init === value && parent.id.type === 'Identifier') {
+      return isMutated(sourceCode, parent.id, [...seen, variable]);
+    }
+    if (parent.type === 'CallExpression' && parent.arguments[0] === value) {
+      const callee = unwrap(parent.callee);
+      if (
+        callee.type === 'MemberExpression' &&
+        callee.object.type === 'Identifier' &&
+        declaredWhere(sourceCode, callee.object) === 'global'
+      ) {
+        const methods =
+          callee.object.name === 'Object'
+            ? OBJECT_MUTATORS
+            : callee.object.name === 'Reflect'
+              ? REFLECT_MUTATORS
+              : undefined;
+        if (methods?.has(memberName(callee) ?? '')) return true;
+      }
+    }
+    const member = unwrap(value);
+    if (member.type !== 'MemberExpression') return false;
     return (
       (parent.type === 'AssignmentExpression' && parent.left === value) ||
       parent.type === 'UpdateExpression' ||
       (parent.type === 'UnaryExpression' && parent.operator === 'delete') ||
-      (parent.type === 'CallExpression' && parent.callee === value && ARRAY_MUTATORS.has(memberName(value) ?? ''))
+      (parent.type === 'CallExpression' && parent.callee === value && ARRAY_MUTATORS.has(memberName(member) ?? ''))
     );
   });
   mutatedBindings.set(variable, written);
@@ -1096,9 +1118,25 @@ function interpolationText(sourceCode: SourceCode, node: Node, seen: readonly No
   const text = staticText(sourceCode, node, seen);
   if (text !== undefined) return text;
   const target = unwrap(node);
-  const value = target.type === 'Literal' ? target : constantValue(sourceCode, target);
+  const value = constantValue(sourceCode, target) ?? target;
   if (
-    value?.type !== 'Literal' ||
+    value.type === 'Identifier' &&
+    declaredWhere(sourceCode, value) === 'global' &&
+    ['undefined', 'NaN', 'Infinity'].includes(value.name)
+  )
+    return value.name;
+  if (value.type === 'UnaryExpression') {
+    if (value.operator === 'void') return 'undefined';
+    const argument = unwrap(value.argument);
+    if (
+      value.operator === '-' &&
+      argument.type === 'Literal' &&
+      (typeof argument.value === 'number' || typeof argument.value === 'bigint')
+    )
+      return String(-argument.value);
+  }
+  if (
+    value.type !== 'Literal' ||
     (value.value !== null && !['number', 'boolean', 'bigint'].includes(typeof value.value))
   )
     return undefined;
@@ -1351,22 +1389,31 @@ function optionApplies(node: Node): boolean | undefined {
 
 /** Keys of a retry options object that hold a count: Vitest's `count`, Cypress's `runMode` and `openMode`. */
 const RETRY_COUNT_KEYS = new Set(['count', 'runMode', 'openMode']);
+const VITEST_RETRY_COUNT_KEYS = new Set(['count']);
+const CYPRESS_RETRY_COUNT_KEYS = new Set(['runMode', 'openMode']);
 
 /**
  * Whether a retry count gives retries: anything but `0`, `false`, `null` or `undefined` written out, since a
  * count known only when the tests run, as `process.env.CI ? 2 : 0`, retries where flaky tests hide. An
  * object retries unless every count it holds is one of those.
  */
-function retries(node: Node | undefined): boolean {
+function retries(
+  sourceCode: SourceCode,
+  node: Node | undefined,
+  keys: ReadonlySet<string> = RETRY_COUNT_KEYS,
+  seen: readonly Node[] = [],
+): boolean {
   if (node === undefined) return false;
-  const value = unwrap(node);
+  if (seen.includes(node)) return true;
+  const own = unwrap(node);
+  const value = constantValue(sourceCode, own) ?? own;
   if (value.type === 'Literal') return value.value !== 0 && value.value !== false && value.value !== null;
   if (value.type === 'Identifier') return value.name !== 'undefined';
   if (value.type !== 'ObjectExpression') return true;
-  const counts = value.properties.flatMap((prop) =>
-    prop.type === 'Property' && RETRY_COUNT_KEYS.has(propertyName(prop) ?? '') ? [prop.value] : [],
-  );
-  return counts.length === 0 || counts.some(retries);
+  const unread: Node[] = [];
+  const counts = objectDetails(sourceCode, value, unread).filter(([key]) => keys.has(key));
+  if (unread.length > 0 && ![...keys].every((key) => counts.some(([name]) => name === key))) return true;
+  return counts.length === 0 || counts.some(([, count]) => retries(sourceCode, count, keys, [...seen, node]));
 }
 
 /** Values that are never `false` or `undefined`. */
@@ -1807,13 +1854,17 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       }
       // `skipIf(true)` always skips and `skipIf(false)` never does, like `{ skip: true }` and `{ skip: false }`.
       const condition = booleanOf(args.get(member));
-      if (condition === undefined) add(effect.modifier, false);
-      else if (condition === effect.when) add(effect.modifier, true);
+      if (condition === undefined) modifiers.set(effect.modifier, false);
+      else if (condition === effect.when) modifiers.set(effect.modifier, true);
+      else modifiers.delete(effect.modifier);
     }
     // `{ skip: true }` always skips, `{ skip: isMobile }` only sometimes, `{ skip: false }` never.
     for (const [key, value] of details) {
       if (key === framework.retryOption) {
-        if (retries(value)) add('retry', true);
+        if (
+          retries(sourceCode, value, framework.name === 'vitest' ? VITEST_RETRY_COUNT_KEYS : CYPRESS_RETRY_COUNT_KEYS)
+        )
+          add('retry', true);
         continue;
       }
       const modifier = framework.optionEffects.get(key);
@@ -2139,32 +2190,19 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
    */
   const runtimeCall = (call: TSESTree.CallExpression): Subject | undefined => {
     const { callee } = call;
-    if (callee.type === 'Identifier') {
-      const info = resolveInfo(callee);
-      if (info?.method === undefined) return undefined;
-      // A global such as Jasmine's `pending` counts unless the file declares the name itself; an import of
-      // one counts unless a function or block declares the name again.
-      const fn = info.runtimeFunction;
+    const info = resolveInfo(callee);
+    if (info?.method !== undefined) {
       const applied =
         info.boundArgs === undefined ? call : { ...call, arguments: [...info.boundArgs, ...call.arguments] };
       const subject = runtimeSubject(applied, info.method, info.step ?? info.owner);
-      if (subject) subject.functionName = fn?.name;
+      if (subject) subject.functionName = info.runtimeFunction?.name;
       return subject;
     }
-    if (callee.type !== 'MemberExpression') return undefined;
-    const name = memberName(callee);
+    const member = unwrap(callee);
+    if (member.type !== 'MemberExpression') return undefined;
+    const name = memberName(member);
     if (name === undefined) return undefined;
-    const { object } = callee;
-    // Mocha's `this.skip()` or node:test's `this.todo()`, in a test or hook whose `function` gives it the
-    // test's `this`.
-    if (object.type === 'ThisExpression') {
-      const owner = framework.thisMethods.has(name) ? thisFunction(call) : undefined;
-      return owner !== undefined && thisBodies.has(owner) ? runtimeSubject(call, name) : undefined;
-    }
-    if (object.type === 'Identifier') {
-      const info = resolveInfo(object);
-      return info?.methods?.has(name) ? runtimeSubject(call, name, info.step ?? info.owner) : undefined;
-    }
+    const object = unwrap(member.object);
     const isTestInfo =
       RUNTIME_MODIFIERS.has(name) &&
       object.type === 'CallExpression' &&
@@ -2217,7 +2255,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
 
   /** A call that gives retries when `count` does; retries need a ticket even when only some runs get them. */
   const retrySubject = (call: TSESTree.CallExpression, count: Node | undefined, name: string): Subject | undefined => {
-    if (!retries(count)) return undefined;
+    if (!retries(sourceCode, count)) return undefined;
     const subject = runtimeSubject(call, 'retry', undefined, true);
     if (subject) subject.functionName = name;
     return subject;

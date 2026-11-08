@@ -8,6 +8,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Vitest conditional factories can clear an earlier skip in a modifier chain. Runtime context methods
+  retain their state through TypeScript wrappers on the receiver or method.
+- Mutation detection follows wrapped references and aliases, and recognizes writes through the global
+  `Object` and `Reflect` mutation methods without treating shadowed helpers as those built-ins.
+- Retry counts are read through local constants and object members, with effective properties after
+  spreads and overrides. Unread spreads remain possible retries unless every relevant count is known.
+- Commented-out tests no longer hide a broken marker or a disallowed note behind another valid marker.
+- Negative numeric and bigint template interpolations, `void`, and unshadowed `undefined`, `NaN` and
+  `Infinity` retain their rendered text when checking tag boundaries.
 - Mutable constant objects and arrays no longer supply stale tag or annotation values after detected
   property writes, deletion, array mutation or writes through a local alias.
 - Runtime context methods keep their original test owner inside nested subtests. Vitest skip notes
