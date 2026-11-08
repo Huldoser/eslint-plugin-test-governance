@@ -510,13 +510,35 @@ runRule('require-ticket-for-commented-out-tests (1000-case hunt boundaries)', co
     },
     {
       code: "import { test } from '@playwright/test';\n// SKIP: PROBE-17 note\n// SKIP: PROBE-18\n// test('matrix', () => {});",
-      errors: [{ messageId: 'extraText', suggestions: 1 }],
+      errors: [
+        {
+          messageId: 'extraText',
+          suggestions: [
+            {
+              messageId: 'removeExtraText',
+              output:
+                "import { test } from '@playwright/test';\n// SKIP: PROBE-17\n// SKIP: PROBE-18\n// test('matrix', () => {});",
+            },
+          ],
+        },
+      ],
       name: 'Commented markers 8, style 0, notes false',
       settings: settings({ framework: 'playwright', allowNotes: false }),
     },
     {
       code: "import { test } from '@playwright/test';\n// SKIP: PROBE-17\n// SKIP: PROBE-18 note\n// test('matrix', () => {});",
-      errors: [{ messageId: 'extraText', suggestions: 1 }],
+      errors: [
+        {
+          messageId: 'extraText',
+          suggestions: [
+            {
+              messageId: 'removeExtraText',
+              output:
+                "import { test } from '@playwright/test';\n// SKIP: PROBE-17\n// SKIP: PROBE-18\n// test('matrix', () => {});",
+            },
+          ],
+        },
+      ],
       name: 'Commented markers 9, style 0, notes false',
       settings: settings({ framework: 'playwright', allowNotes: false }),
     },
