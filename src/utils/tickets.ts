@@ -203,7 +203,7 @@ export function ticketPattern(pattern: string, flags: string | undefined): RegEx
   const kept = flags?.replace(/[gy]/g, '');
   // Compiled alone first: a stray `)` in it would otherwise close the anchoring group and match anything.
   new RegExp(pattern, kept);
-  return new RegExp(`^(?:${pattern})$`, kept);
+  return new RegExp(`(?<![\\s\\S])(?:${pattern})(?![\\s\\S])`, kept);
 }
 
 function compilePreset(spec: TicketSpec): CompiledPreset {

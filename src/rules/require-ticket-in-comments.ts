@@ -1,4 +1,3 @@
-import type { TSESTree } from '@typescript-eslint/utils';
 import { appliesTo, commentLines, parseTickets } from '../utils/analyze.ts';
 import { createRule } from '../utils/create-rule.ts';
 import { compileTicketSpec } from '../utils/tickets.ts';
@@ -38,11 +37,11 @@ export default createRule({
 
     // A marker directly above a test in that state belongs to require-ticket, which also reports one
     // in the wrong case.
-    const owned = new Set<TSESTree.Comment>();
+    const owned = new Set<number>();
     for (const subject of analysis.subjects) {
       for (const marker of [...subject.markers, ...subject.regionMarkers]) {
         const state = marker.state ?? marker.caseOf;
-        if (state && appliesTo(subject, state.name)) owned.add(marker.comment);
+        if (state && appliesTo(subject, state.name)) owned.add(marker.keywordStart);
       }
     }
 
@@ -74,11 +73,11 @@ export default createRule({
     }
 
     for (const comment of sourceCode.getAllComments()) {
-      if (owned.has(comment)) continue;
       for (const { text: line, start } of commentLines(comment)) {
         const match = keywordRe.exec(line);
         if (!match) continue;
         const [whole, indent, keyword] = match;
+        if (owned.has(start + indent.length)) continue;
         // The parenthesised group is optional, so it can be undefined despite RegExpExecArray's typing.
         const inParens = match[3] as string | undefined;
         const upper = keyword.toUpperCase();

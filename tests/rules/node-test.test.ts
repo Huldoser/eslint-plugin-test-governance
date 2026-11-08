@@ -403,14 +403,11 @@ runRule('no-orphaned-marker (node:test)', noOrphanedMarker, {
 runRule('no-conflicting-states (node:test)', noConflictingStates, {
   valid: withOptions({ ...nodeTest, lifecycleTags: true }, [
     "import { test } from 'node:test';\ntest('fills a limit order @new', { skip: isWindows }, () => {});",
+    "import { test } from 'node:test';\ntest('settles at T+1 @new', (t) => {\n  t.todo();\n});",
   ]),
   invalid: withOptions({ ...nodeTest, lifecycleTags: true }, [
     {
       code: "import { test } from 'node:test';\ntest('fills a limit order @new', { skip: 'flaky' }, () => {});",
-      errors: [{ messageId: 'newSkipped' }],
-    },
-    {
-      code: "import { test } from 'node:test';\ntest('settles at T+1 @new', (t) => {\n  t.todo();\n});",
       errors: [{ messageId: 'newSkipped' }],
     },
   ]),
