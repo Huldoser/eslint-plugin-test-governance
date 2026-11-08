@@ -138,6 +138,21 @@ runRule('require-ticket (annotations.only, Vitest)', rule, {
   invalid: withOptions(vitest, [
     {
       code: "// SKIP: TRADE-1\ntest.skip('places an order', () => {});",
+      settings: { 'test-governance': { annotations: { type: '__proto__', only: true } } },
+      errors: [
+        {
+          messageId: 'useAnnotation',
+          suggestions: [
+            {
+              messageId: 'moveToAnnotation',
+              output: "test.skip('places an order', { meta: { ['__proto__']: 'TRADE-1' } }, () => {});",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: "// SKIP: TRADE-1\ntest.skip('places an order', () => {});",
       errors: [meta("test.skip('places an order', { meta: { issue: 'TRADE-1' } }, () => {});")],
     },
     { code: "// SKIP: TRADE-1\ntest.skip('places an order');", errors: [meta()] },
