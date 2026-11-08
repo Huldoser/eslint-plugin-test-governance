@@ -266,6 +266,8 @@ type InfoName = {
   boundArgs?: TSESTree.CallExpressionArgument[];
   /** The step a `TestStepInfo` belongs to. Unset for the others, which act on the whole test. */
   step?: Subject;
+  /** The test whose context this binding represents, including inside nested subtests. */
+  owner?: Subject;
   /** For a runtime function, its own name, as `pending` also when imported as `pend`, and how it is reached. */
   runtimeFunction?: { name: string; imported: boolean };
 } & ({ methods: ReadonlySet<string>; method?: undefined } | { method: string; methods?: undefined });
@@ -304,13 +306,13 @@ function memberKey(node: TSESTree.MemberExpression): string | undefined {
 function chainOf(node: Node, factories: ReadonlySet<string>): Chain | undefined {
   const path: string[] = [];
   const args = new Map<string, Node | undefined>();
-  let current = node;
+  let current = unwrap(node);
   for (;;) {
     if (current.type === 'MemberExpression') {
       const name = memberName(current);
       if (name === undefined) return undefined;
       path.unshift(name);
-      current = current.object;
+      current = unwrap(current.object);
       continue;
     }
     const factory =
@@ -323,8 +325,8 @@ function chainOf(node: Node, factories: ReadonlySet<string>): Chain | undefined 
     const name = memberName(factory);
     if (name === undefined || !factories.has(name)) return undefined;
     path.unshift(`${name}()`);
-    if (current.type === 'CallExpression') args.set(`${name}()`, current.arguments.at(0));
-    current = factory.object;
+    if (current.type === 'CallExpression' && !args.has(`${name}()`)) args.set(`${name}()`, current.arguments.at(0));
+    current = unwrap(factory.object);
   }
   return current.type === 'Identifier' || current.type === 'CallExpression' ? { root: current, path, args } : undefined;
 }
@@ -334,9 +336,13 @@ function unwrap(node: Node): Node {
   while (
     current.type === 'TSAsExpression' ||
     current.type === 'TSNonNullExpression' ||
-    current.type === 'TSSatisfiesExpression'
+    current.type === 'TSSatisfiesExpression' ||
+    current.type === 'TSTypeAssertion' ||
+    current.type === 'TSInstantiationExpression' ||
+    current.type === 'SequenceExpression'
   ) {
-    current = current.expression;
+    current =
+      current.type === 'SequenceExpression' ? current.expressions[current.expressions.length - 1] : current.expression;
   }
   return current;
 }
@@ -556,6 +562,41 @@ function isReassigned(sourceCode: SourceCode, id: TSESTree.Identifier): boolean 
   return written;
 }
 
+const mutatedBindings = new WeakMap<TSESLint.Scope.Variable, boolean>();
+const ARRAY_MUTATORS = new Set(['copyWithin', 'fill', 'pop', 'push', 'reverse', 'shift', 'sort', 'splice', 'unshift']);
+
+/** Whether a binding's object is written through a property, an array mutator or a local alias. */
+function isMutated(
+  sourceCode: SourceCode,
+  id: TSESTree.Identifier,
+  seen: readonly TSESLint.Scope.Variable[] = [],
+): boolean {
+  const variable = declaredVariable(sourceCode, id);
+  if (variable === undefined || seen.includes(variable)) return false;
+  const cached = mutatedBindings.get(variable);
+  if (cached !== undefined) return cached;
+  const written = variable.references.some((reference) => {
+    let value: Node = reference.identifier;
+    let parent = value.parent;
+    if (parent.type === 'VariableDeclarator' && parent.init === value && parent.id.type === 'Identifier') {
+      return isMutated(sourceCode, parent.id, [...seen, variable]);
+    }
+    while (parent.type === 'MemberExpression' && parent.object === value) {
+      value = parent;
+      parent = value.parent;
+    }
+    if (value.type !== 'MemberExpression') return false;
+    return (
+      (parent.type === 'AssignmentExpression' && parent.left === value) ||
+      parent.type === 'UpdateExpression' ||
+      (parent.type === 'UnaryExpression' && parent.operator === 'delete') ||
+      (parent.type === 'CallExpression' && parent.callee === value && ARRAY_MUTATORS.has(memberName(value) ?? ''))
+    );
+  });
+  mutatedBindings.set(variable, written);
+  return written;
+}
+
 /**
  * Whether `id` refers to a variable or function declared inside a function or block, such as a local
  * helper that happens to be called `test`. Top-level variables, imports, parameters and globals still count.
@@ -748,7 +789,7 @@ function templateText(
     // `cooked` is null only in tagged templates, which are not read as title or tag text.
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
     quasi.value.cooked!,
-    ...(i < node.expressions.length ? [staticText(sourceCode, node.expressions[i]) ?? ' '] : []),
+    ...(i < node.expressions.length ? [interpolationText(sourceCode, node.expressions[i]) ?? ' '] : []),
   ]);
   let offset = 0;
   const offsets = parts.map((part) => {
@@ -814,6 +855,7 @@ function isStaticText(node: Node): node is Text {
  * or the enum itself. Undefined for any other name, such as an import, a parameter or a `let`.
  */
 function declaredValue(sourceCode: SourceCode, id: TSESTree.Identifier): Node | undefined {
+  if (isMutated(sourceCode, id)) return undefined;
   for (let scope: TSESLint.Scope.Scope | null = sourceCode.getScope(id); scope; scope = scope.upper) {
     const variable = scope.set.get(id.name);
     if (!variable) continue;
@@ -827,12 +869,18 @@ function declaredValue(sourceCode: SourceCode, id: TSESTree.Identifier): Node | 
   return undefined;
 }
 
+function isPrototypeSetter(prop: TSESTree.Property): boolean {
+  return (
+    !prop.computed && !prop.shorthand && !prop.method && prop.kind === 'init' && propertyName(prop) === '__proto__'
+  );
+}
+
 /** The value of the last property called `key`, or undefined when a spread written after it may replace it. */
 function propertyValue(object: TSESTree.ObjectExpression, key: string): Node | undefined {
   for (let i = object.properties.length - 1; i >= 0; i--) {
     const prop = object.properties[i];
     if (prop.type === 'SpreadElement' || (prop.computed && propertyName(prop) === undefined)) return undefined;
-    if (propertyName(prop) === key) return prop.value;
+    if (!isPrototypeSetter(prop) && propertyName(prop) === key) return prop.value;
   }
   return undefined;
 }
@@ -994,6 +1042,7 @@ function objectDetails(
       for (const [key, value] of values) entries.set(key, value);
       continue;
     }
+    if (isPrototypeSetter(prop)) continue;
     const key = detailKey(sourceCode, prop, unread);
     if (key === undefined) entries.clear();
     else entries.set(key, prop.value);
@@ -1029,7 +1078,7 @@ function staticText(sourceCode: SourceCode, node: Node, seen: readonly Node[] = 
   const read = (value: Node): string | undefined => {
     if (value.type === 'Literal') return typeof value.value === 'string' ? value.value : undefined;
     if (value.type !== 'TemplateLiteral') return undefined;
-    const expressions = value.expressions.map((expression) => staticText(sourceCode, unwrap(expression), path));
+    const expressions = value.expressions.map((expression) => interpolationText(sourceCode, expression, path));
     if (expressions.some((text) => text === undefined)) return undefined;
     // `cooked` is only null in tagged templates, which no annotation value is.
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
@@ -1040,6 +1089,20 @@ function staticText(sourceCode: SourceCode, node: Node, seen: readonly Node[] = 
   if (own !== undefined) return own;
   const constant = constantValue(sourceCode, target);
   return constant === undefined ? undefined : read(unwrap(constant));
+}
+
+/** Static primitive interpolation text, without evaluating object coercion or user code. */
+function interpolationText(sourceCode: SourceCode, node: Node, seen: readonly Node[] = []): string | undefined {
+  const text = staticText(sourceCode, node, seen);
+  if (text !== undefined) return text;
+  const target = unwrap(node);
+  const value = target.type === 'Literal' ? target : constantValue(sourceCode, target);
+  if (
+    value?.type !== 'Literal' ||
+    (value.value !== null && !['number', 'boolean', 'bigint'].includes(typeof value.value))
+  )
+    return undefined;
+  return String(value.value);
 }
 
 /**
@@ -1321,14 +1384,14 @@ const OPTION_VALUES = new Set([
  * Whether a runtime call always applies: it has no condition, or `true`, or with `notes` only a note, as
  * Vitest's `context.skip('Broker sandbox is down')`, and nothing around it makes it conditional.
  */
-function isUnconditional(call: TSESTree.CallExpression, framework: Framework): boolean {
+function isUnconditional(sourceCode: SourceCode, call: TSESTree.CallExpression, framework: Framework): boolean {
   const first = call.arguments.at(0);
   const always =
     first === undefined ||
     booleanOf(first) === true ||
     // node:test's `t.skip(message)` and Jasmine's `pending(message)` take no condition, so any argument is a note.
     framework.reasonArgument === 'only' ||
-    (framework.skipNotes && isStaticText(first));
+    (framework.skipNotes && (isStaticText(unwrap(first)) || staticText(sourceCode, first) !== undefined));
   return always && !isGuarded(call);
 }
 
@@ -1391,9 +1454,17 @@ function optionReason(sourceCode: SourceCode, node: Node): boolean {
 
 const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression']);
 
-/** Whether a statement always leaves the function or block: `return`, `throw`, or a block containing one. */
+/** Whether a statement can leave the enclosing body, without entering nested functions or loops. */
 function exits(statement: TSESTree.Statement): boolean {
-  if (statement.type === 'ReturnStatement' || statement.type === 'ThrowStatement') return true;
+  if (
+    statement.type === 'ReturnStatement' ||
+    statement.type === 'ThrowStatement' ||
+    statement.type === 'BreakStatement' ||
+    statement.type === 'ContinueStatement'
+  )
+    return true;
+  if (statement.type === 'IfStatement')
+    return exits(statement.consequent) || (statement.alternate !== null && exits(statement.alternate));
   return statement.type === 'BlockStatement' && statement.body.some(exits);
 }
 
@@ -1524,9 +1595,11 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       declarator.init !== null
     ) {
       if (seen.includes(declarator)) return undefined;
-      const property = declarator.id.properties.find(
-        (prop) => prop.type === 'Property' && prop.value.type === 'Identifier' && prop.value.name === root.name,
-      );
+      const property = declarator.id.properties.find((prop) => {
+        if (prop.type !== 'Property') return false;
+        const binding = prop.value.type === 'AssignmentPattern' ? prop.value.left : prop.value;
+        return binding.type === 'Identifier' && binding.name === root.name;
+      });
       const key = property?.type === 'Property' ? propertyName(property) : undefined;
       const init = chainOf(unwrap(declarator.init), framework.factories);
       return key === undefined || init === undefined
@@ -1924,7 +1997,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
           : undefined;
       }
       const object = resolveInfo(value.object, path);
-      return object?.methods?.has(name) ? { name, method: name, step: object.step } : undefined;
+      return object?.methods?.has(name) ? { name, method: name, step: object.step, owner: object.owner } : undefined;
     }
     if (value.type !== 'Identifier' || isReassigned(sourceCode, value)) return undefined;
     const direct = infoOf(value);
@@ -1944,7 +2017,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     );
     const name = property?.type === 'Property' ? propertyName(property) : undefined;
     return name !== undefined && source.methods.has(name)
-      ? { name: value.name, method: name, step: source.step }
+      ? { name: value.name, method: name, step: source.step, owner: source.owner }
       : undefined;
   };
 
@@ -2014,7 +2087,10 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const written = expanded.callee;
     const callee = target(chainOf(written, framework.factories));
     if (callee === undefined) {
-      return subtestOf(call) ?? pickedDeclaration(call, written) ?? { subject: runtimeCall(call) ?? retryCall(call) };
+      return (
+        subtestOf(call) ??
+        pickedDeclaration(call, written) ?? { subject: runtimeCall(call) ?? retryCall({ ...call, callee: written }) }
+      );
     }
     usesTest = true;
     const args = call.arguments;
@@ -2071,7 +2147,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       const fn = info.runtimeFunction;
       const applied =
         info.boundArgs === undefined ? call : { ...call, arguments: [...info.boundArgs, ...call.arguments] };
-      const subject = runtimeSubject(applied, info.method, info.step);
+      const subject = runtimeSubject(applied, info.method, info.step ?? info.owner);
       if (subject) subject.functionName = fn?.name;
       return subject;
     }
@@ -2087,7 +2163,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     }
     if (object.type === 'Identifier') {
       const info = resolveInfo(object);
-      return info?.methods?.has(name) ? runtimeSubject(call, name, info.step) : undefined;
+      return info?.methods?.has(name) ? runtimeSubject(call, name, info.step ?? info.owner) : undefined;
     }
     const isTestInfo =
       RUNTIME_MODIFIERS.has(name) &&
@@ -2126,6 +2202,12 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
           def.parent.type === 'ImportDeclaration' &&
           framework.ownsModule(def.parent.source.value)
         );
+      if (def.type === 'Variable' && def.node.id.type === 'ObjectPattern' && def.node.init !== null) {
+        const property = def.node.id.properties.find(
+          (prop) => prop.type === 'Property' && prop.value.type === 'Identifier' && prop.value.name === value.name,
+        );
+        return property?.type === 'Property' && propertyName(property) === 'jest' && moduleOf(def.node.init);
+      }
       const alias = declaredValue(sourceCode, value);
       return alias !== undefined && isJestObject(unwrap(alias), [...seen, value]);
     };
@@ -2146,7 +2228,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     call: TSESTree.CallExpression,
     modifier: string,
     step?: Subject,
-    always = isUnconditional(call, framework),
+    always = isUnconditional(sourceCode, call, framework),
   ): Subject | undefined => {
     if (!states.some((s) => s.modifier === modifier)) return undefined;
     if (framework.reasonArgument !== 'only' && booleanOf(call.arguments.at(0)) === false) return undefined;
@@ -2175,6 +2257,8 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
         pushedSubject = true;
       }
       for (const info of visit.infos ?? []) {
+        if (!info.runtimeFunction && info.step === undefined && visit.subject?.kind === 'test')
+          info.owner = visit.subject;
         infos.push(info);
         pushedInfos++;
       }

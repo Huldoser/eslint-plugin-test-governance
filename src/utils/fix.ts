@@ -82,7 +82,7 @@ export function moveToAnnotation(
   const one = (ticket: string): string => `{ type: ${quote(type)}, description: ${quote(ticket)} }`;
   const value =
     source.shape === 'meta'
-      ? `{ ${IDENTIFIER_RE.test(type) ? type : quote(type)}: ${quote(tickets[0])} }`
+      ? `{ ${type === '__proto__' ? `[${quote(type)}]` : IDENTIFIER_RE.test(type) ? type : quote(type)}: ${quote(tickets[0])} }`
       : tickets.length === 1
         ? one(tickets[0])
         : `[${tickets.map(one).join(', ')}]`;
