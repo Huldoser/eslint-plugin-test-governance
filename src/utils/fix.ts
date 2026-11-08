@@ -33,9 +33,11 @@ export function removeMarkerComment(sourceCode: SourceCode, marker: Marker): TSE
     return { range: [valueStart + description.separator, valueStart + comment.value.trimEnd().length], text: '' };
   }
   const { text } = sourceCode;
-  const lineStart = text.lastIndexOf('\n', comment.range[0] - 1) + 1;
-  const newline = text.indexOf('\n', comment.range[1]);
-  const lineEnd = newline === -1 ? text.length : newline + 1;
+  const lineStart = sourceCode.getIndexFromLoc({ line: comment.loc.start.line, column: 0 });
+  const lineEnd =
+    comment.loc.end.line < sourceCode.lines.length
+      ? sourceCode.getIndexFromLoc({ line: comment.loc.end.line + 1, column: 0 })
+      : text.length;
   const aloneOnLine =
     text.slice(lineStart, comment.range[0]).trim() === '' && text.slice(comment.range[1], lineEnd).trim() === '';
   return { range: aloneOnLine ? [lineStart, lineEnd] : comment.range, text: '' };
@@ -57,7 +59,7 @@ export function indentOf(sourceCode: SourceCode, comment: TSESTree.Comment): str
 const IDENTIFIER_RE = /^[A-Za-z_$][\w$]*$/;
 
 function quote(text: string): string {
-  return `'${text.replace(/[\\']/g, '\\$&')}'`;
+  return `'${text.replace(/[\\']/g, '\\$&').replace(/\r/g, '\\r').replace(/\n/g, '\\n')}'`;
 }
 
 /**

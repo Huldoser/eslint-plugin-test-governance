@@ -6,6 +6,29 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Test functions are read through aliases of whole modules, local destructuring, bound functions and
+  nested conditional selections. Reassigning an alias to a helper no longer leaves it treated as a test.
+- Runtime test contexts and their methods keep their meaning through chains of aliases, `bind()` and
+  default parameter values. Arguments supplied by `bind()` retain their condition and reason, and a
+  bound title no longer gives a diagnostic whose end is before its start.
+- A runtime skip in a conditional loop, or after a conditional early exit inside a nested block, is
+  read as conditional. A TypeScript assertion around a literal boolean keeps that boolean's meaning.
+- With the retry state on, Jest's retry calls are read through renamed and namespace imports, and a
+  Mocha describe chosen by a condition still supplies its suite context for `this.retries()`.
+- Chains of constants retain their tags, details and annotation tickets. An unread computed property
+  no longer leaves an earlier member of a tag object treated as certain.
+- Tags from literal and nested template interpolations are checked using the rendered text's boundaries,
+  so joining text around an `@` doesn't invent a state tag. Plain Vitest tags written as templates count
+  like quoted strings. Cyclic constant and template definitions remain unread instead of recursing.
+- `annotations.only` checks every supplied issue ticket, including an invalid one next to a valid one.
+- The commented-out-test rule recognizes renamed test imports.
+- Removing an orphaned marker removes its complete line with CR or Unicode line endings too.
+- A suggestion to add another state's marker no longer copies a ticket that state's format rejects.
+- Suggestions that move a ticket into annotations escape line breaks in the annotation type or key,
+  keeping the suggested JavaScript valid.
+
 ## [0.13.2] - 2026-11-08
 
 ### Fixed
