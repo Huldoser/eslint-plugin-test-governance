@@ -8,6 +8,18 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Mutable constant objects and arrays no longer supply stale tag or annotation values after detected
+  property writes, deletion, array mutation or writes through a local alias.
+- Runtime context methods keep their original test owner inside nested subtests. Vitest skip notes
+  supplied through constants remain unconditional skips.
+- Test callees retain their meaning through TypeScript assertions and type instantiations, sequence
+  expressions and defaulted local destructuring. Repeated conditional factories use the final condition.
+- Nested conditional returns and throws, and conditional loop breaks and continues, guard later runtime
+  skips. Jest retry calls are recognized through CommonJS object bindings and method aliases, including
+  bound arguments.
+- Primitive template interpolations retain their rendered text when checking tag boundaries. Object
+  prototype setters do not count as own tag or metadata properties, and suggestions use computed keys
+  for metadata named `__proto__`.
 - Test functions are read through aliases of whole modules, local destructuring, bound functions and
   nested conditional selections. Reassigning an alias to a helper no longer leaves it treated as a test.
 - Runtime test contexts and their methods keep their meaning through chains of aliases, `bind()` and
