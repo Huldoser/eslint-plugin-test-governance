@@ -7,6 +7,18 @@ const compile = (options: Partial<GovernanceOptions>) => compileOptions({ framew
 const stateNames = (options: Partial<GovernanceOptions>) => compile(options).states.map((s) => s.name);
 
 describe('compileOptions', () => {
+  it('defaults the retry ceiling to two and accepts zero to forbid retries', () => {
+    assert.equal(compile({}).maxRetries, 2);
+    assert.equal(compile({ maxRetries: 0 }).maxRetries, 0);
+    assert.equal(compile({ maxRetries: 5 }).maxRetries, 5);
+  });
+
+  it('rejects retry ceilings that are not non-negative integers', () => {
+    for (const maxRetries of [-1, 0.5, NaN, Infinity, '2', false, null]) {
+      assert.throws(() => compile({ maxRetries } as never), /maxRetries must be/);
+    }
+  });
+
   it('turns on skip and fixme by default', () => {
     const resolved = compile({});
     assert.deepEqual(

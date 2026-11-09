@@ -175,6 +175,7 @@ function spec({ header, block }: Spec, lines: number): string {
 /** The fastest of `runs` lints of `code`, counting only the time spent in the plugin's rules. */
 async function ruleTime(options: GovernanceOptions, code: string, runs: number): Promise<number> {
   const config = configure(options);
+  config.rules['test-governance/limit-retries'] = 'error';
   const eslint = new ESLint({ overrideConfigFile: true, overrideConfig: config as Linter.Config, stats: true });
   let fastest = Infinity;
   for (let run = 0; run < runs; run++) {

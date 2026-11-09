@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Add the opt-in `limit-retries` rule for Playwright, Jest, Vitest, Mocha, Cypress and WebdriverIO.
+  It checks readable native retry counts against the shared `maxRetries` setting (default `2`),
+  independently of retry ticket requirements. Framework configs leave the rule off.
+- Recognize chained Mocha retry setters such as `it('example', fn).retries(3)` for retry ticketing
+  as well as retry limits.
+
 ### Removed
 
 - **Breaking:** remove `lifecycleTags`, `states.new`, `states.quarantined` and their tag overrides.

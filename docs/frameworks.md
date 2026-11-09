@@ -110,6 +110,9 @@ Vitest's `.for` and `.each` table-driven forms count too.
 | conditional skip, no ticket by default      | `if (...) this.skip()`, `(condition ? it.skip : it)(...)`                                                                                                                 |
 | tags such as `@needs-review` (`// REVIEW:`) | the title                                                                                                                                                                 |
 
+Direct chained setters such as `it('name', fn).retries(3)` and `describe('name', fn).retries(3)`
+also count for retry ticketing and [retry limits](rules/limit-retries.md).
+
 `this.skip()` and `this.retries()` count in tests or hooks written as `function`; an arrow function
 has no Mocha context. `this.slow(ms)` only sets the speed threshold and is not the `slow` state.
 A skipped test or describe with no body still counts as skipped.

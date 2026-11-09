@@ -71,6 +71,8 @@ export interface GovernanceOptions {
    * get: `@Smoke` and `@smok` are reported. Write them with the `@`, also for Vitest's `tags: ['smoke']`.
    */
   knownTags?: string[];
+  /** Maximum retry count checked by the opt-in `limit-retries` rule. Defaults to `2`; `0` forbids retries. */
+  maxRetries?: number;
   /** Require a ticket for conditional skips such as `test.skip(browserName === 'webkit')`. */
   requireTicketForConditional?: boolean;
   /**
@@ -126,6 +128,7 @@ export interface ResolvedOptions {
   states: StateDef[];
   /** Tags besides the state tags whose case and spelling `consistent-tag-names` checks. */
   knownTags: string[];
+  maxRetries: number;
   requireTicketForConditional: boolean;
   requireReasonForConditional: boolean;
   allowBlankLine: boolean;
@@ -404,6 +407,7 @@ export function compileOptions(options: GovernanceOptions): ResolvedOptions {
     testFunctions: new Set(options.testFunctions ?? framework.testFunctions),
     states,
     knownTags: options.knownTags ?? [],
+    maxRetries: options.maxRetries ?? 2,
     requireTicketForConditional: options.requireTicketForConditional ?? false,
     requireReasonForConditional: options.requireReasonForConditional ?? false,
     allowBlankLine: options.allowBlankLine ?? false,

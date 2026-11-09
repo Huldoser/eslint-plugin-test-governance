@@ -164,7 +164,7 @@ only the `files` of each config tell them apart.
 
 Each framework's config, such as `configs.playwright`, sets only the framework, so one listed after a
 `configure()` for the same files keeps that config's options and changes only the framework. They all
-turn on the same rules. See [Framework syntax](frameworks.md) for the calls each config recognizes.
+set the same rule defaults. See [Framework syntax](frameworks.md) for the calls each config recognizes.
 
 ## Options
 
@@ -184,6 +184,7 @@ and markers. To turn a rule off, set it to `'off'` as usual.
 | `states`                      | `{ [state]: boolean \| { enabled?, marker?, ticket? } }` | `skip`, `fixme` and `todo` on     | See [states details](#states).                                                                                                                                                               |
 | `customStates`                | `{ [name]: { when, marker, ticket? } }`                  | `{}`                              | Adds a state for a tag, e.g. `{ 'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' } }`. `when` is a tag and `marker` an uppercase keyword; neither can be shared with another state. |
 | `knownTags`                   | `string[]`                                               | `[]`                              | See [knownTags details](#knowntags).                                                                                                                                                         |
+| `maxRetries`                  | `number`                                                 | `2`                               | Maximum retry count for the opt-in [limit-retries](rules/limit-retries.md) rule. A non-negative integer; `0` forbids retries.                                                                |
 | `requireTicketForConditional` | `boolean`                                                | `false`                           | See [requireTicketForConditional details](#requireticketforconditional).                                                                                                                     |
 | `requireReasonForConditional` | `boolean`                                                | `false`                           | See [requireReasonForConditional details](#requirereasonforconditional).                                                                                                                     |
 | `allowBlankLine`              | `boolean`                                                | `false`                           | Let blank lines separate a marker from its test.                                                                                                                                             |
@@ -210,6 +211,12 @@ Turns built-in states (`skip`, `fixme`, `fail`, `slow`, `todo`, `retry`) on or o
 ### knownTags
 
 Your team's other tags, such as `['@smoke', '@regression']`, written with the `@`. `consistent-tag-names` reports them in the wrong case or misspelled, as it does state tags, and never reports a listed tag as a typo of a state tag.
+
+### maxRetries
+
+The maximum retry count checked by [limit-retries](rules/limit-retries.md), default `2`. Set it to
+a non-negative integer; `0` forbids retries. The rule is off in every preset and must be enabled
+explicitly. This setting does not enable retry ticketing or change the runner's retry count.
 
 ### requireTicketForConditional
 

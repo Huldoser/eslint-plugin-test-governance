@@ -134,7 +134,7 @@ describe('options validation', () => {
 
   it('reports every problem at once', () => {
     assert.deepEqual(problems({ xyzzy: 1, allowNotes: 'no' }), [
-      'xyzzy is not a known option (expected one of: framework, testFunctions, ticket, placeholders, states, customStates, knownTags, comments, annotations, requireTicketForConditional, requireReasonForConditional, allowBlankLine, allowNotes, reportUnreadableTags)',
+      'xyzzy is not a known option (expected one of: framework, testFunctions, ticket, placeholders, states, customStates, knownTags, maxRetries, comments, annotations, requireTicketForConditional, requireReasonForConditional, allowBlankLine, allowNotes, reportUnreadableTags)',
       'allowNotes must be a boolean (got "no")',
     ]);
   });
