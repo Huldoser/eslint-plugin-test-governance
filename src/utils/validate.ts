@@ -18,6 +18,8 @@ export interface Schema {
   anyOf?: readonly Schema[];
   /** Old property names, with the name each one has now, so a config that uses one says what to change. */
   renamed?: Readonly<Record<string, string>>;
+  /** Removed options and instructions for migrating them. */
+  removed?: Readonly<Record<string, string>>;
 }
 
 type Kind = 'object' | 'array' | 'string' | 'boolean' | 'integer' | 'number' | 'null' | 'other';
@@ -134,6 +136,8 @@ export function validate(value: unknown, schema: Schema, path = ''): string[] {
       const propertySchema = Object.hasOwn(properties, key) ? properties[key] : schema.additionalProperties;
       if (typeof propertySchema === 'object') {
         problems.push(...validate(item, propertySchema, join(path, key)));
+      } else if (schema.removed && Object.hasOwn(schema.removed, key)) {
+        problems.push(`${join(path, key)} was removed; ${schema.removed[key]}`);
       } else if (schema.renamed && Object.hasOwn(schema.renamed, key)) {
         problems.push(`${join(path, key)} was renamed to "${schema.renamed[key]}"`);
       } else if (propertySchema === false) {

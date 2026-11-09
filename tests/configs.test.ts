@@ -44,7 +44,16 @@ describe('configs', () => {
   });
 
   it('needs a framework in configure() when the config file loads', () => {
-    assert.throws(() => configure({ lifecycleTags: true } as never), /framework is required/);
+    assert.throws(
+      () =>
+        configure({
+          customStates: {
+            new: { when: '@new', marker: 'NEW' },
+            quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+          },
+        } as never),
+      /framework is required/,
+    );
   });
 
   it('fails on the first lint when a config built by hand names no framework', () => {
@@ -99,5 +108,47 @@ describe('configs', () => {
     const code = "import { test } from '@playwright/test';\ntest.skip('fills a limit order', async () => {});";
     assert.equal(linter.verify(code, config, 'e2e/orders.spec.js').length, 1);
     assert.equal(linter.verify(code, config, 'unit/orders.test.js').length, 0);
+  });
+});
+
+describe('custom tag policy', () => {
+  it('rejects the old rule name with migration guidance', () => {
+    assert.throws(
+      () =>
+        new Linter().verify("test('orders', () => {});", {
+          plugins: { 'test-governance': testGovernance },
+          rules: { 'test-governance/no-conflicting-states': 'warn' },
+          settings: { 'test-governance': { framework: 'playwright' } },
+        }),
+      /no-conflicting-states was renamed to consistent-tag-names.*conflict checks were removed.*upgrading/,
+    );
+    assert.ok(!Object.keys(rules).includes('no-conflicting-states'));
+    assert.ok(Object.keys(rules).includes('consistent-tag-names'));
+  });
+
+  it('allows unlisted tags and spelling-only known tags without ticket markers', () => {
+    const config = configure({ framework: 'playwright', knownTags: ['@smoke'] });
+    const linter = new Linter();
+    assert.deepEqual(linter.verify("test('orders @smoke @new @quarantined @team-owned', () => {});", config), []);
+    const [typo] = linter.verify("test('orders @Smoke', () => {});", config);
+    assert.equal(typo.ruleId, 'test-governance/consistent-tag-names');
+    assert.equal(typo.messageId, 'tagCase');
+  });
+
+  it('lets custom tags coexist with each other and a native skip while enforcing their tickets', () => {
+    const config = configure({
+      framework: 'playwright',
+      ticket: { preset: 'github' },
+      customStates: {
+        new: { when: '@new', marker: 'NEW' },
+        quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+      },
+    });
+    const linter = new Linter();
+    const code = "test.skip('orders @new @quarantined', () => {});";
+    const missing = linter.verify(code, config);
+    assert.equal(missing.length, 3);
+    assert.ok(missing.every((m) => m.ruleId === 'test-governance/require-ticket'));
+    assert.deepEqual(linter.verify('// SKIP: #123\n// NEW: #123\n// QUARANTINED: #123\n' + code, config), []);
   });
 });

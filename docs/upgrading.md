@@ -3,6 +3,68 @@
 Run ESLint on your tests before and after updating. An upgrade may recognize syntax that an older
 version missed, producing new reports. Check the [changelog](../CHANGELOG.md) for fixes and additions.
 
+## Next release: custom tag states
+
+This change is unreleased. Tag policies are now fully custom; the plugin no longer assigns lifecycle
+stages. Projects using only native runner states such as `skip` need no settings changes. Framework
+configs enable the renamed spelling rule automatically.
+
+| Previous configuration                              | Migration                                                                                             |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `lifecycleTags: true`                               | Add explicit `customStates` mappings for the tags you want to track.                                  |
+| `lifecycleTags: false`                              | Remove the option; no tag policy is enabled by default.                                               |
+| `states.new` or `states.quarantined`                | Move enabled entries to `customStates`, replacing `tag` with `when` and setting `marker`.             |
+| A tag state with `enabled: false` or set to `false` | Omit that custom state. Custom states have no `enabled` setting.                                      |
+| `test-governance/no-conflicting-states`             | Rename manual rule entries to `test-governance/consistent-tag-names`, including entries set to `off`. |
+
+Before, on 0.13:
+
+```js
+testGovernance.configure({
+  framework: 'playwright',
+  lifecycleTags: true,
+  states: { quarantined: { tag: '@flaky', marker: 'FLAKY', ticket: { preset: 'github' } } },
+});
+```
+
+After, retaining those ticket requirements:
+
+<!-- migration: custom-tags -->
+
+```js
+testGovernance.configure({
+  framework: 'playwright',
+  customStates: {
+    new: { when: '@new', marker: 'NEW' },
+    quarantined: { when: '@flaky', marker: 'FLAKY', ticket: { preset: 'github' } },
+  },
+});
+```
+
+To retain the old default `@quarantined` tag instead, use
+`quarantined: { when: '@quarantined', marker: 'QUARANTINED' }`. Copy any per-state `ticket` settings
+to the corresponding custom state. Native `states` settings, shared ticket formats and `knownTags`
+continue to work. Both `configure()` and hand-written shared settings reject removed options:
+
+```text
+eslint-plugin-test-governance: invalid options:
+  - lifecycleTags was removed; configure tags explicitly with customStates instead; omit it to leave tags unchecked
+```
+
+This prevents an old `lifecycleTags` configuration from silently losing its ticket checks. Search
+your ESLint configuration and rule overrides for `lifecycleTags`, `states.new`, `states.quarantined`
+and `no-conflicting-states`, including object entries such as `states: { new: ... }`, then run ESLint
+on the test suite. Configuration errors identify removed settings and enabled old rule entries. Rename overrides set
+to `off` too, so they disable the new rule rather than leaving it enabled by the framework config.
+
+The old checks for `@new` combined with `@quarantined`, and `@new` on skipped tests, are removed.
+Even if those tags are configured as custom states, they can coexist. Each tracked state still needs
+its ticket; a skipped test tagged `@new` needs both its `SKIP:` and `NEW:` markers, or a valid annotation.
+Your team's tags are not deleted or rewritten. There is no automatic promotion or change to which tests run.
+
+For tags that only need spelling and case checks, use `knownTags: ['@smoke', '@regression']`.
+Other unlisted tags remain allowed. See [Tag names](configuration.md#tag-names).
+
 ## Upgrading to 0.13
 
 No configuration migration is required. The new `requireReasonForConditional` and `knownTags`
@@ -42,53 +104,23 @@ may expose previously missed cases.
 
 ## Upgrading to 0.6
 
-0.6.0 renames the `unstable` state to `quarantined`. Only projects that turn it on, with
-`lifecycleTags: true` or `states.unstable`, need to change anything.
-
-| What changed                                                | Who it affects                                           | What to do                                              |
-| ----------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------- |
-| [`@unstable` is now `@quarantined`](#the-quarantined-state) | Projects with `lifecycleTags: true` or `states.unstable` | Rename the tags and markers, or keep them with `states` |
-
-### The quarantined state
-
-The state's tag is now `@quarantined` and its marker `// QUARANTINED:`.
-
-Before:
-
-```ts
-// UNSTABLE: TRADE-311
-test('streams level 2 quotes @unstable', async ({ page }) => {});
-```
-
-After:
-
-```ts
-// QUARANTINED: TRADE-311
-test('streams level 2 quotes @quarantined', async ({ page }) => {});
-```
-
-In Vitest, `{ tags: ['unstable'] }` becomes `{ tags: ['quarantined'] }` too. To keep the tags and
-markers you have instead, name them in `states`:
+0.6.0 renamed the built-in `unstable` state to `quarantined`. When upgrading directly to the current
+code, both built-in tag states have been removed. Preserve existing `@unstable` tags and their
+`UNSTABLE:` markers by configuring them explicitly:
 
 ```js
 testGovernance.configure({
   framework: 'playwright',
-  lifecycleTags: true,
-  states: { quarantined: { tag: '@unstable', marker: 'UNSTABLE' } },
+  customStates: { unstable: { when: '@unstable', marker: 'UNSTABLE' } },
 });
 ```
 
-A config that sets `states.unstable` fails when it loads, so rename it to `states.quarantined`:
+The current error for `states.unstable` points to that migration:
 
 ```text
 eslint-plugin-test-governance: invalid options:
-  - states.unstable was renamed to "quarantined"
+  - states.unstable was removed; configure a customStates entry with when and marker instead
 ```
-
-A config that only sets `lifecycleTags: true` still loads, and nothing reports the old tag: an
-`@unstable` test no longer needs a ticket, and its `// UNSTABLE:` marker is an ordinary comment. Before
-you upgrade, list them with `grep -rni unstable tests/` (or wherever your tests are), then rename them
-or keep them as above.
 
 ## Upgrading to 0.5
 
@@ -143,7 +175,6 @@ Before:
 ```js
 testGovernance.configure({
   ticket: { preset: 'jira', projects: ['TRADE', 'RISK'] },
-  lifecycleTags: true,
 });
 ```
 
@@ -153,7 +184,6 @@ After:
 testGovernance.configure({
   framework: 'playwright',
   ticket: { preset: 'jira', projects: ['TRADE', 'RISK'] },
-  lifecycleTags: true,
 });
 ```
 
@@ -179,13 +209,13 @@ objects imported from another module, not only titles. It works the same way.
 Before:
 
 ```js
-testGovernance.configure({ framework: 'playwright', lifecycleTags: true, reportDynamicTitles: true });
+testGovernance.configure({ framework: 'playwright', reportDynamicTitles: true });
 ```
 
 After:
 
 ```js
-testGovernance.configure({ framework: 'playwright', lifecycleTags: true, reportUnreadableTags: true });
+testGovernance.configure({ framework: 'playwright', reportUnreadableTags: true });
 ```
 
 The old name fails when the config loads:

@@ -18,7 +18,14 @@ interface Spec {
 
 const specs: Record<string, Spec> = {
   Playwright: {
-    options: { framework: 'playwright', lifecycleTags: true, states: { fail: true, slow: true } },
+    options: {
+      framework: 'playwright',
+      states: { fail: true, slow: true },
+      customStates: {
+        new: { when: '@new', marker: 'NEW' },
+        quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+      },
+    },
     header: "import { test, expect } from '@playwright/test';\n",
     // Valid and missing markers, tags, steps, runtime skips and a title in a constant.
     block: (i) => `
@@ -48,7 +55,13 @@ test.describe('orders ${i}', { tag: '@smoke' }, () => {
 `,
   },
   Mocha: {
-    options: { framework: 'mocha', lifecycleTags: true },
+    options: {
+      framework: 'mocha',
+      customStates: {
+        new: { when: '@new', marker: 'NEW' },
+        quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+      },
+    },
     header: "import assert from 'node:assert/strict';\n",
     // `this.skip()` in hooks, tests and nested functions, pending tests, tags and other context calls.
     block: (i) => `
@@ -80,7 +93,14 @@ describe('orders ${i}', { tags: '@smoke' }, function () {
 `,
   },
   'node:test': {
-    options: { framework: 'node-test', lifecycleTags: true, states: { fail: true } },
+    options: {
+      framework: 'node-test',
+      states: { fail: true },
+      customStates: {
+        new: { when: '@new', marker: 'NEW' },
+        quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+      },
+    },
     header: "import { describe, test, beforeEach } from 'node:test';\n",
     // Options, context calls in hooks, tests and nested subtests, a title left out and pending tests.
     block: (i) => `
@@ -109,7 +129,13 @@ describe('orders ${i}', { skip: process.platform === 'win32' }, () => {
 `,
   },
   Jasmine: {
-    options: { framework: 'jasmine', lifecycleTags: true },
+    options: {
+      framework: 'jasmine',
+      customStates: {
+        new: { when: '@new', marker: 'NEW' },
+        quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+      },
+    },
     header: '',
     // The x and f forms, pending tests, and runtime functions in hooks, tests and their callbacks.
     block: (i) => `
@@ -179,7 +205,13 @@ for (const [name, framework] of Object.entries(specs)) {
 
 it('lints four times the fragments in a long title template in about four times the rule time', async () => {
   const title = (count: number): string => 'test(`fills ' + "${'x '}".repeat(count) + ' @new`, () => {});';
-  const options = { framework: 'playwright', lifecycleTags: true } as const;
+  const options = {
+    framework: 'playwright',
+    customStates: {
+      new: { when: '@new', marker: 'NEW' },
+      quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+    },
+  } as const;
   await ruleTime(options, title(500), 1);
   const smallMs = await ruleTime(options, title(500), 5);
   const largeMs = await ruleTime(options, title(2000), 5);

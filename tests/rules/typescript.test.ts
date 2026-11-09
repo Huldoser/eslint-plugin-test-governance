@@ -5,7 +5,9 @@ import { PLAYWRIGHT_SETTINGS, settings } from '../helpers.ts';
 
 // Syntax only the TypeScript parser understands.
 const tester = new RuleTester({ languageOptions: { parser: tsParser }, settings: PLAYWRIGHT_SETTINGS });
-const lifecycle = settings({ lifecycleTags: true });
+const lifecycle = settings({
+  customStates: { new: { when: '@new', marker: 'NEW' }, quarantined: { when: '@quarantined', marker: 'QUARANTINED' } },
+});
 
 tester.run('require-ticket (TypeScript syntax)', rule as never, {
   valid: [
@@ -76,7 +78,13 @@ tester.run('require-ticket (TypeScript syntax)', rule as never, {
         { messageId: 'dynamicTags', line: 5, column: 55, endLine: 5, endColumn: 62 },
       ],
       name: 'enum members without a string, merged enums and missing members',
-      settings: settings({ lifecycleTags: true, reportUnreadableTags: true }),
+      settings: settings({
+        reportUnreadableTags: true,
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
   ],
 });

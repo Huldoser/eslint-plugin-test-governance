@@ -11,7 +11,7 @@
 | Custom fixture or alias not recognized      | Check [recognized functions](frameworks.md). Add imported fixture names to `testFunctions`; your list replaces its defaults, so keep the names you still need.                                                                             |
 | Marker reported as missing or orphaned      | Put it in the comment block directly above its test, describe or skip call. A blank line breaks attachment unless `allowBlankLine: true`. Match the state: `SKIP` for skip, `FIXME` for fixme.                                             |
 | Ticket rejected                             | Check the selected preset, placeholders and comma separation. Notes after a ticket require `allowNotes: true`. A preset's `host` is a hostname, without a scheme, port or path.                                                            |
-| `@new` or `@quarantined` has no effect      | These states are off by default. Set `lifecycleTags: true` or enable them with `states`. A renamed tag replaces the old one. The linter does not change runner execution.                                                                  |
+| A tag has no effect                         | Tags require an explicit `customStates` mapping to a marker. Use `knownTags` for spelling checks alone. See [Tag names](configuration.md#tag-names). The linter does not change runner execution.                                          |
 | Imported tags cannot be checked             | Keep readable tags or details in the file, or enable `reportUnreadableTags` to report the uncertainty when a tag state is on. It does not resolve imports.                                                                                 |
 | Vitest rejects a tag that ESLint accepts    | Vitest's `tags` and `meta` need 4.1+. Register tags in your [Vitest configuration](https://vitest.dev/guide/test-tags#defining-tags). Governance `knownTags` only configures spelling checks.                                              |
 | A warning fails CI                          | Check the command's `--max-warnings` threshold. The presets use warnings for tag conflicts and commented-out tests, but a zero-warning policy makes those fail too.                                                                        |
@@ -22,8 +22,8 @@ Replace `tests/order.spec.js` in the diagnostic command with the path you are in
 
 ## Understand fixes and suggestions
 
-`npx eslint tests --fix` applies automatic fixes, such as changing a literal `@New` tag to `@new`
-when the `new` state is on. Near-miss tag spellings are reported for you to review. Shared constants
+`npx eslint tests --fix` applies automatic fixes, such as changing a literal `@Needs-review` tag to `@needs-review`
+when that tag is configured in `customStates` or `knownTags`. Near-miss tag spellings are reported for you to review. Shared constants
 are not autofixed, because other tests may use them.
 
 Other changes are editor suggestions that you choose individually: removing a leftover marker,
@@ -66,8 +66,7 @@ Change `files` and the framework to match the suite you are adopting. When its m
 are addressed, remove the severity override to restore errors. An existing `--max-warnings 0` policy
 will still reject warnings; account for that before using this transition config.
 
-Once the base policy works, enable optional states deliberately: lifecycle tags for your promotion
-workflow, `states: { retry: true }` for retries, and `requireReasonForConditional` or
+Once the base policy works, enable optional states deliberately: custom tags that need tickets, `states: { retry: true }` for retries, and `requireReasonForConditional` or
 `requireTicketForConditional` for conditional skips. See [shared options](configuration.md#options).
 
 ## Report a wrong or missed diagnostic

@@ -8,15 +8,32 @@ runRule('require-ticket (mutation and primitive controls)', rule, {
   valid: [
     {
       code: "const T = { tag: '@new' }; Object[method](T); Object.keys(T);\n// NEW: PROBE-17\ntest('control', { tag: T.tag }, () => {});",
-      settings: settings({ lifecycleTags: true, reportUnreadableTags: true }),
+      settings: settings({
+        reportUnreadableTags: true,
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: "const T = { tag: '@new' }; const Object = helper; Object.assign(T, {});\n// NEW: PROBE-17\ntest('control', { tag: T.tag }, () => {});",
-      settings: settings({ lifecycleTags: true, reportUnreadableTags: true }),
+      settings: settings({
+        reportUnreadableTags: true,
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: 'test(`${-1n}@new`, () => {});',
-      settings: settings({ lifecycleTags: true }),
+      settings: settings({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
   ],
   invalid: [
@@ -188,52 +205,112 @@ runRule('require-ticket (1000-case hunt boundaries)', rule, {
     {
       code: 'test(`${-1}@new`, () => {});',
       name: 'Primitive 0, boundary 0, title',
-      settings: settings({ framework: 'playwright', lifecycleTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: 'test(`${1n}@new`, () => {});',
       name: 'Primitive 1, boundary 0, title',
-      settings: settings({ framework: 'playwright', lifecycleTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: 'test(`${-0}@new`, () => {});',
       name: 'Primitive 2, boundary 0, title',
-      settings: settings({ framework: 'playwright', lifecycleTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: 'test(`${false}@new`, () => {});',
       name: 'Primitive 3, boundary 0, title',
-      settings: settings({ framework: 'playwright', lifecycleTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: 'test(`${1e21}@new`, () => {});',
       name: 'Primitive 4, boundary 0, title',
-      settings: settings({ framework: 'playwright', lifecycleTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: "test(`${'box'}@new`, () => {});",
       name: 'Primitive 5, boundary 0, title',
-      settings: settings({ framework: 'playwright', lifecycleTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: 'test(`${undefined}@new`, () => {});',
       name: 'Primitive 6, boundary 0, title',
-      settings: settings({ framework: 'playwright', lifecycleTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: 'test(`${void 0}@new`, () => {});',
       name: 'Primitive 7, boundary 0, title',
-      settings: settings({ framework: 'playwright', lifecycleTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: 'test(`${NaN}@new`, () => {});',
       name: 'Primitive 8, boundary 0, title',
-      settings: settings({ framework: 'playwright', lifecycleTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: 'test(`${Infinity}@new`, () => {});',
       name: 'Primitive 9, boundary 0, title',
-      settings: settings({ framework: 'playwright', lifecycleTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
   ],
   invalid: [
@@ -703,61 +780,131 @@ new RuleTester({ languageOptions: { parser: tsParser } }).run(
         code: "const T = { tag: '@new' }; (T as any).tag = '@smoke'; test('matrix', { tag: T.tag }, () => {});",
         errors: [{ messageId: 'dynamicTags', line: 1, column: 77, endLine: 1, endColumn: 82 }],
         name: 'Mutation operation 0, read 0, strict true',
-        settings: settings({ framework: 'playwright', lifecycleTags: true, reportUnreadableTags: true }),
+        settings: settings({
+          framework: 'playwright',
+          reportUnreadableTags: true,
+          customStates: {
+            new: { when: '@new', marker: 'NEW' },
+            quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+          },
+        }),
       },
       {
         code: "const T = { tag: '@new' }; T!.tag = '@smoke'; test('matrix', { tag: T.tag }, () => {});",
         errors: [{ messageId: 'dynamicTags', line: 1, column: 69, endLine: 1, endColumn: 74 }],
         name: 'Mutation operation 1, read 0, strict true',
-        settings: settings({ framework: 'playwright', lifecycleTags: true, reportUnreadableTags: true }),
+        settings: settings({
+          framework: 'playwright',
+          reportUnreadableTags: true,
+          customStates: {
+            new: { when: '@new', marker: 'NEW' },
+            quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+          },
+        }),
       },
       {
         code: "const T = { tag: '@new' }; const A = T as typeof T; A.tag = '@smoke'; test('matrix', { tag: T.tag }, () => {});",
         errors: [{ messageId: 'dynamicTags', line: 1, column: 93, endLine: 1, endColumn: 98 }],
         name: 'Mutation operation 2, read 0, strict true',
-        settings: settings({ framework: 'playwright', lifecycleTags: true, reportUnreadableTags: true }),
+        settings: settings({
+          framework: 'playwright',
+          reportUnreadableTags: true,
+          customStates: {
+            new: { when: '@new', marker: 'NEW' },
+            quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+          },
+        }),
       },
       {
         code: "const T = { tag: '@new' }; const A = (0, T); A.tag = '@smoke'; test('matrix', { tag: T.tag }, () => {});",
         errors: [{ messageId: 'dynamicTags', line: 1, column: 86, endLine: 1, endColumn: 91 }],
         name: 'Mutation operation 3, read 0, strict true',
-        settings: settings({ framework: 'playwright', lifecycleTags: true, reportUnreadableTags: true }),
+        settings: settings({
+          framework: 'playwright',
+          reportUnreadableTags: true,
+          customStates: {
+            new: { when: '@new', marker: 'NEW' },
+            quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+          },
+        }),
       },
       {
         code: "const T = { tag: '@new' }; Object.assign(T, { tag: '@smoke' }); test('matrix', { tag: T.tag }, () => {});",
         errors: [{ messageId: 'dynamicTags', line: 1, column: 87, endLine: 1, endColumn: 92 }],
         name: 'Mutation operation 4, read 0, strict true',
-        settings: settings({ framework: 'playwright', lifecycleTags: true, reportUnreadableTags: true }),
+        settings: settings({
+          framework: 'playwright',
+          reportUnreadableTags: true,
+          customStates: {
+            new: { when: '@new', marker: 'NEW' },
+            quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+          },
+        }),
       },
       {
         code: "const T = { tag: '@new' }; Object.defineProperty(T, 'tag', { value: '@smoke' }); test('matrix', { tag: T.tag }, () => {});",
         errors: [{ messageId: 'dynamicTags', line: 1, column: 104, endLine: 1, endColumn: 109 }],
         name: 'Mutation operation 5, read 0, strict true',
-        settings: settings({ framework: 'playwright', lifecycleTags: true, reportUnreadableTags: true }),
+        settings: settings({
+          framework: 'playwright',
+          reportUnreadableTags: true,
+          customStates: {
+            new: { when: '@new', marker: 'NEW' },
+            quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+          },
+        }),
       },
       {
         code: "const T = { tag: '@new' }; Reflect.set(T, 'tag', '@smoke'); test('matrix', { tag: T.tag }, () => {});",
         errors: [{ messageId: 'dynamicTags', line: 1, column: 83, endLine: 1, endColumn: 88 }],
         name: 'Mutation operation 6, read 0, strict true',
-        settings: settings({ framework: 'playwright', lifecycleTags: true, reportUnreadableTags: true }),
+        settings: settings({
+          framework: 'playwright',
+          reportUnreadableTags: true,
+          customStates: {
+            new: { when: '@new', marker: 'NEW' },
+            quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+          },
+        }),
       },
       {
         code: "const T = { tag: '@new' }; Reflect.deleteProperty(T, 'tag'); test('matrix', { tag: T.tag }, () => {});",
         errors: [{ messageId: 'dynamicTags', line: 1, column: 84, endLine: 1, endColumn: 89 }],
         name: 'Mutation operation 7, read 0, strict true',
-        settings: settings({ framework: 'playwright', lifecycleTags: true, reportUnreadableTags: true }),
+        settings: settings({
+          framework: 'playwright',
+          reportUnreadableTags: true,
+          customStates: {
+            new: { when: '@new', marker: 'NEW' },
+            quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+          },
+        }),
       },
       {
         code: "const T = { tag: '@new' }; delete (T as any).tag; test('matrix', { tag: T.tag }, () => {});",
         errors: [{ messageId: 'dynamicTags', line: 1, column: 73, endLine: 1, endColumn: 78 }],
         name: 'Mutation operation 8, read 0, strict true',
-        settings: settings({ framework: 'playwright', lifecycleTags: true, reportUnreadableTags: true }),
+        settings: settings({
+          framework: 'playwright',
+          reportUnreadableTags: true,
+          customStates: {
+            new: { when: '@new', marker: 'NEW' },
+            quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+          },
+        }),
       },
       {
         code: "const T = { tag: '@new' }; (T as any).tag += 'x'; test('matrix', { tag: T.tag }, () => {});",
         errors: [{ messageId: 'dynamicTags', line: 1, column: 73, endLine: 1, endColumn: 78 }],
         name: 'Mutation operation 9, read 0, strict true',
-        settings: settings({ framework: 'playwright', lifecycleTags: true, reportUnreadableTags: true }),
+        settings: settings({
+          framework: 'playwright',
+          reportUnreadableTags: true,
+          customStates: {
+            new: { when: '@new', marker: 'NEW' },
+            quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+          },
+        }),
       },
     ],
   },

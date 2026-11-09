@@ -1,5 +1,5 @@
 import markerMatchesState from '../../src/rules/marker-matches-state.ts';
-import noConflictingStates from '../../src/rules/no-conflicting-states.ts';
+import consistentTagNames from '../../src/rules/consistent-tag-names.ts';
 import noOrphanedMarker from '../../src/rules/no-orphaned-marker.ts';
 import requireTicketInComments from '../../src/rules/require-ticket-in-comments.ts';
 import requireTicket from '../../src/rules/require-ticket.ts';
@@ -28,7 +28,13 @@ runRule('require-ticket (Jest)', requireTicket, {
     // Jest tests have no details object, so a second argument never hides a tag.
     {
       code: "test('fills a limit order', orderCase, () => {});",
-      settings: settings({ lifecycleTags: true, reportUnreadableTags: true }),
+      settings: settings({
+        reportUnreadableTags: true,
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     // Jest's hooks get no test context to skip with.
     'beforeEach((context) => {\n  context.skip();\n});',
@@ -149,13 +155,23 @@ runRule('require-ticket (Jest)', requireTicket, {
     },
     {
       code: "test('fills a limit order @new', () => {});",
-      settings: settings({ lifecycleTags: true }),
+      settings: settings({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [missing('new', 'NEW')],
     },
     // `only`, `fit` and `fdescribe` change no state, but the tags in their titles do.
     {
       code: "test.only('fills a limit order @new', () => {});\nfit('fills a market order @new', () => {});\nfdescribe('order book @quarantined', () => {});\ndescribe.only('order entry @quarantined', () => {});",
-      settings: settings({ lifecycleTags: true }),
+      settings: settings({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [
         missing('new', 'NEW'),
         missing('new', 'NEW'),
@@ -213,7 +229,12 @@ runRule('require-ticket (Jest)', requireTicket, {
     },
     {
       code: "(process.env.CI ? describe.skip : describe)('order book @new', () => {\n  it('shows the best bid', () => {});\n});",
-      settings: settings({ lifecycleTags: true }),
+      settings: settings({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [missing('new', 'NEW', 'This describe block')],
     },
     // A marker above a line that starts with another statement isn't the test's.
@@ -295,12 +316,23 @@ runRule('no-orphaned-marker (Jest)', noOrphanedMarker, {
   ]),
 });
 
-runRule('no-conflicting-states (Jest)', noConflictingStates, {
-  valid: withOptions({ ...jest, lifecycleTags: true }, ["test('fills a limit order @new', () => {});"]),
-  invalid: withOptions({ ...jest, lifecycleTags: true }, [
-    { code: "xit('fills a limit order @new', () => {});", errors: [{ messageId: 'newSkipped' }] },
-    { code: "test.todo('fills a partial order @new');", errors: [{ messageId: 'newSkipped' }] },
-  ]),
+runRule('consistent-tag-names (Jest)', consistentTagNames, {
+  valid: withOptions(
+    {
+      ...jest,
+      customStates: {
+        new: { when: '@new', marker: 'NEW' },
+        quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+      },
+    },
+    [
+      "test('fills a limit order @new', () => {});",
+      // Custom tags do not impose lifecycle conflicts.
+      { code: "xit('fills a limit order @new', () => {});" },
+      { code: "test.todo('fills a partial order @new');" },
+    ],
+  ),
+  invalid: [],
 });
 
 runRule('require-ticket-in-comments (Jest)', requireTicketInComments, {

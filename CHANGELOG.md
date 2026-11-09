@@ -6,7 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Removed
+
+- **Breaking:** remove `lifecycleTags`, `states.new`, `states.quarantined` and their tag overrides.
+  Use explicit `customStates` mappings for any tag that should require a ticket. Removed settings
+  fail with migration instructions; native runner states keep their existing defaults.
+- Remove the built-in checks for `@new` on a skipped test and for `@new` combined with `@quarantined`.
+  Custom tags have no prescribed lifecycle or conflicts.
+
 ### Changed
+
+- **Breaking:** rename `no-conflicting-states` to `consistent-tag-names`. It retains case fixes and
+  spelling checks for `customStates` and `knownTags`; the old rule name fails with migration guidance.
+  See the [upgrade guide](docs/upgrading.md#next-release-custom-tag-states).
 
 - Reorganize documentation around a complete first lint run, with separate configuration, framework
   and troubleshooting references. Clarify supported version combinations, optional states, example

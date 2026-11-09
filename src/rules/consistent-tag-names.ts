@@ -1,4 +1,4 @@
-import { headLoc, type TagOccurrence } from '../utils/analyze.ts';
+import type { TagOccurrence } from '../utils/analyze.ts';
 import { createRule } from '../utils/create-rule.ts';
 import { isTagState } from '../utils/options.ts';
 import { editDistance, typoThreshold } from '../utils/distance.ts';
@@ -7,16 +7,13 @@ export default createRule({
   meta: {
     type: 'problem',
     docs: {
-      description: 'Disallow state tags that contradict each other, differ in case or look like typos',
+      description: 'Disallow tag names that differ in case or look like typos',
       recommended: 'warn',
-      url: 'https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/rules/no-conflicting-states.md',
+      url: 'https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/rules/consistent-tag-names.md',
     },
     fixable: 'code',
     schema: [],
     messages: {
-      newAndQuarantined: '`{{new}}` and `{{quarantined}}` are separate stages; a test should be in only one of them.',
-      newSkipped:
-        "`{{new}}` on a skipped test: a new test that doesn't run can't be promoted. Fix the test or drop the tag.",
       tagCase: '`{{found}}` should be written `{{expected}}`.',
       tagTypo: '`{{found}}` looks like a typo of `{{expected}}`.',
     },
@@ -24,35 +21,10 @@ export default createRule({
   create(context, analysis, options) {
     // State tags first, so a tag near both a state tag and a known tag is read as the state's.
     const checkedTags = [...options.states.filter(isTagState).map((s) => s.tag), ...options.knownTags];
-    const newTag = options.states.find((s) => s.name === 'new')?.tag;
-    const quarantinedTag = options.states.find((s) => s.name === 'quarantined')?.tag;
     const spelled = new Set<string>();
 
     for (const subject of analysis.subjects) {
       for (const occurrence of subject.tags) checkSpelling(occurrence);
-
-      if (newTag === undefined) continue;
-      const own = (tag: string): TagOccurrence | undefined => subject.tags.find((t) => t.tag === tag);
-      const has = (tag: string): boolean => own(tag) !== undefined || subject.inheritedTags.has(tag);
-      const ownNew = own(newTag);
-
-      if (quarantinedTag !== undefined && has(newTag) && has(quarantinedTag)) {
-        const occurrence = ownNew ?? own(quarantinedTag);
-        if (occurrence) {
-          context.report({
-            node: occurrence.node,
-            messageId: 'newAndQuarantined',
-            data: { new: newTag, quarantined: quarantinedTag },
-          });
-        }
-      }
-      if (has(newTag) && subject.skipped && (ownNew || subject.parent?.skipped !== true)) {
-        context.report({
-          ...(ownNew ? { node: ownNew.node } : { loc: headLoc(subject) }),
-          messageId: 'newSkipped',
-          data: { new: newTag },
-        });
-      }
     }
 
     function checkSpelling(occurrence: TagOccurrence): void {

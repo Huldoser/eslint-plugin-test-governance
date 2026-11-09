@@ -1,18 +1,31 @@
-import rule from '../../src/rules/no-conflicting-states.ts';
+import rule from '../../src/rules/consistent-tag-names.ts';
 import { runRule, settings } from '../helpers.ts';
 
-const lifecycle = settings({ lifecycleTags: true });
+const lifecycle = settings({
+  customStates: { new: { when: '@new', marker: 'NEW' }, quarantined: { when: '@quarantined', marker: 'QUARANTINED' } },
+});
 const custom = settings({ customStates: { quarantine: { when: '@quarantine', marker: 'QUARANTINE' } } });
-const flaky = settings({ lifecycleTags: true, states: { quarantined: { tag: '@flaky', marker: 'FLAKY' } } });
+const flaky = settings({
+  customStates: { new: { when: '@new', marker: 'NEW' }, quarantined: { when: '@flaky', marker: 'FLAKY' } },
+});
 const known = settings({ knownTags: ['@smoke', '@regression', '@e2e'] });
 
-runRule('no-conflicting-states', rule, {
+runRule('consistent-tag-names', rule, {
   valid: [
     ...[
       "import { test } from 'node:test'; test('fills @new', { todo: true }, () => {});",
       "import { test } from 'node:test'; test('fills @new', t => { t.todo('needs the fixture'); });",
       "import { describe, test } from 'node:test'; describe('orders @new', { todo: true }, () => { test('fills', () => {}); });",
-    ].map((code) => ({ code, settings: settings({ framework: 'node-test', lifecycleTags: true }) })),
+    ].map((code) => ({
+      code,
+      settings: settings({
+        framework: 'node-test',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
+    })),
     "test('places an order @New @quarantiend', async () => {});",
     { code: "test('places a limit order @new', async () => {});", settings: lifecycle },
     { code: "test('shows live prices @quarantined @smoke @news @neww', async () => {});", settings: lifecycle },
@@ -21,7 +34,7 @@ runRule('no-conflicting-states', rule, {
       code: "test('shows the order book', async ({ browserName }) => { test.skip(browserName === 'webkit'); });",
       settings: lifecycle,
     },
-    // A conditional skip doesn't make a new test skipped.
+    // Conditional skips do not change tag spelling checks.
     {
       code: "test('shows the order book @new', async ({ browserName }) => { test.skip(browserName === 'webkit'); });",
       settings: lifecycle,
@@ -33,16 +46,16 @@ runRule('no-conflicting-states', rule, {
     { code: "test('streams price updates @quarantine', async () => {});", settings: custom },
     // Real words two or more letters away in length are not typos.
     { code: "test('fills a partial order @unquarantined @requarantined', async () => {});", settings: lifecycle },
-    // Only @quarantined is on: no @new checks.
+    // Only configured custom tags get spelling checks.
     {
       code: "test.skip('amends the order price @new @quarantined', async () => {});",
-      settings: settings({ states: { quarantined: true } }),
+      settings: settings({ customStates: { quarantined: { when: '@quarantined', marker: 'QUARANTINED' } } }),
     },
     {
       code: "test('rebalances the portfolio @new @quarantined', async () => {});",
-      settings: settings({ states: { new: true } }),
+      settings: settings({ customStates: { new: { when: '@new', marker: 'NEW' } } }),
     },
-    // A skipped step doesn't skip its test, so a new test with one still runs.
+    // Tags stay valid when a test contains a skipped step.
     {
       code: "test('places an order @new', async () => {\n  await test.step.skip('confirms the fill', async () => {});\n});",
       settings: lifecycle,
@@ -57,7 +70,56 @@ runRule('no-conflicting-states', rule, {
     // A tag listed as known is never a typo of a state tag.
     {
       code: "test('places an order @quarantine', async () => {});",
-      settings: settings({ lifecycleTags: true, knownTags: ['@quarantine'] }),
+      settings: settings({
+        knownTags: ['@quarantine'],
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
+    },
+
+    // Custom tags do not impose lifecycle conflicts.
+    { code: "test('places a market order @new @quarantined', async () => {});", settings: lifecycle },
+    {
+      code: "test.describe('risk limits @quarantined', () => {\n  test('stops trading at the daily loss limit', { tag: '@new' }, async () => {});\n  test('caps position size at 2% of equity', async () => {});\n});",
+      settings: lifecycle,
+    },
+    {
+      code: "test.describe('order entry @new', () => {\n  test.describe('limit orders @quarantined', () => {\n    test.describe('amendments', () => { test('amends an order', async () => {}); });\n  });\n});",
+      settings: lifecycle,
+    },
+    {
+      code: "test.describe('market data @new', () => { test('streams price updates @quarantined', async () => {}); });",
+      settings: lifecycle,
+    },
+    {
+      code: "test.describe('market data @new', () => {\n  test.describe('level 2', () => { test('streams the order book @quarantined', async () => {}); });\n});",
+      settings: lifecycle,
+    },
+    { code: "test('places a market order @new @flaky', async () => {});", settings: flaky },
+    { code: "test.skip('exports the trade history @new', async () => {});", settings: lifecycle },
+    {
+      code: "test.describe.fixme('backtesting @new', () => {\n  test('backtests a moving-average strategy', async () => {});\n});",
+      settings: lifecycle,
+    },
+    {
+      code: "test.describe('order entry @new', () => {\n  test.skip('cancels an order', async () => {});\n});",
+      settings: lifecycle,
+    },
+    {
+      code: "test.describe.skip('portfolio', () => {\n  test('calculates profit and loss @new', async () => {});\n});",
+      settings: lifecycle,
+    },
+    { code: "test('rejects orders after market close @new', async () => {\n  test.skip();\n});", settings: lifecycle },
+    { code: "test.skip('shows the order book @new', async () => {});", settings: lifecycle },
+    {
+      code: "test.describe('risk limits', () => {\n  test.skip(true);\n  test('triggers a stop-loss when the price drops @new', async () => {});\n});",
+      settings: lifecycle,
+    },
+    {
+      code: "test('places an order @new', async () => {\n  await test.step('fills the order', async () => {\n    test.skip();\n  });\n});",
+      settings: lifecycle,
     },
   ],
   invalid: [
@@ -85,7 +147,13 @@ runRule('no-conflicting-states', rule, {
     // Near both a state tag and a known tag, a tag is read as the state's.
     {
       code: "test('places an order @quarantind', async () => {});",
-      settings: settings({ lifecycleTags: true, knownTags: ['@quarantine'] }),
+      settings: settings({
+        knownTags: ['@quarantine'],
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [{ messageId: 'tagTypo', data: { found: '@quarantind', expected: '@quarantined' } }],
     },
     // A tag from a constant is reported where the test uses it. The constant may be shared, so there is no autofix.
@@ -102,83 +170,13 @@ runRule('no-conflicting-states', rule, {
         "const TAG = '@new';\ntest(`places an order ${TAG}`, async () => {});\ntest(`cancels an order ${TAG}`, async () => {});",
       errors: [{ messageId: 'tagCase', data: { found: '@New', expected: '@new' }, line: 1 }],
     },
-    {
-      code: "test('places a market order @new @quarantined', async () => {});",
-      settings: lifecycle,
-      errors: [{ messageId: 'newAndQuarantined', data: { new: '@new', quarantined: '@quarantined' } }],
-    },
-    {
-      code: "test.describe('risk limits @quarantined', () => {\n  test('stops trading at the daily loss limit', { tag: '@new' }, async () => {});\n  test('caps position size at 2% of equity', async () => {});\n});",
-      settings: lifecycle,
-      errors: [{ messageId: 'newAndQuarantined', line: 2 }],
-    },
-    // Both tags inherited: reported once, on the describe where they first meet.
-    {
-      code: "test.describe('order entry @new', () => {\n  test.describe('limit orders @quarantined', () => {\n    test.describe('amendments', () => { test('amends an order', async () => {}); });\n  });\n});",
-      settings: lifecycle,
-      errors: [{ messageId: 'newAndQuarantined', line: 2 }],
-    },
-    {
-      code: "test.describe('market data @new', () => { test('streams price updates @quarantined', async () => {}); });",
-      settings: lifecycle,
-      errors: [{ messageId: 'newAndQuarantined' }],
-    },
-    {
-      code: "test.describe('market data @new', () => {\n  test.describe('level 2', () => { test('streams the order book @quarantined', async () => {}); });\n});",
-      settings: lifecycle,
-      errors: [{ messageId: 'newAndQuarantined', line: 2 }],
-    },
-    // A renamed tag gets the same checks.
-    {
-      code: "test('places a market order @new @flaky', async () => {});",
-      settings: flaky,
-      errors: [{ messageId: 'newAndQuarantined', data: { new: '@new', quarantined: '@flaky' } }],
-    },
+
     {
       code: "test('places a market order @flakey', async () => {});",
       settings: flaky,
       errors: [{ messageId: 'tagTypo', data: { found: '@flakey', expected: '@flaky' } }],
     },
-    {
-      code: "test.skip('exports the trade history @new', async () => {});",
-      settings: lifecycle,
-      errors: [{ messageId: 'newSkipped', data: { new: '@new' } }],
-    },
-    {
-      code: "test.describe.fixme('backtesting @new', () => {\n  test('backtests a moving-average strategy', async () => {});\n});",
-      settings: lifecycle,
-      errors: [{ messageId: 'newSkipped', line: 1 }],
-    },
-    {
-      code: "test.describe('order entry @new', () => {\n  test.skip('cancels an order', async () => {});\n});",
-      settings: lifecycle,
-      errors: [{ messageId: 'newSkipped', line: 2, column: 3 }],
-    },
-    {
-      code: "test.describe.skip('portfolio', () => {\n  test('calculates profit and loss @new', async () => {});\n});",
-      settings: lifecycle,
-      errors: [{ messageId: 'newSkipped', line: 2 }],
-    },
-    {
-      code: "test('rejects orders after market close @new', async () => {\n  test.skip();\n});",
-      settings: lifecycle,
-      errors: [{ messageId: 'newSkipped' }],
-    },
-    {
-      code: "test.skip('shows the order book @new', async () => {});",
-      settings: lifecycle,
-      errors: [
-        {
-          message:
-            "`@new` on a skipped test: a new test that doesn't run can't be promoted. Fix the test or drop the tag.",
-        },
-      ],
-    },
-    {
-      code: "test.describe('risk limits', () => {\n  test.skip(true);\n  test('triggers a stop-loss when the price drops @new', async () => {});\n});",
-      settings: lifecycle,
-      errors: [{ messageId: 'newSkipped', line: 3 }],
-    },
+
     {
       code: "test('places a limit order @New', async () => {});",
       settings: lifecycle,
@@ -257,12 +255,6 @@ runRule('no-conflicting-states', rule, {
       code: "test('caps position size at 2% of equity @qurantiine', async () => {});",
       settings: custom,
       errors: [{ messageId: 'tagTypo', data: { found: '@qurantiine', expected: '@quarantine' } }],
-    },
-    // `test.skip()` inside a step skips the whole test.
-    {
-      code: "test('places an order @new', async () => {\n  await test.step('fills the order', async () => {\n    test.skip();\n  });\n});",
-      settings: lifecycle,
-      errors: [{ messageId: 'newSkipped', line: 1 }],
     },
   ],
 });

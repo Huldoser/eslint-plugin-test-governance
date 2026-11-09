@@ -186,7 +186,7 @@ const playwright: Framework = {
   todoWithoutBody: false,
   runtimeFunctions: new Map(),
   retryCall: 'describe.configure',
-  states: new Set(['skip', 'fixme', 'fail', 'slow', 'retry', 'new', 'quarantined']),
+  states: new Set(['skip', 'fixme', 'fail', 'slow', 'retry']),
   playwright: true,
 };
 
@@ -228,7 +228,7 @@ const jest: Framework = {
   todoWithoutBody: false,
   runtimeFunctions: new Map(),
   retryCall: 'jest.retryTimes',
-  states: new Set(['skip', 'todo', 'fail', 'retry', 'new', 'quarantined']),
+  states: new Set(['skip', 'todo', 'fail', 'retry']),
   playwright: false,
 };
 
@@ -281,7 +281,7 @@ const vitest: Framework = {
   todoWithoutBody: false,
   runtimeFunctions: new Map(),
   retryOption: 'retry',
-  states: new Set(['skip', 'todo', 'fail', 'retry', 'new', 'quarantined']),
+  states: new Set(['skip', 'todo', 'fail', 'retry']),
   playwright: false,
 };
 
@@ -334,7 +334,7 @@ const mocha: Omit<Framework, 'name'> = {
   // Cypress's `{ retries: 2 }` or `{ retries: { runMode: 2, openMode: 0 } }`; Mocha itself takes no options.
   retryOption: 'retries',
   retryCall: 'this.retries',
-  states: new Set(['skip', 'todo', 'retry', 'new', 'quarantined']),
+  states: new Set(['skip', 'todo', 'retry']),
   playwright: false,
 };
 
@@ -394,7 +394,7 @@ const nodeTest: Framework = {
   thisMethods: NODE_TEST_CONTEXT,
   todoWithoutBody: false,
   runtimeFunctions: new Map(),
-  states: new Set(['skip', 'todo', 'fail', 'new', 'quarantined']),
+  states: new Set(['skip', 'todo', 'fail']),
   playwright: false,
 };
 
@@ -444,7 +444,7 @@ const jasmine: Framework = {
     ['pending', 'skip'],
     ['notApplicable', 'skip'],
   ]),
-  states: new Set(['skip', 'todo', 'new', 'quarantined']),
+  states: new Set(['skip', 'todo']),
   playwright: false,
 };
 

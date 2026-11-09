@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/npm/l/eslint-plugin-test-governance)](LICENSE)
 
 Require tracking tickets for disabled tests and TODO/FIXME comments with ESLint. Supports Playwright,
-Jest, Vitest, Mocha, Cypress, WebdriverIO, `node:test` and Jasmine. Lifecycle tags and retry tracking
+Jest, Vitest, Mocha, Cypress, WebdriverIO, `node:test` and Jasmine. Custom tag policies and retry tracking
 are optional.
 
 <!-- example: valid -->
@@ -120,14 +120,14 @@ All framework configs use the severities in [Defaults](#defaults).
 
 <!-- begin auto-generated rules list -->
 
-| Name                                                                                           | Description                                                                       |
-| :--------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------- |
-| [marker-matches-state](docs/rules/marker-matches-state.md)                                     | Require the marker keyword to match the test's state                              |
-| [no-conflicting-states](docs/rules/no-conflicting-states.md)                                   | Disallow state tags that contradict each other, differ in case or look like typos |
-| [no-orphaned-marker](docs/rules/no-orphaned-marker.md)                                         | Disallow marker comments that no longer match a test state                        |
-| [require-ticket](docs/rules/require-ticket.md)                                                 | Require a ticket for skipped, fixme, todo, retried and tagged tests               |
-| [require-ticket-for-commented-out-tests](docs/rules/require-ticket-for-commented-out-tests.md) | Require a ticket marker on commented-out tests                                    |
-| [require-ticket-in-comments](docs/rules/require-ticket-in-comments.md)                         | Require FIXME and TODO comments in test files to start with a ticket              |
+| Name                                                                                           | Description                                                          |
+| :--------------------------------------------------------------------------------------------- | :------------------------------------------------------------------- |
+| [consistent-tag-names](docs/rules/consistent-tag-names.md)                                     | Disallow tag names that differ in case or look like typos            |
+| [marker-matches-state](docs/rules/marker-matches-state.md)                                     | Require the marker keyword to match the test's state                 |
+| [no-orphaned-marker](docs/rules/no-orphaned-marker.md)                                         | Disallow marker comments that no longer match a test state           |
+| [require-ticket](docs/rules/require-ticket.md)                                                 | Require a ticket for skipped, fixme, todo, retried and tagged tests  |
+| [require-ticket-for-commented-out-tests](docs/rules/require-ticket-for-commented-out-tests.md) | Require a ticket marker on commented-out tests                       |
+| [require-ticket-in-comments](docs/rules/require-ticket-in-comments.md)                         | Require FIXME and TODO comments in test files to start with a ticket |
 
 <!-- end auto-generated rules list -->
 
@@ -136,7 +136,7 @@ All framework configs use the severities in [Defaults](#defaults).
 | Setting                   | Default                                                                                                  |
 | ------------------------- | -------------------------------------------------------------------------------------------------------- |
 | States that need a ticket | `skip`, `fixme`; in the other frameworks `skip`, `todo`                                                  |
-| `@new`, `@quarantined`    | off; `lifecycleTags: true` turns both on                                                                 |
+| Tag ticket requirements   | none by default; configure your own with `customStates`                                                  |
 | Conditional skips         | no ticket or reason required; opt in with `requireTicketForConditional` or `requireReasonForConditional` |
 | `fail`, `slow`, `retry`   | off; enable the states your framework supports with `states`                                             |
 | Marker format             | uppercase keyword and colon, then comma-separated tickets: `// SKIP: TRADE-123, TRADE-124`               |
@@ -145,11 +145,11 @@ All framework configs use the severities in [Defaults](#defaults).
 | Placement                 | comment block directly above the test or skip call; a blank line breaks it                               |
 | Placeholder tickets       | rejected: `TODO`, `TBD`, `XXX-*`, and any ticket numbered 0                                              |
 | Describe blocks           | a marker on a skipped or tagged describe covers its tests                                                |
-| Severity                  | `no-conflicting-states` and `require-ticket-for-commented-out-tests`: warn; every other rule: error      |
+| Severity                  | `consistent-tag-names` and `require-ticket-for-commented-out-tests`: warn; every other rule: error       |
 
-Lifecycle tags describe stages in your team's workflow. Enabling them checks tickets and tag
-consistency; it does not change how the test runner runs or quarantines tests. Warnings normally
-allow a successful lint run, but an existing `--max-warnings 0` policy makes them fail too.
+Tags have no built-in meaning. Configure `customStates` for tags that need ticket markers, or
+`knownTags` for spelling checks alone. Other tags remain allowed. See [custom tag policies](docs/configuration.md#tag-names).
+Warnings allow a successful lint run unless your command uses `--max-warnings 0`.
 
 ## Options
 
@@ -162,7 +162,7 @@ plugin's shared settings, not individual rules.
 <a name="tickets-from-annotations"></a>
 <a name="markers-in-eslint-disable-comments"></a>
 
-- [Tag names and lifecycle states](docs/configuration.md#tag-names)
+- [Custom tags and spelling checks](docs/configuration.md#tag-names)
 - [Ticket presets](docs/configuration.md#ticket-presets)
 - [Tickets from annotations](docs/configuration.md#tickets-from-annotations)
 - [Markers in ESLint directives](docs/configuration.md#markers-in-eslint-disable-comments)

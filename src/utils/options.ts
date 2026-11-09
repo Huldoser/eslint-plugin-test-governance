@@ -4,7 +4,6 @@ import {
   HOST_ENTRY_RE,
   type BuiltinStateName,
   type FrameworkName,
-  type TagStateName,
 } from './constants.ts';
 import { ConfigError } from './errors.ts';
 import { FRAMEWORKS, type Framework, type Modifier } from './frameworks.ts';
@@ -24,8 +23,6 @@ export const SETTINGS_KEY = 'test-governance';
 /** A state override in `states`. `false` turns a state off, `true` turns it on. */
 export interface StateOverride {
   enabled?: boolean;
-  /** The tag that puts a test in the state, e.g. `@flaky`. Only `new` and `quarantined` have a tag. */
-  tag?: string;
   marker?: string;
   ticket?: TicketSpec | TicketSpec[];
 }
@@ -60,13 +57,9 @@ export interface GovernanceOptions {
    * ...); tickets numbered 0 are always rejected.
    */
   placeholders?: string[];
-  /** Turns on the `@new` and `@quarantined` states. */
-  lifecycleTags?: boolean;
   /**
-   * Turns built-in states on or off, renames their tag or marker, or gives them their own ticket format.
-   * `skip`, `fixme` and `todo` are on by default, `fail`, `slow` and `retry` off; a setting for `new` or
-   * `quarantined` wins over `lifecycleTags`. Only `new` and `quarantined` have a tag, e.g.
-   * `{ quarantined: { tag: '@flaky', marker: 'FLAKY' } }`. `fixme` and `slow` exist only in Playwright,
+   * Turns native runner states on or off, renames their marker, or gives them their own ticket format.
+   * `skip`, `fixme` and `todo` are on by default, `fail`, `slow` and `retry` off. `fixme` and `slow` exist only in Playwright,
    * `todo` in every framework but Playwright, `fail` in Playwright, Jest, Vitest and node:test, and `retry` in every
    * framework but node:test and Jasmine.
    */
@@ -118,7 +111,7 @@ interface StateBase {
   ticket: TicketMatcher;
 }
 
-/** A state is entered either through a modifier (`test.skip`) or through a tag (`@new`), never both. */
+/** A state is entered either through a modifier (`test.skip`) or through a configured tag, never both. */
 export type StateDef = StateBase & ({ modifier: Modifier; tag?: undefined } | { tag: string; modifier?: undefined });
 
 export type TagStateDef = Extract<StateDef, { tag: string }>;
@@ -131,7 +124,7 @@ export interface ResolvedOptions {
   framework: Framework;
   testFunctions: Set<string>;
   states: StateDef[];
-  /** Tags besides the state tags whose case and spelling `no-conflicting-states` checks. */
+  /** Tags besides the state tags whose case and spelling `consistent-tag-names` checks. */
   knownTags: string[];
   requireTicketForConditional: boolean;
   requireReasonForConditional: boolean;
@@ -154,23 +147,19 @@ export interface ResolvedOptions {
   commentTicket: TicketMatcher;
 }
 
-type BuiltinDef = { marker: string; lifecycle?: boolean; enabled: boolean } & (
-  { modifier: Modifier; tag?: undefined } | { tag: string; modifier?: undefined }
-);
+interface BuiltinDef {
+  marker: string;
+  enabled: boolean;
+  modifier: Modifier;
+}
 
-// A state in `TAG_STATE_NAMES` must have a tag and every other one a modifier, so the schema offers `tag`
-// to the right states.
-const BUILTIN_STATES: {
-  [Name in BuiltinStateName]: Extract<BuiltinDef, Name extends TagStateName ? { tag: string } : { modifier: Modifier }>;
-} = {
+const BUILTIN_STATES: Record<BuiltinStateName, BuiltinDef> = {
   skip: { marker: 'SKIP', modifier: 'skip', enabled: true },
   fixme: { marker: 'FIXME', modifier: 'fixme', enabled: true },
   fail: { marker: 'FAIL', modifier: 'fail', enabled: false },
   slow: { marker: 'SLOW', modifier: 'slow', enabled: false },
   todo: { marker: 'TODO', modifier: 'todo', enabled: true },
   retry: { marker: 'RETRY', modifier: 'retry', enabled: false },
-  new: { marker: 'NEW', tag: '@new', lifecycle: true, enabled: false },
-  quarantined: { marker: 'QUARANTINED', tag: '@quarantined', lifecycle: true, enabled: false },
 };
 
 export { ConfigError } from './errors.ts';
@@ -379,15 +368,13 @@ export function compileOptions(options: GovernanceOptions): ResolvedOptions {
   for (const [name, def] of Object.entries(BUILTIN_STATES) as [BuiltinStateName, BuiltinDef][]) {
     const raw = overrides[name];
     const override: StateOverride = typeof raw === 'boolean' ? { enabled: raw } : (raw ?? {});
-    const enabled = override.enabled ?? (def.lifecycle ? (options.lifecycleTags ?? def.enabled) : def.enabled);
+    const enabled = override.enabled ?? def.enabled;
     // Compiled even for a state that is off, so a mistake in its ticket format shows before it is turned on.
     const ticket = override.ticket === undefined ? defaultMatcher : compile(override.ticket);
     // A state the framework has no way to enter, such as `fixme` in Jest, stays off.
     if (!enabled || !framework.states.has(name)) continue;
     const base = { name, marker: override.marker ?? def.marker, ticket };
-    states.push(
-      def.modifier === undefined ? { ...base, tag: override.tag ?? def.tag } : { ...base, modifier: def.modifier },
-    );
+    states.push({ ...base, modifier: def.modifier });
   }
 
   for (const [name, custom] of Object.entries(options.customStates ?? {})) {

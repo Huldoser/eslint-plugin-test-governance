@@ -11,16 +11,14 @@ at the ticket that explains it, so disabled tests show up in planning instead of
 
 A test is in a state when it is:
 
-| State          | Put there by                                                                                                                          | Marker                 | On by default              |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | -------------------------- |
-| `skip`         | `test.skip('title', fn)`, `test.describe.skip`, `test.skip()` in a body, `testInfo.skip()`, `test.step.skip`, `step.skip()` in a step | `// SKIP:`             | yes                        |
-| `fixme`        | `test.fixme(...)`, `test.describe.fixme`, `testInfo.fixme()`                                                                          | `// FIXME:`            | yes                        |
-| `todo`         | Jest's, Vitest's and `node:test`'s `test.todo`, and a Mocha or Jasmine test with only a title, `it('title')`                          | `// TODO:`             | yes, except in Playwright  |
-| `new`          | the `@new` tag                                                                                                                        | `// NEW:`              | with `lifecycleTags: true` |
-| `quarantined`  | the `@quarantined` tag                                                                                                                | `// QUARANTINED:`      | with `lifecycleTags: true` |
-| `fail`, `slow` | `test.fail(...)`, `test.slow()`, `testInfo.fail()`, `testInfo.slow()`                                                                 | `// FAIL:`, `// SLOW:` | no                         |
-| `retry`        | `describe.configure({ retries })`, `jest.retryTimes()`, Vitest's `{ retry }`, `this.retries()`, Cypress's `{ retries }`               | `// RETRY:`            | no                         |
-| custom         | any tag you list in `customStates`                                                                                                    | your keyword           | when configured            |
+| State          | Put there by                                                                                                                          | Marker                 | On by default             |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | ------------------------- |
+| `skip`         | `test.skip('title', fn)`, `test.describe.skip`, `test.skip()` in a body, `testInfo.skip()`, `test.step.skip`, `step.skip()` in a step | `// SKIP:`             | yes                       |
+| `fixme`        | `test.fixme(...)`, `test.describe.fixme`, `testInfo.fixme()`                                                                          | `// FIXME:`            | yes                       |
+| `todo`         | Jest's, Vitest's and `node:test`'s `test.todo`, and a Mocha or Jasmine test with only a title, `it('title')`                          | `// TODO:`             | yes, except in Playwright |
+| `fail`, `slow` | `test.fail(...)`, `test.slow()`, `testInfo.fail()`, `testInfo.slow()`                                                                 | `// FAIL:`, `// SLOW:` | no                        |
+| `retry`        | `describe.configure({ retries })`, `jest.retryTimes()`, Vitest's `{ retry }`, `this.retries()`, Cypress's `{ retries }`               | `// RETRY:`            | no                        |
+| custom         | any tag you list in `customStates`                                                                                                    | your keyword           | when configured           |
 
 In Jest and Vitest, `xit`, `xdescribe`, Vitest's `{ skip: true }`, `skipIf(true)`, `context.skip()` and
 `context.skip('note')`, in a test or in `beforeEach`, skip a test too, and `test.failing` and `test.fails` put it in the `fail` state. Any retry count but `0` puts a test, describe or file in the `retry` state, including one known only when the tests run, such as `process.env.CI ? 2 : 0`; node:test and Jasmine have no retries. In Mocha, Cypress and WebdriverIO, `xit`, `xdescribe` and
@@ -30,12 +28,24 @@ browsers, which counts as a conditional skip. In `node:test`, `{ skip: 'reason' 
 Jasmine, `xit`, `xdescribe`, and `pending()` or `notApplicable()` in a test, `beforeEach` or `afterEach` skip a test. The
 [framework reference](../frameworks.md) lists every form.
 
-Tags are read from the title (`'places a limit order @new'`) and from `{ tag: '@new' }` or `{ tag: ['@new', '@smoke'] }`,
-also when they come from a `const` or an enum declared in the same file, as in `{ tag: TAGS.NEW }`.
-Vitest 4.1+ and node:test (Node 26.2+) write tag names without the `@`, so `{ tags: ['new'] }` is the `@new` tag. Cypress tags from
-@cypress/grep keep it: `{ tags: '@new' }`. Tags on a
-`describe` apply to every test inside it. `states` can rename the tag and marker of `new` and
-`quarantined`, as in `states: { quarantined: { tag: '@flaky', marker: 'FLAKY' } }`.
+Tag examples on this page use this policy:
+
+```js
+testGovernance.configure({
+  framework: 'playwright',
+  customStates: {
+    review: { when: '@needs-review', marker: 'REVIEW' },
+    blocked: { when: '@blocked', marker: 'BLOCKED' },
+  },
+});
+```
+
+Tags are read from the title (`'places a limit order @needs-review'`) and from `{ tag: '@needs-review' }` or `{ tag: ['@needs-review', '@smoke'] }`,
+also when they come from a `const` or an enum declared in the same file, as in `{ tag: TAGS.REVIEW }`.
+Vitest 4.1+ and node:test (Node 26.2+) write tag names without the `@`, so `{ tags: ['needs-review'] }` is the `@needs-review` tag. Cypress tags from
+@cypress/grep keep it: `{ tags: '@needs-review' }`. Tags on a
+`describe` apply to every test inside it. Configure a tag and its marker with `customStates`;
+no tag has a built-in meaning. See [Tag names](../configuration.md#tag-names).
 
 ## Marker format
 
@@ -157,15 +167,14 @@ it('places an order', function () {
 
 ## Titles and tags that can't be read
 
-Tags can only be read from text: a string or a template literal such as `` `buys ${symbol} @new` ``,
+Tags can only be read from text: a string or a template literal such as `` `buys ${symbol} @needs-review` ``,
 written in the call or kept in a `const` or an enum in the same file. A title built another way, such
 as `'buys ' + symbol`, and a tag or details object imported from another module may hide a tag. With
-`reportUnreadableTags: true`, the rule reports those whenever a tag state (`@new`, `@quarantined` or a
-custom state) is on, so no tagged test slips past.
+`reportUnreadableTags: true`, the rule reports those whenever a custom tag state is configured, so no tagged test slips past.
 
-With `lifecycleTags: true`, `reportUnreadableTags: true`:
+With the custom tag policy above, `reportUnreadableTags: true`:
 
-<!-- example: invalid settings={"lifecycleTags":true,"reportUnreadableTags":true} -->
+<!-- example: invalid settings={"reportUnreadableTags":true,"customStates":{"review":{"when":"@needs-review","marker":"REVIEW"},"blocked":{"when":"@blocked","marker":"BLOCKED"}}} -->
 
 ```js
 for (const symbol of ['AAPL', 'MSFT']) {
@@ -173,19 +182,19 @@ for (const symbol of ['AAPL', 'MSFT']) {
 }
 ```
 
-With `lifecycleTags: true`, `reportUnreadableTags: true`:
+With the custom tag policy above, `reportUnreadableTags: true`:
 
-<!-- example: invalid settings={"lifecycleTags":true,"reportUnreadableTags":true} -->
+<!-- example: invalid settings={"reportUnreadableTags":true,"customStates":{"review":{"when":"@needs-review","marker":"REVIEW"},"blocked":{"when":"@blocked","marker":"BLOCKED"}}} -->
 
 ```js
 import { TAGS } from './tags';
 
-test('closes all positions with one click', { tag: TAGS.NEW }, async ({ page }) => {});
+test('closes all positions with one click', { tag: TAGS.REVIEW }, async ({ page }) => {});
 ```
 
-With `lifecycleTags: true`, `reportUnreadableTags: true`:
+With the custom tag policy above, `reportUnreadableTags: true`:
 
-<!-- example: valid settings={"lifecycleTags":true,"reportUnreadableTags":true} -->
+<!-- example: valid settings={"reportUnreadableTags":true,"customStates":{"review":{"when":"@needs-review","marker":"REVIEW"},"blocked":{"when":"@blocked","marker":"BLOCKED"}}} -->
 
 ```js
 for (const symbol of ['AAPL', 'MSFT']) {
@@ -193,15 +202,15 @@ for (const symbol of ['AAPL', 'MSFT']) {
 }
 ```
 
-With `lifecycleTags: true`, `reportUnreadableTags: true`:
+With the custom tag policy above, `reportUnreadableTags: true`:
 
-<!-- example: valid settings={"lifecycleTags":true,"reportUnreadableTags":true} -->
+<!-- example: valid settings={"reportUnreadableTags":true,"customStates":{"review":{"when":"@needs-review","marker":"REVIEW"},"blocked":{"when":"@blocked","marker":"BLOCKED"}}} -->
 
 ```js
-const TAGS = { NEW: '@new', SMOKE: '@smoke' };
+const TAGS = { REVIEW: '@needs-review', SMOKE: '@smoke' };
 
-// NEW: TRADE-77
-test('closes all positions with one click', { tag: [TAGS.NEW, TAGS.SMOKE] }, async ({ page }) => {});
+// REVIEW: TRADE-77
+test('closes all positions with one click', { tag: [TAGS.REVIEW, TAGS.SMOKE] }, async ({ page }) => {});
 ```
 
 ## Examples
@@ -238,12 +247,12 @@ test.skip('rejects a margin order above the buying power', async ({ page }) => {
 test.skip('rejects a margin order above the buying power', async ({ page }) => {});
 ```
 
-With `lifecycleTags: true`:
+With the custom tag policy above:
 
-<!-- example: invalid settings={"lifecycleTags":true} -->
+<!-- example: invalid settings={"customStates":{"review":{"when":"@needs-review","marker":"REVIEW"},"blocked":{"when":"@blocked","marker":"BLOCKED"}}} -->
 
 ```js
-test('closes all positions with one click @new', async ({ page }) => {});
+test('closes all positions with one click @needs-review', async ({ page }) => {});
 ```
 
 With `framework: "jest"`:
@@ -292,12 +301,12 @@ it('streams level 2 quotes', () => {
 });
 ```
 
-With `framework: "cypress"`, `lifecycleTags: true`:
+With `framework: "cypress"`, with the custom tag policy above:
 
-<!-- example: invalid settings={"framework":"cypress","lifecycleTags":true} -->
+<!-- example: invalid settings={"framework":"cypress","customStates":{"review":{"when":"@needs-review","marker":"REVIEW"},"blocked":{"when":"@blocked","marker":"BLOCKED"}}} -->
 
 ```js
-it('places a stop order', { tags: '@quarantined' }, () => {});
+it('places a stop order', { tags: '@blocked' }, () => {});
 ```
 
 Correct:
@@ -336,13 +345,13 @@ With `allowNotes: true`:
 test.skip('rejects a margin order above the buying power', async ({ page }) => {});
 ```
 
-With `lifecycleTags: true`:
+With the custom tag policy above:
 
-<!-- example: valid settings={"lifecycleTags":true} -->
+<!-- example: valid settings={"customStates":{"review":{"when":"@needs-review","marker":"REVIEW"},"blocked":{"when":"@blocked","marker":"BLOCKED"}}} -->
 
 ```js
-// NEW: TRADE-77
-test('closes all positions with one click', { tag: '@new' }, async ({ page }) => {});
+// REVIEW: TRADE-77
+test('closes all positions with one click', { tag: '@needs-review' }, async ({ page }) => {});
 ```
 
 With `framework: "vitest"`:
@@ -412,7 +421,7 @@ This rule has no options of its own. It reads the shared options described in th
 change what it reports:
 
 - `ticket` and `placeholders`: which tickets are accepted.
-- `lifecycleTags`, `states` and `customStates`: which states need a marker, which tag puts a test in
+- `states` and `customStates`: which states need a marker, which tag puts a test in
   each, what the marker is called, and, for a state with its own `ticket`, which tickets it accepts.
 - `requireTicketForConditional`: conditional skips need a ticket too.
 - `requireReasonForConditional`: conditional skips need a reason, a comment or the call's own reason argument.

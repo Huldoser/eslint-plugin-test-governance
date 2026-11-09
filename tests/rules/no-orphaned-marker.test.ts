@@ -1,7 +1,9 @@
 import rule from '../../src/rules/no-orphaned-marker.ts';
 import { runRule, settings } from '../helpers.ts';
 
-const lifecycle = settings({ lifecycleTags: true });
+const lifecycle = settings({
+  customStates: { new: { when: '@new', marker: 'NEW' }, quarantined: { when: '@quarantined', marker: 'QUARANTINED' } },
+});
 
 runRule('no-orphaned-marker', rule, {
   valid: [
@@ -13,7 +15,7 @@ runRule('no-orphaned-marker', rule, {
     '// skip: lowercase is not a marker here\nconst x = 1;',
     // A lowercase keyword away from any test is not a marker.
     "test('places an order', async () => {});\n// skip: TRADE-1\nconst broker = connectBroker();",
-    // With lifecycleTags off, NEW: isn't a known marker.
+    // Without a custom tag policy, NEW: isn't a known marker.
     "// NEW: TRADE-1\ntest('places a limit order', async () => {});",
     { code: "// NEW: TRADE-1\ntest('places a limit order @new', async () => {});", settings: lifecycle },
     // Marker above a conditional skip, or above the test that holds one, is fine.

@@ -66,7 +66,7 @@ try {
       '',
       'const options: GovernanceOptions = {',
       "  framework: 'playwright',",
-      '  lifecycleTags: true,',
+      "  customStates: { review: { when: '@needs-review', marker: 'REVIEW' } },",
       "  ticket: { preset: 'jira', projects: ['TRADE'] },",
       '};',
       'export default [configure(options), testGovernance.configs.playwright];',

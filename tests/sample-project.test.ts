@@ -21,8 +21,11 @@ const config = [
     ...testGovernance.configure({
       framework: 'playwright',
       ticket: { preset: 'jira', projects: ['TRADE', 'RISK'] },
-      lifecycleTags: true,
-      customStates: { 'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' } },
+      customStates: {
+        new: { when: '@new', marker: 'NEW' },
+        quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' },
+      },
     }),
   },
   { files: ['tests/unit/**/*.spec.ts'], ...testGovernance.configs.vitest },
@@ -71,7 +74,7 @@ test('configure() rejects a bad config when the config file loads', () => {
   );
   // A typo fails with a hint instead of being ignored.
   assert.throws(
-    () => testGovernance.configure({ framework: 'playwright', lifecycleTag: true } as never),
-    /did you mean "lifecycleTags"/,
+    () => testGovernance.configure({ framework: 'playwright', customState: true } as never),
+    /did you mean "customStates"/,
   );
 });

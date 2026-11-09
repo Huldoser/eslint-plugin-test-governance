@@ -6,7 +6,7 @@ Offers editor suggestions; these do not run with `--fix`.
 
 <!-- end auto-generated rule header -->
 
-When a test is promoted from `@new`, or a skipped test is fixed, its marker is often left behind.
+When a custom tag or a skip is removed from a test, its marker can be left behind.
 A leftover marker makes searches for open tickets lie. This rule reports:
 
 - a marker above a test, describe or skip call that is not in that marker's state,
@@ -37,8 +37,8 @@ A marker written in the wrong case, such as `// skip: TRADE-1`, is reported once
 in that state, as long as a valid ticket follows the colon. Without one, as in `// skip: not on mobile`,
 it reads as a sentence.
 
-When a test's tags come from another module, as in `{ tag: TAGS.NEW }` with `TAGS` imported, the rule
-can't tell which tags it has, so it leaves markers for tag states such as `// NEW:` alone on that test
+When a test's tags come from another module, as in `{ tag: TAGS.REVIEW }` with `TAGS` imported, the rule
+can't tell which tags it has, so it leaves markers for tag states such as `// REVIEW:` alone on that test
 and the tests inside it. The same goes for Vitest's state options, such as `// SKIP:`, when the options
 object itself comes from another module. Tags kept in a `const` or an enum in the same file are read
 and checked as usual.
@@ -50,17 +50,29 @@ comment above the test, it deletes only the marker's line.
 
 ## Examples
 
+Tag examples on this page use this policy:
+
+```js
+testGovernance.configure({
+  framework: 'playwright',
+  customStates: {
+    review: { when: '@needs-review', marker: 'REVIEW' },
+    blocked: { when: '@blocked', marker: 'BLOCKED' },
+  },
+});
+```
+
 Examples use Playwright unless noted. Settings shown with an example go in `configure()` alongside
 `framework`. Incorrect examples illustrate this rule; other enabled rules may report them too.
 
 Incorrect:
 
-With `lifecycleTags: true`:
+With the custom tag policy above:
 
-<!-- example: invalid settings={"lifecycleTags":true} -->
+<!-- example: invalid settings={"customStates":{"review":{"when":"@needs-review","marker":"REVIEW"},"blocked":{"when":"@blocked","marker":"BLOCKED"}}} -->
 
 ```js
-// NEW: TRADE-80 promoted last sprint
+// REVIEW: TRADE-80 promoted last sprint
 test('saves a watchlist', async () => {});
 ```
 
@@ -94,9 +106,9 @@ test.skipIf(false)('fills a stop order when the market opens', () => {});
 
 Correct:
 
-With `lifecycleTags: true`:
+With the custom tag policy above:
 
-<!-- example: valid settings={"lifecycleTags":true} -->
+<!-- example: valid settings={"customStates":{"review":{"when":"@needs-review","marker":"REVIEW"},"blocked":{"when":"@blocked","marker":"BLOCKED"}}} -->
 
 ```js
 test('saves a watchlist', async () => {});
@@ -125,8 +137,8 @@ test.fixme('places a limit order', async ({ page }) => {
 This rule has no options of its own. It reads the shared options described in the
 [configuration reference](../configuration.md#options). These change what it reports:
 
-- `lifecycleTags`, `states` and `customStates`: which keywords are markers. `// NEW:` is a marker
-  only while the `new` state is on, so with `lifecycleTags` off it is an ordinary comment.
+- `states` and `customStates`: which keywords are markers. `// REVIEW:` is a marker
+  only when configured in `customStates`; otherwise it is an ordinary comment.
 - `ticket` and `placeholders`: whether a comment starts with a valid ticket, which separates a
   leftover marker from a sentence or a work comment.
 - `allowBlankLine`: whether a marker separated from the code below it by a blank line still belongs
