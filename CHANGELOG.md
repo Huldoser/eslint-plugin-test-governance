@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Reorganize documentation around a complete first lint run, with separate configuration, framework
+  and troubleshooting references. Clarify supported version combinations, optional states, example
+  settings and recent upgrade actions; retain existing README section links.
+
 ## [0.13.3] - 2026-11-09
 
 ### Fixed

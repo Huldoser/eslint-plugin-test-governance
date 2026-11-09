@@ -1,10 +1,8 @@
 # Require the marker keyword to match the test's state (`test-governance/marker-matches-state`)
 
-📝 Require the marker keyword to match the test's state.
+Enabled as **error** in every [framework config](../../README.md#frameworks).
 
-💼 This rule is enabled in the following [configs](https://github.com/Huldoser/eslint-plugin-test-governance#usage): 🌲 `cypress`, 🌼 `jasmine`, 🃏 `jest`, ☕ `mocha`, 🟢 `node-test`, 🎭 `playwright`, ⚡ `vitest`, 🤖 `webdriverio`.
-
-💡 This rule is manually fixable by [editor suggestions](https://eslint.org/docs/latest/use/core-concepts#rule-suggestions).
+Offers editor suggestions; these do not run with `--fix`.
 
 <!-- end auto-generated rule header -->
 
@@ -17,6 +15,9 @@ that reuses the same ticket.
 
 ## Examples
 
+Examples use Playwright unless noted. Settings shown with an example go in `configure()` alongside
+`framework`. Incorrect examples illustrate this rule; other enabled rules may report them too.
+
 Incorrect:
 
 <!-- example: invalid -->
@@ -25,6 +26,8 @@ Incorrect:
 // SKIP: TRADE-500
 test.fixme('shows the unfilled quantity of a partly filled order', async () => {});
 ```
+
+With `lifecycleTags: true`:
 
 <!-- example: invalid settings={"lifecycleTags":true} -->
 
@@ -42,6 +45,8 @@ Correct:
 test.fixme('shows the unfilled quantity of a partly filled order', async () => {});
 ```
 
+With `lifecycleTags: true`:
+
 <!-- example: valid settings={"lifecycleTags":true} -->
 
 ```js
@@ -53,7 +58,7 @@ test.skip('shows the unfilled quantity of a partly filled order @quarantined', a
 ## Options
 
 This rule has no options of its own. It reads the shared options described in the
-[README](../../README.md#options). These change what it reports:
+[configuration reference](../configuration.md#options). These change what it reports:
 
 - `lifecycleTags`, `states` and `customStates`: which states are on, and the marker keyword each
   one expects.

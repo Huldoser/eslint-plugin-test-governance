@@ -1,25 +1,22 @@
 # Require FIXME and TODO comments in test files to start with a ticket (`test-governance/require-ticket-in-comments`)
 
-📝 Require FIXME and TODO comments in test files to start with a ticket.
+Enabled as **error** in every [framework config](../../README.md#frameworks).
 
-💼 This rule is enabled in the following [configs](https://github.com/Huldoser/eslint-plugin-test-governance#usage): 🌲 `cypress`, 🌼 `jasmine`, 🃏 `jest`, ☕ `mocha`, 🟢 `node-test`, 🎭 `playwright`, ⚡ `vitest`, 🤖 `webdriverio`.
-
-💡 This rule is manually fixable by [editor suggestions](https://eslint.org/docs/latest/use/core-concepts#rule-suggestions).
+Offers editor suggestions; these do not run with `--fix`.
 
 <!-- end auto-generated rule header -->
 
-A `// TODO: clean this up` comment is a promise nobody tracks. This rule makes every `FIXME` and
-`TODO` comment in a test file start with the ticket that tracks the work, so the ticket stays the
-source of truth and nothing is forgotten in a comment.
+This rule requires `FIXME` and `TODO` comments in test files to start with a tracking ticket.
+Keep the work's details in the ticket, or enable `allowNotes` for short notes in comments.
 
-```ts
-// TODO: TRADE-512                 ✓
-// FIXME: TRADE-77, TRADE-78       ✓ several tickets, separated by commas
-// TODO(TRADE-512)                 ✓ the ticket can go in parentheses
-// TODO(alice): refactor this      ✖ a name is not a ticket
-// TODO: refactor this             ✖ no ticket
-// FIXME: TRADE-77 flaky locator   ✖ only tickets are allowed (allowNotes: true allows the note)
-```
+| Comment                            | Result                                            |
+| ---------------------------------- | ------------------------------------------------- |
+| `// TODO: TRADE-512`               | Valid ticket                                      |
+| `// FIXME: TRADE-77, TRADE-78`     | Valid comma-separated tickets                     |
+| `// TODO(TRADE-512)`               | Valid ticket in parentheses                       |
+| `// TODO(EXAMPLE): refactor this`  | Invalid: the value in parentheses is not a ticket |
+| `// TODO: refactor this`           | Invalid: no ticket                                |
+| `// FIXME: TRADE-77 flaky locator` | Invalid unless `allowNotes: true`                 |
 
 How comments are read:
 
@@ -40,6 +37,9 @@ How comments are read:
   Application code is left alone, even if your config applies the plugin to it.
 
 ## Examples
+
+Examples use Playwright unless noted. Settings shown with an example go in `configure()` alongside
+`framework`. Incorrect examples illustrate this rule; other enabled rules may report them too.
 
 Incorrect:
 
@@ -70,6 +70,8 @@ test('places a limit order', async ({ page }) => {
 });
 ```
 
+With `comments: {"keywords": ["FIXME"]}`:
+
 <!-- example: valid settings={"comments":{"keywords":["FIXME"]}} -->
 
 ```js
@@ -80,7 +82,7 @@ test('places a limit order', async ({ page }) => {});
 ## Options
 
 This rule has no options of its own. It reads the shared options described in the
-[README](../../README.md#options):
+[configuration reference](../configuration.md#options):
 
 - `comments`: the keywords to check, `{ keywords: ['FIXME', 'TODO'] }` by default. Your list
   replaces the default one: `{ keywords: ['FIXME'] }` allows free-form `TODO`s, and

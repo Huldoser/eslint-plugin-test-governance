@@ -24,6 +24,9 @@ const ruleDocs = readdirSync(path.join(root, 'docs/rules'))
   .map((f) => `docs/rules/${f}`);
 const readme = read('README.md');
 const contributing = read('CONTRIBUTING.md');
+const configuration = read('docs/configuration.md');
+const frameworks = read('docs/frameworks.md');
+const referenceDocs = ['docs/configuration.md', 'docs/frameworks.md', 'docs/troubleshooting.md'];
 const packageJson = JSON.parse(read('package.json')) as {
   description: string;
   keywords: string[];
@@ -151,12 +154,13 @@ for (const file of ruleDocs) {
     found.forEach((example, i) => {
       it(`example ${i + 1} is ${example.kind}`, () => {
         checkExample(example, { [`test-governance/${rule}`]: 'error' });
+        if (example.kind === 'valid') checkExample(example, testGovernance.configs.playwright.rules);
       });
     });
   });
 }
 
-describe('README.md', () => {
+describe('README and configuration reference', () => {
   const found = examples(readme);
 
   it('marks its code samples as examples', () => {
@@ -170,11 +174,14 @@ describe('README.md', () => {
   });
 
   it('documents every option', () => {
-    assert.deepEqual([...rowsByName(table(readme, '## Options')).keys()].sort(), optionNames);
+    assert.deepEqual([...rowsByName(table(configuration, '## Options')).keys()].sort(), optionNames);
   });
 
   it('documents every ticket preset', () => {
-    assert.deepEqual([...rowsByName(table(readme, '### Ticket presets')).keys()].sort(), [...TICKET_PRESETS].sort());
+    assert.deepEqual(
+      [...rowsByName(table(configuration, '## Ticket presets')).keys()].sort(),
+      [...TICKET_PRESETS].sort(),
+    );
   });
 
   it('has only valid options in its configure() examples', () => {
@@ -189,7 +196,9 @@ describe('README.md', () => {
       } while (depth > 0);
       return code.slice(start, end);
     };
-    const blocks = [...readme.matchAll(/```(?:js|ts)\n([\s\S]*?)```/g)].map((m) => m[1]);
+    const blocks = [...[readme, ...referenceDocs.map(read)].join('\n').matchAll(/```(?:js|ts)\n([\s\S]*?)```/g)].map(
+      (m) => m[1],
+    );
     const configureExamples = blocks.flatMap((code) => {
       // Objects the block keeps in a constant, as in `const options = {...}`, for the examples that spread them.
       const constants = Object.fromEntries(
@@ -211,7 +220,7 @@ describe('README.md', () => {
   });
 
   it('shows the error configure() really gives for a mistyped option', () => {
-    const sample = /validates the options[\s\S]*?```text\n([\s\S]*?)```/.exec(readme)?.[1];
+    const sample = /validates the options[\s\S]*?```text\n([\s\S]*?)```/.exec(configuration)?.[1];
     assert.ok(sample);
     // `…` in the sample stands for text left out.
     const pattern = new RegExp(
@@ -252,7 +261,7 @@ describe('README.md', () => {
       }
       return true;
     };
-    for (const [preset, row] of rowsByName(table(readme, '### Ticket presets'))) {
+    for (const [preset, row] of rowsByName(table(configuration, '## Ticket presets'))) {
       const listed = codeSpans(row[2]).filter((name) => ticketOptions.includes(name));
       assert.deepEqual(
         listed.sort(),
@@ -262,11 +271,15 @@ describe('README.md', () => {
     }
   });
 
-  it('has a column for each framework in the framework table', () => {
-    const [header] = table(readme, '### Frameworks');
+  it('documents every framework in its own reference section', () => {
+    const headings = [...frameworks.matchAll(/^## (.+)$/gm)].map((match) => match[1].toLowerCase());
+    assert.deepEqual(headings.slice(0, FRAMEWORK_NAMES.length), [...FRAMEWORK_NAMES]);
+    const configs = table(readme, '### Frameworks')
+      .slice(1)
+      .map((row) => row[1]);
     assert.deepEqual(
-      header.slice(1).map((cell) => cell.toLowerCase()),
-      [...FRAMEWORK_NAMES],
+      configs,
+      FRAMEWORK_NAMES.map((name) => (/^\w+$/.test(name) ? `\`configs.${name}\`` : `\`configs['${name}']\``)),
     );
   });
 
@@ -277,7 +290,9 @@ describe('README.md', () => {
   });
 
   it('lists every exported type', () => {
-    const listed = codeSpans(paragraph(readme, 'it exports these types:')).filter((name) => /^[A-Z]\w*$/.test(name));
+    const listed = codeSpans(paragraph(configuration, 'it exports these types:')).filter((name) =>
+      /^[A-Z]\w*$/.test(name),
+    );
     const source = read('src/index.ts');
     const exported = [
       ...[...source.matchAll(/^export type \{([^}]+)\}/gm)].flatMap((m) => m[1].split(',').map((name) => name.trim())),
@@ -286,6 +301,16 @@ describe('README.md', () => {
     assert.deepEqual(listed.sort(), exported.sort());
   });
 });
+
+for (const file of referenceDocs) {
+  describe(file, () => {
+    examples(read(file)).forEach((example, i) => {
+      it(`example ${i + 1} is ${example.kind} with all the rules on`, () => {
+        checkExample(example, testGovernance.configs.playwright.rules);
+      });
+    });
+  });
+}
 
 describe('docs/upgrading.md', () => {
   /** The message `fn` throws. */
@@ -310,12 +335,18 @@ describe('docs/upgrading.md', () => {
 });
 
 describe('option defaults', () => {
-  const options = table(readme, '## Options');
+  const options = table(configuration, '## Options');
   const defaultColumn = options[0].indexOf('Default');
   const descriptionColumn = options[0].indexOf('Description');
   const optionRows = rowsByName(options);
   const defaultsRows = new Map(table(readme, '## Defaults').map((row) => [row[0], row[1]]));
   const required = [...(optionsSchema.required ?? [])];
+
+  /** An option's summary and any longer description below the options table. */
+  const optionDescription = (name: string): string => {
+    const details = configuration.split(`### ${name}\n`)[1]?.split(/^#{2,3} /m)[0] ?? '';
+    return `${optionRows.get(name)?.[descriptionColumn] ?? ''} ${details}`;
+  };
 
   // Tickets that tell the presets and placeholders apart.
   const SAMPLE_TICKETS = [
@@ -388,7 +419,7 @@ describe('option defaults', () => {
     }
   });
 
-  it('lists the required options as required, in the README and the hover docs', () => {
+  it('lists the required options as required, in the reference and the hover docs', () => {
     assert.deepEqual(required, ['framework']);
     for (const name of required) {
       assert.equal(optionRows.get(name)?.[defaultColumn], 'required', name);
@@ -397,7 +428,7 @@ describe('option defaults', () => {
     }
   });
 
-  it('gives the same defaults in the hover docs as in the README', () => {
+  it('gives the same defaults in the hover docs as in the configuration reference', () => {
     for (const [name, text] of hoverDocs) {
       const literal = /Defaults to `([^`]+)`/.exec(text)?.[1];
       if (literal === undefined) continue;
@@ -407,7 +438,7 @@ describe('option defaults', () => {
   });
 
   it('lists the test functions each framework uses by default', () => {
-    const description = optionRows.get('testFunctions')?.[descriptionColumn] ?? '';
+    const description = optionDescription('testFunctions');
     for (const [names, frameworks] of [
       ['Jest, Vitest and node:test default to', ['jest', 'vitest', 'node-test']],
       ['Mocha, Cypress and WebdriverIO to', ['mocha', 'cypress', 'webdriverio']],
@@ -432,7 +463,7 @@ describe('option defaults', () => {
   });
 
   it('lists every built-in state', () => {
-    const description = optionRows.get('states')?.[descriptionColumn] ?? '';
+    const description = optionDescription('states');
     const listed = /built-in states \(([^)]*)\)/.exec(description)?.[1] ?? '';
     assert.deepEqual(codeSpans(listed), [...BUILTIN_STATE_NAMES]);
   });
@@ -493,7 +524,12 @@ describe('supported versions', () => {
   };
 
   it('match package.json in the README', () => {
-    says(readme, `Requires ESLint ${list(eslintMajors, 'or')} with flat config, and Node.js ${oldestNode} or later.`);
+    says(readme, `Requires ESLint ${list(eslintMajors, 'or')} with flat config.`);
+    says(readme, `The plugin requires Node.js ${oldestNode} or later`);
+    const versions = rowsByName(table(readme, '## Install'));
+    assert.deepEqual([...versions.keys()], eslintMajors);
+    assert.equal(versions.get(eslintMajors[0] ?? '')?.[1], `${oldestNode} or later`);
+    assert.equal(versions.get('10')?.[1], '22.13 or later within Node 22, or Node 24 and later');
   });
 
   it('match package.json in the CI matrix', () => {
@@ -503,7 +539,9 @@ describe('supported versions', () => {
   });
 
   it('match the CI matrix in CONTRIBUTING.md', () => {
-    says(contributing, `Requires Node.js ${oldestNode} or later.`);
+    says(contributing, `The plugin's oldest supported Node.js version is ${oldestNode}.`);
+    says(contributing, 'NODE_OPTIONS=--experimental-strip-types npm test');
+    says(ci, 'NODE_OPTIONS: --experimental-strip-types');
     says(
       contributing,
       `tests on Node ${list(ciList('node'), 'and')} with ESLint ${list(eslintMajors, 'and')}, plus the oldest supported versions, Node ${oldestNode} with ESLint ${oldestEslint}`,
@@ -513,7 +551,7 @@ describe('supported versions', () => {
   it('match the TypeScript version the package is tested with', () => {
     const tested = /const OLDEST_TYPESCRIPT = '([\d.]+)'/.exec(read('scripts/pack-smoke.mjs'))?.[1];
     assert.ok(tested);
-    says(readme, `work with TypeScript ${tested} or later`);
+    says(configuration, `work with TypeScript ${tested} or later`);
   });
 });
 
@@ -536,6 +574,7 @@ describe('links between docs', () => {
     'SECURITY.md',
     '.github/pull_request_template.md',
     'docs/upgrading.md',
+    ...referenceDocs,
     ...ruleDocs,
   ];
   const withoutCodeBlocks = (text: string): string => text.replace(/^```[\s\S]*?^```/gm, '');
@@ -554,6 +593,7 @@ describe('links between docs', () => {
       seen.set(slug, count + 1);
       result.add(count === 0 ? slug : `${slug}-${count}`);
     }
+    for (const [, name] of read(file).matchAll(/<a name="([^"]+)"><\/a>/g)) result.add(name);
     return result;
   }
 
@@ -581,6 +621,7 @@ describe('links between docs', () => {
       'CONTRIBUTING.md',
       '.github/pull_request_template.md',
       'docs/upgrading.md',
+      ...referenceDocs,
       ...ruleDocs,
     ]) {
       for (const [, script] of read(file).matchAll(/\bnpm run ([\w:-]+)/g)) {

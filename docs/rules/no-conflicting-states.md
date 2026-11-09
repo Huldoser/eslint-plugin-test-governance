@@ -1,10 +1,8 @@
 # Disallow state tags that contradict each other, differ in case or look like typos (`test-governance/no-conflicting-states`)
 
-📝 Disallow state tags that contradict each other, differ in case or look like typos.
+Enabled as **warn** in every [framework config](../../README.md#frameworks).
 
-⚠️ This rule _warns_ in the following [configs](https://github.com/Huldoser/eslint-plugin-test-governance#usage): 🌲 `cypress`, 🌼 `jasmine`, 🃏 `jest`, ☕ `mocha`, 🟢 `node-test`, 🎭 `playwright`, ⚡ `vitest`, 🤖 `webdriverio`.
-
-🔧 This rule is automatically fixable by the [`--fix` CLI option](https://eslint.org/docs/latest/user-guide/command-line-interface#--fix).
+Supports automatic fixes with `--fix`.
 
 <!-- end auto-generated rule header -->
 
@@ -28,6 +26,8 @@ the same checks. A listed tag is never reported as a typo of a state tag, so `kn
 keeps a tag your team uses next to `@quarantined`. Tags of four letters or fewer after the `@`, such as
 `@e2e` or `@fast`, get only the case check, since one letter off is often another word.
 
+With `knownTags: ["@smoke","@regression"]`:
+
 <!-- example: invalid settings={"knownTags":["@smoke","@regression"]} -->
 
 ```js
@@ -36,13 +36,20 @@ test('places a market order @smok', async () => {});
 
 ## Examples
 
+Examples use Playwright unless noted. Settings shown with an example go in `configure()` alongside
+`framework`. Incorrect examples illustrate this rule; other enabled rules may report them too.
+
 Incorrect:
+
+With `lifecycleTags: true`:
 
 <!-- example: invalid settings={"lifecycleTags":true} -->
 
 ```js
 test('places a limit order @new @quarantined', async () => {});
 ```
+
+With `lifecycleTags: true`:
 
 <!-- example: invalid settings={"lifecycleTags":true} -->
 
@@ -52,11 +59,15 @@ test('places a limit order @new @quarantined', async () => {});
 test.skip('places a limit order @new', async () => {});
 ```
 
+With `lifecycleTags: true`:
+
 <!-- example: invalid settings={"lifecycleTags":true} -->
 
 ```js
 test('exports the trade history as CSV @New', async () => {});
 ```
+
+With `lifecycleTags: true`:
 
 <!-- example: invalid settings={"lifecycleTags":true} -->
 
@@ -66,16 +77,19 @@ test('shows dividend payments in the account history @quarantiend', async () => 
 
 Correct:
 
+With `lifecycleTags: true`:
+
 <!-- example: valid settings={"lifecycleTags":true} -->
 
 ```js
+// QUARANTINED: TRADE-10
 test('places a limit order @quarantined', async () => {});
 ```
 
 ## Options
 
 This rule has no options of its own. It reads the shared options described in the
-[README](../../README.md#options). These change what it reports:
+[configuration reference](../configuration.md#options). These change what it reports:
 
 - `lifecycleTags`, or `states` for `new` and `quarantined`: the `@new` checks run when the `new` state
   is on, and `@new` together with `@quarantined` is reported when both are on. A tag renamed in
