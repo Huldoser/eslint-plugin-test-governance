@@ -28,6 +28,29 @@ function documentedConfig(file: string, name: string): Linter.Config[] {
 }
 
 describe('documented config files', () => {
+  it('the retry-limit config reports excessive counts independently of retry tickets', async () => {
+    const eslint = new ESLint({
+      cwd: root,
+      overrideConfigFile: true,
+      overrideConfig: documentedConfig('docs/rules/limit-retries.md', 'retry-limit'),
+    });
+    for (const [count, expected] of [
+      [0, 0],
+      [1, 0],
+      [2, 1],
+    ] as const) {
+      const [result] = await eslint.lintText(`test.describe.configure({ retries: ${count} });`, {
+        filePath: 'tests/retries.spec.js',
+      });
+      assert.equal(result.messages.length, expected);
+      if (expected) {
+        assert.equal(result.messages[0].ruleId, 'test-governance/limit-retries');
+        assert.equal(result.messages[0].messageId, 'excessiveRetries');
+        assert.equal(result.messages[0].severity, 2);
+      }
+    }
+  });
+
   for (const { file, name, extension, severity } of [
     { file: 'README.md', name: 'javascript', extension: 'js', severity: 2 },
     { file: 'docs/configuration.md', name: 'typescript', extension: 'ts', severity: 2 },

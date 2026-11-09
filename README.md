@@ -97,7 +97,7 @@ tracker. The default accepts `PROJ-123`, `#123`, `owner/repo#123` or an http(s) 
 
 ### Frameworks
 
-Each config enables the same rules, adapted to the runner. There is no `recommended` or default config.
+Each config sets the same rule defaults, adapted to the runner. There is no `recommended` or default config.
 See [Framework syntax](docs/frameworks.md) for imports, supported calls and version-specific features.
 
 | Runner                                      | Config                 |
@@ -123,6 +123,7 @@ All framework configs use the severities in [Defaults](#defaults).
 | Name                                                                                           | Description                                                          |
 | :--------------------------------------------------------------------------------------------- | :------------------------------------------------------------------- |
 | [consistent-tag-names](docs/rules/consistent-tag-names.md)                                     | Disallow tag names that differ in case or look like typos            |
+| [limit-retries](docs/rules/limit-retries.md)                                                   | Enforce a maximum retry count for tests                              |
 | [marker-matches-state](docs/rules/marker-matches-state.md)                                     | Require the marker keyword to match the test's state                 |
 | [no-orphaned-marker](docs/rules/no-orphaned-marker.md)                                         | Disallow marker comments that no longer match a test state           |
 | [require-ticket](docs/rules/require-ticket.md)                                                 | Require a ticket for skipped, fixme, todo, retried and tagged tests  |
@@ -133,19 +134,20 @@ All framework configs use the severities in [Defaults](#defaults).
 
 ## Defaults
 
-| Setting                   | Default                                                                                                  |
-| ------------------------- | -------------------------------------------------------------------------------------------------------- |
-| States that need a ticket | `skip`, `fixme`; in the other frameworks `skip`, `todo`                                                  |
-| Tag ticket requirements   | none by default; configure your own with `customStates`                                                  |
-| Conditional skips         | no ticket or reason required; opt in with `requireTicketForConditional` or `requireReasonForConditional` |
-| `fail`, `slow`, `retry`   | off; enable the states your framework supports with `states`                                             |
-| Marker format             | uppercase keyword and colon, then comma-separated tickets: `// SKIP: TRADE-123, TRADE-124`               |
-| Notes after the ticket    | not allowed; `allowNotes: true` allows them                                                              |
-| `FIXME` / `TODO` comments | require tickets in test files; `comments: false` turns this check off                                    |
-| Placement                 | comment block directly above the test or skip call; a blank line breaks it                               |
-| Placeholder tickets       | rejected: `TODO`, `TBD`, `XXX-*`, and any ticket numbered 0                                              |
-| Describe blocks           | a marker on a skipped or tagged describe covers its tests                                                |
-| Severity                  | `consistent-tag-names` and `require-ticket-for-commented-out-tests`: warn; every other rule: error       |
+| Setting                   | Default                                                                                                                          |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| States that need a ticket | `skip`, `fixme`; in the other frameworks `skip`, `todo`                                                                          |
+| Tag ticket requirements   | none by default; configure your own with `customStates`                                                                          |
+| Conditional skips         | no ticket or reason required; opt in with `requireTicketForConditional` or `requireReasonForConditional`                         |
+| `fail`, `slow`, `retry`   | off; enable the states your framework supports with `states`                                                                     |
+| Marker format             | uppercase keyword and colon, then comma-separated tickets: `// SKIP: TRADE-123, TRADE-124`                                       |
+| Notes after the ticket    | not allowed; `allowNotes: true` allows them                                                                                      |
+| `FIXME` / `TODO` comments | require tickets in test files; `comments: false` turns this check off                                                            |
+| Placement                 | comment block directly above the test or skip call; a blank line breaks it                                                       |
+| Placeholder tickets       | rejected: `TODO`, `TBD`, `XXX-*`, and any ticket numbered 0                                                                      |
+| Describe blocks           | a marker on a skipped or tagged describe covers its tests                                                                        |
+| Severity                  | `consistent-tag-names` and `require-ticket-for-commented-out-tests`: warn; every other rule except the opt-in retry limit: error |
+| Retry limit               | `limit-retries`: off; enable the rule explicitly, then set `maxRetries` (default `2`)                                            |
 
 Tags have no built-in meaning. Configure `customStates` for tags that need ticket markers, or
 `knownTags` for spelling checks alone. Other tags remain allowed. See [custom tag policies](docs/configuration.md#tag-names).

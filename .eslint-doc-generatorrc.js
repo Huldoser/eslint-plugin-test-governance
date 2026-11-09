@@ -23,8 +23,12 @@ export default {
         : rule.meta?.hasSuggestions
           ? 'Offers editor suggestions; these do not run with `--fix`.'
           : 'Reports problems without fixes.';
-      const notice = `Enabled as **${severity}** in every [framework config](../../README.md#frameworks).\n\n${behavior}\n\n`;
-      content = content.replace(/^.*This rule (?:is enabled|_warns_).*$/m, notice.trimEnd());
+      const status =
+        severity === 'off'
+          ? 'Disabled in every [framework config](../../README.md#frameworks); enable it explicitly.'
+          : `Enabled as **${severity}** in every [framework config](../../README.md#frameworks).`;
+      const notice = `${status}\n\n${behavior}\n\n`;
+      content = content.replace(/^.*This rule (?:is enabled|_warns_|is _disabled_).*$/m, notice.trimEnd());
     }
     return prettier.format(content.replaceAll('\u00a0', ''), {
       ...(await prettier.resolveConfig(filePath)),

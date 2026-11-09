@@ -6,6 +6,7 @@ import noOrphanedMarker from './rules/no-orphaned-marker.ts';
 import requireTicketForCommentedOutTests from './rules/require-ticket-for-commented-out-tests.ts';
 import requireTicketInComments from './rules/require-ticket-in-comments.ts';
 import requireTicket from './rules/require-ticket.ts';
+import limitRetries from './rules/limit-retries.ts';
 import { FRAMEWORK_NAMES, type FrameworkName } from './utils/constants.ts';
 import { ConfigError } from './utils/errors.ts';
 import { compileOptions, SETTINGS_KEY, type GovernanceOptions } from './utils/options.ts';
@@ -24,37 +25,39 @@ export type RuleName =
   | 'no-orphaned-marker'
   | 'consistent-tag-names'
   | 'require-ticket-in-comments'
-  | 'require-ticket-for-commented-out-tests';
+  | 'require-ticket-for-commented-out-tests'
+  | 'limit-retries';
 
-const ruleModules: Record<RuleName, { meta: { docs: { recommended: 'error' | 'warn' } } }> = {
+const ruleModules: Record<RuleName, { meta: { docs: { recommended: 'error' | 'warn' | 'off' } } }> = {
   'require-ticket': requireTicket,
   'marker-matches-state': markerMatchesState,
   'no-orphaned-marker': noOrphanedMarker,
   'consistent-tag-names': consistentTagNames,
   'require-ticket-in-comments': requireTicketInComments,
   'require-ticket-for-commented-out-tests': requireTicketForCommentedOutTests,
+  'limit-retries': limitRetries,
 };
 
 // Public types come from `eslint` itself, so users don't need typescript-eslint installed.
 export const rules = ruleModules as unknown as Record<RuleName, Rule.RuleModule>;
 
-// Every framework config turns on all the rules, at the severity in each rule's `meta.docs.recommended`.
+// Every framework config uses the default severity in each rule's `meta.docs.recommended`.
 const configRules = Object.fromEntries(
   (Object.keys(ruleModules) as RuleName[]).map((name) => [
     `${PLUGIN_NAME}/${name}`,
     ruleModules[name].meta.docs.recommended,
   ]),
-) as Record<`${typeof PLUGIN_NAME}/${RuleName}`, 'error' | 'warn'>;
+) as Record<`${typeof PLUGIN_NAME}/${RuleName}`, 'error' | 'warn' | 'off'>;
 
 export interface FlatConfig {
   name: string;
   plugins: Record<string, ESLint.Plugin>;
-  rules: Record<string, 'error' | 'warn'>;
+  rules: Record<string, 'error' | 'warn' | 'off'>;
   settings?: Record<string, unknown>;
 }
 
 /**
- * One config per framework. Each turns on the same rules for that framework's tests; point each one at its
+ * One config per framework. Each sets the same rule defaults for that framework's tests; point each one at its
  * test files with `files`.
  */
 export type ConfigName = FrameworkName;

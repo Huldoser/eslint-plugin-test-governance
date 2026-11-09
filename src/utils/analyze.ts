@@ -222,6 +222,8 @@ export interface CommentedOutTest {
 
 export interface Analysis {
   subjects: Subject[];
+  /** Statically readable native retry counts, collected even when retry ticketing is off. */
+  retryCounts: { node: Node; count: number }[];
   /** Markers that are not in the comment block of any test, describe or runtime call. */
   detachedMarkers: StateMarker[];
   /** Markers of `eslint-disable` regions that cover tests, none of them in the marker's state. */
@@ -1658,6 +1660,31 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     (statement) => statement.type === 'ImportDeclaration' && framework.ownsModule(statement.source.value),
   );
   const subjects: Subject[] = [];
+  const retryCounts: Analysis['retryCounts'] = [];
+  /** Follows local constants and conditional branches without executing a runtime expression. */
+  const recordRetryCounts = (node: Node | undefined, keys?: ReadonlySet<string>, seen: readonly Node[] = []): void => {
+    if (node === undefined) return;
+    const own = unwrap(node);
+    const value = constantValue(sourceCode, own) ?? own;
+    if (seen.includes(value)) return;
+    const path = [...seen, value];
+    if (value.type === 'Literal' && typeof value.value === 'number') {
+      retryCounts.push({ node: own, count: value.value });
+    } else if (value.type === 'UnaryExpression' && (value.operator === '+' || value.operator === '-')) {
+      const argument = constantValue(sourceCode, unwrap(value.argument)) ?? unwrap(value.argument);
+      if (argument.type === 'Literal' && typeof argument.value === 'number') {
+        retryCounts.push({ node: own, count: value.operator === '-' ? -argument.value : argument.value });
+      }
+    } else if (value.type === 'ConditionalExpression') {
+      const condition = booleanOf(constantValue(sourceCode, unwrap(value.test)) ?? value.test);
+      if (condition !== false) recordRetryCounts(value.consequent, keys, path);
+      if (condition !== true) recordRetryCounts(value.alternate, keys, path);
+    } else if (value.type === 'ObjectExpression' && keys !== undefined) {
+      for (const [key, count] of objectDetails(sourceCode, value, [])) {
+        if (keys.has(key)) recordRetryCounts(count, undefined, path);
+      }
+    }
+  };
   const claimed = new Set<Comment>();
   const allComments = sourceCode.getAllComments();
   const commentedOut = findCommentedOutTests(
@@ -1974,6 +2001,10 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const args = call.arguments;
     const untitled = leavesOutTitle(sourceCode, framework, args);
     const details = detailsOf(sourceCode, call, untitled && !isFunction(args[0]));
+    if (framework.name === 'vitest' || framework.name === 'cypress') {
+      const count = details.entries.findLast(([key]) => key === framework.retryOption);
+      recordRetryCounts(count?.[1], framework.name === 'vitest' ? VITEST_RETRY_COUNT_KEYS : CYPRESS_RETRY_COUNT_KEYS);
+    }
     const annotations =
       options.annotations === undefined || framework.annotations === undefined
         ? { annotations: [], unreadAnnotations: [] }
@@ -2199,10 +2230,20 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     if (callee.type !== 'MemberExpression') return undefined;
     const name = memberName(callee);
     const { object } = callee;
-    if (framework.retryCall === 'this.retries' && name === 'retries' && object.type === 'ThisExpression') {
-      const owner = thisFunction(call);
-      const ownsThis = owner !== undefined && (thisBodies.has(owner) || suiteBodies.has(owner));
-      return ownsThis ? retrySubject(call, call.arguments.at(0), name) : undefined;
+    if (framework.retryCall === 'this.retries' && name === 'retries') {
+      if (object.type === 'ThisExpression') {
+        const owner = thisFunction(call);
+        const ownsThis = owner !== undefined && (thisBodies.has(owner) || suiteBodies.has(owner));
+        return ownsThis ? retrySubject(call, call.arguments.at(0), name) : undefined;
+      }
+      if (object.type === 'CallExpression') {
+        const callee = target(chainOf(object.callee, framework.factories));
+        const declaration = callee && declarationOf(callee);
+        if (declaration && declares(declaration, object.arguments)) {
+          return retrySubject(call, call.arguments.at(0), name);
+        }
+      }
+      return undefined;
     }
     if (framework.retryCall !== 'jest.retryTimes' || name !== 'retryTimes') {
       return undefined;
@@ -2235,6 +2276,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
 
   /** A call that gives retries when `count` does; retries need a ticket even when only some runs get them. */
   const retrySubject = (call: TSESTree.CallExpression, count: Node | undefined, name: string): Subject | undefined => {
+    recordRetryCounts(count);
     if (!retries(sourceCode, count)) return undefined;
     const subject = runtimeSubject(call, 'retry', undefined, true);
     if (subject) subject.functionName = name;
@@ -2320,6 +2362,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
 
   return {
     subjects,
+    retryCounts,
     detachedMarkers,
     idleRegionMarkers,
     commentedOutTests: commentedOut.found,

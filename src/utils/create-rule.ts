@@ -7,7 +7,7 @@ type RuleOptions = [];
 
 interface RuleDocs {
   description: string;
-  recommended: 'error' | 'warn';
+  recommended: 'error' | 'warn' | 'off';
   url: string;
 }
 

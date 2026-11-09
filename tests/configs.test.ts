@@ -14,7 +14,7 @@ describe('configs', () => {
     for (const framework of FRAMEWORK_NAMES) {
       const config = configs[framework];
       assert.equal(config.name, `test-governance/${framework}`);
-      // Every config turns on every rule, at the same severity.
+      // Every config sets every rule to the same default severity.
       assert.deepEqual(Object.keys(config.rules).sort(), ruleNames.sort());
       assert.deepEqual(config.rules, configs.playwright.rules);
       assert.deepEqual(config.settings, { 'test-governance': { framework } });

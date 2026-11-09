@@ -106,6 +106,10 @@ runRule('require-ticket (retry, Mocha and Cypress)', requireTicket, {
   invalid: [
     ...withOptions({ framework: 'mocha', ...retry }, [
       {
+        code: "it('places an order', function () {}).retries(3);",
+        errors: [missing('This retries call')],
+      },
+      {
         code: "describe('orders', function () {\n  this.retries(2);\n});",
         errors: [{ ...missing('This retries call'), line: 2 }],
       },
