@@ -1,5 +1,45 @@
 # Upgrading
 
+Run ESLint on your tests before and after updating. An upgrade may recognize syntax that an older
+version missed, producing new reports. Check the [changelog](../CHANGELOG.md) for fixes and additions.
+
+## Upgrading to 0.13
+
+No configuration migration is required. The new `requireReasonForConditional` and `knownTags`
+settings are opt-in. Existing defaults stay the same. See [configuration](configuration.md#options).
+
+## Upgrading to 0.12
+
+| Change                                                       | Who it affects                                                     | Action                                                                                                                        |
+| ------------------------------------------------------------ | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| TODO/FIXME descriptions in ESLint directives are now checked | Test files containing descriptions such as `-- TODO: migrate this` | Add the ticket, as in `-- TODO: TRADE-123`. If your policy allows free-form TODOs, configure `comments.keywords` accordingly. |
+| Commented-out tests now need markers                         | Projects using the framework configs                               | Add a valid `SKIP:` marker to each commented-out test block, or delete obsolete test code.                                    |
+| Annotation-only tickets and retry tracking are available     | Projects opting into these settings                                | No action unless enabling `annotations.only` or `states.retry`.                                                               |
+
+The commented-out-test rule is a warning by default. An existing `--max-warnings 0` command makes
+warnings fail CI too. Its markers belong to the commented-out block, so a skipped active test below
+still needs its own marker. See [the rule](rules/require-ticket-for-commented-out-tests.md).
+
+## Upgrading to 0.11
+
+Every ticket preset that takes `host` now rejects schemes, ports and paths at configuration load time.
+Previously, those malformed values could silently reject links. Use just the hostname:
+
+Before: `ticket: { preset: 'jira', host: 'https://jira.example.com' }`.
+
+After: `ticket: { preset: 'jira', host: 'jira.example.com' }`.
+
+Playwright annotations and Vitest metadata can now satisfy ticket requirements. When an enabled
+state needs a ticket, a supplied annotation of the configured type is validated as well, even if
+a marker is present. Check those existing values if an upgrade introduces an annotation error.
+See [annotation tickets and runner prerequisites](configuration.md#tickets-from-annotations).
+
+## Upgrading from 0.7 through 0.10
+
+These releases add frameworks and ticket presets without requiring a config rename. Keep your
+framework and `files` patterns explicit. The [changelog](../CHANGELOG.md) records syntax fixes that
+may expose previously missed cases.
+
 ## Upgrading to 0.6
 
 0.6.0 renames the `unstable` state to `quarantined`. Only projects that turn it on, with

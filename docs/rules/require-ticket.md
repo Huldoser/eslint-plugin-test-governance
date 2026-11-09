@@ -1,10 +1,8 @@
 # Require a ticket for skipped, fixme, todo, retried and tagged tests (`test-governance/require-ticket`)
 
-📝 Require a ticket for skipped, fixme, todo, retried and tagged tests.
+Enabled as **error** in every [framework config](../../README.md#frameworks).
 
-💼 This rule is enabled in the following [configs](https://github.com/Huldoser/eslint-plugin-test-governance#usage): 🌲 `cypress`, 🌼 `jasmine`, 🃏 `jest`, ☕ `mocha`, 🟢 `node-test`, 🎭 `playwright`, ⚡ `vitest`, 🤖 `webdriverio`.
-
-💡 This rule is manually fixable by [editor suggestions](https://eslint.org/docs/latest/use/core-concepts#rule-suggestions).
+Offers editor suggestions; these do not run with `--fix`.
 
 <!-- end auto-generated rule header -->
 
@@ -30,11 +28,11 @@ In Jest and Vitest, `xit`, `xdescribe`, Vitest's `{ skip: true }`, `skipIf(true)
 browsers, which counts as a conditional skip. In `node:test`, `{ skip: 'reason' }`, `t.skip()` and `this.skip()` skip a test, `{ todo: true }`,
 `t.todo()` and `this.todo()` make it a todo, `t.test()` subtests count as tests, and `test.expectFailure` puts it in the `fail` state. In
 Jasmine, `xit`, `xdescribe`, and `pending()` or `notApplicable()` in a test, `beforeEach` or `afterEach` skip a test. The
-[README](../../README.md#frameworks) lists every form.
+[framework reference](../frameworks.md) lists every form.
 
 Tags are read from the title (`'places a limit order @new'`) and from `{ tag: '@new' }` or `{ tag: ['@new', '@smoke'] }`,
 also when they come from a `const` or an enum declared in the same file, as in `{ tag: TAGS.NEW }`.
-Vitest writes tag names without the `@`, so `{ tags: ['new'] }` is the `@new` tag. Cypress tags from
+Vitest 4.1+ and node:test (Node 26.2+) write tag names without the `@`, so `{ tags: ['new'] }` is the `@new` tag. Cypress tags from
 @cypress/grep keep it: `{ tags: '@new' }`. Tags on a
 `describe` apply to every test inside it. `states` can rename the tag and marker of `new` and
 `quarantined`, as in `states: { quarantined: { tag: '@flaky', marker: 'FLAKY' } }`.
@@ -98,6 +96,8 @@ title and tags count as usual, and a marker goes above it, or in code without se
 (isMobile ? test.skip : test)('places an order', async ({ page }) => {});
 ```
 
+With `framework: "jest"`, `requireTicketForConditional: true`:
+
 <!-- example: invalid settings={"framework":"jest","requireTicketForConditional":true} -->
 
 ```js
@@ -132,6 +132,8 @@ to guess later why it doesn't run. Any of these counts:
 The same goes for the other states a condition can set, such as `test.fixme(condition)`. With
 `requireTicketForConditional` as well, the ticket is required and the reason alone is not enough.
 
+With `requireReasonForConditional: true`:
+
 <!-- example: valid settings={"requireReasonForConditional":true} -->
 
 ```js
@@ -142,6 +144,8 @@ test('copies the order ID', async ({ browserName }) => {
 // Touch screens have no hover.
 (isMobile ? test.skip : test)('shows the price on hover', async ({ page }) => {});
 ```
+
+With `framework: "mocha"`, `requireReasonForConditional: true`:
 
 <!-- example: invalid settings={"framework":"mocha","requireReasonForConditional":true} -->
 
@@ -159,6 +163,8 @@ as `'buys ' + symbol`, and a tag or details object imported from another module 
 `reportUnreadableTags: true`, the rule reports those whenever a tag state (`@new`, `@quarantined` or a
 custom state) is on, so no tagged test slips past.
 
+With `lifecycleTags: true`, `reportUnreadableTags: true`:
+
 <!-- example: invalid settings={"lifecycleTags":true,"reportUnreadableTags":true} -->
 
 ```js
@@ -166,6 +172,8 @@ for (const symbol of ['AAPL', 'MSFT']) {
   test('buys ' + symbol, async ({ page }) => {});
 }
 ```
+
+With `lifecycleTags: true`, `reportUnreadableTags: true`:
 
 <!-- example: invalid settings={"lifecycleTags":true,"reportUnreadableTags":true} -->
 
@@ -175,6 +183,8 @@ import { TAGS } from './tags';
 test('closes all positions with one click', { tag: TAGS.NEW }, async ({ page }) => {});
 ```
 
+With `lifecycleTags: true`, `reportUnreadableTags: true`:
+
 <!-- example: valid settings={"lifecycleTags":true,"reportUnreadableTags":true} -->
 
 ```js
@@ -182,6 +192,8 @@ for (const symbol of ['AAPL', 'MSFT']) {
   test(`buys ${symbol}`, async ({ page }) => {});
 }
 ```
+
+With `lifecycleTags: true`, `reportUnreadableTags: true`:
 
 <!-- example: valid settings={"lifecycleTags":true,"reportUnreadableTags":true} -->
 
@@ -193,6 +205,9 @@ test('closes all positions with one click', { tag: [TAGS.NEW, TAGS.SMOKE] }, asy
 ```
 
 ## Examples
+
+Examples use Playwright unless noted. Settings shown with an example go in `configure()` alongside
+`framework`. Incorrect examples illustrate this rule; other enabled rules may report them too.
 
 Incorrect:
 
@@ -223,11 +238,15 @@ test.skip('rejects a margin order above the buying power', async ({ page }) => {
 test.skip('rejects a margin order above the buying power', async ({ page }) => {});
 ```
 
+With `lifecycleTags: true`:
+
 <!-- example: invalid settings={"lifecycleTags":true} -->
 
 ```js
 test('closes all positions with one click @new', async ({ page }) => {});
 ```
+
+With `framework: "jest"`:
 
 <!-- example: invalid settings={"framework":"jest"} -->
 
@@ -235,11 +254,15 @@ test('closes all positions with one click @new', async ({ page }) => {});
 it.todo('caps position size at 2% of equity');
 ```
 
+With `framework: "vitest"`:
+
 <!-- example: invalid settings={"framework":"vitest"} -->
 
 ```js
 test.skipIf(true)('fills a stop order when the market opens', () => {});
 ```
+
+With `framework: "mocha"`:
 
 <!-- example: invalid settings={"framework":"mocha"} -->
 
@@ -249,6 +272,8 @@ it('settles a trade at T+1', function () {
 });
 ```
 
+With `framework: "node-test"`:
+
 <!-- example: invalid settings={"framework":"node-test"} -->
 
 ```js
@@ -257,6 +282,8 @@ import { test } from 'node:test';
 test('liquidates below maintenance', { skip: 'broker sandbox is down' }, () => {});
 ```
 
+With `framework: "jasmine"`:
+
 <!-- example: invalid settings={"framework":"jasmine"} -->
 
 ```js
@@ -264,6 +291,8 @@ it('streams level 2 quotes', () => {
   pending('needs the market data feed');
 });
 ```
+
+With `framework: "cypress"`, `lifecycleTags: true`:
 
 <!-- example: invalid settings={"framework":"cypress","lifecycleTags":true} -->
 
@@ -298,6 +327,8 @@ test('draws the price chart', async ({ page, browserName }) => {
 });
 ```
 
+With `allowNotes: true`:
+
 <!-- example: valid settings={"allowNotes":true} -->
 
 ```js
@@ -305,12 +336,16 @@ test('draws the price chart', async ({ page, browserName }) => {
 test.skip('rejects a margin order above the buying power', async ({ page }) => {});
 ```
 
+With `lifecycleTags: true`:
+
 <!-- example: valid settings={"lifecycleTags":true} -->
 
 ```js
 // NEW: TRADE-77
 test('closes all positions with one click', { tag: '@new' }, async ({ page }) => {});
 ```
+
+With `framework: "vitest"`:
 
 <!-- example: valid settings={"framework":"vitest"} -->
 
@@ -325,6 +360,8 @@ describe('risk limits', () => {
 });
 ```
 
+With `framework: "mocha"`:
+
 <!-- example: valid settings={"framework":"mocha"} -->
 
 ```js
@@ -338,6 +375,8 @@ describe('settlement', function () {
 });
 ```
 
+With `framework: "node-test"`:
+
 <!-- example: valid settings={"framework":"node-test"} -->
 
 ```js
@@ -350,6 +389,8 @@ test('nets margin across accounts', (t) => {
   if (!process.env.RISK_URL) t.skip();
 });
 ```
+
+With `framework: "jasmine"`:
 
 <!-- example: valid settings={"framework":"jasmine"} -->
 
@@ -367,7 +408,7 @@ describe('order entry', () => {
 ## Options
 
 This rule has no options of its own. It reads the shared options described in the
-[README](../../README.md#options), usually set once with `testGovernance.configure({...})`. These
+[configuration reference](../configuration.md#options), usually set once with `testGovernance.configure({...})`. These
 change what it reports:
 
 - `ticket` and `placeholders`: which tickets are accepted.

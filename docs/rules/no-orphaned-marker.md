@@ -1,10 +1,8 @@
 # Disallow marker comments that no longer match a test state (`test-governance/no-orphaned-marker`)
 
-📝 Disallow marker comments that no longer match a test state.
+Enabled as **error** in every [framework config](../../README.md#frameworks).
 
-💼 This rule is enabled in the following [configs](https://github.com/Huldoser/eslint-plugin-test-governance#usage): 🌲 `cypress`, 🌼 `jasmine`, 🃏 `jest`, ☕ `mocha`, 🟢 `node-test`, 🎭 `playwright`, ⚡ `vitest`, 🤖 `webdriverio`.
-
-💡 This rule is manually fixable by [editor suggestions](https://eslint.org/docs/latest/use/core-concepts#rule-suggestions).
+Offers editor suggestions; these do not run with `--fix`.
 
 <!-- end auto-generated rule header -->
 
@@ -52,7 +50,12 @@ comment above the test, it deletes only the marker's line.
 
 ## Examples
 
+Examples use Playwright unless noted. Settings shown with an example go in `configure()` alongside
+`framework`. Incorrect examples illustrate this rule; other enabled rules may report them too.
+
 Incorrect:
+
+With `lifecycleTags: true`:
 
 <!-- example: invalid settings={"lifecycleTags":true} -->
 
@@ -80,6 +83,8 @@ test('cancels an open order', async ({ page }) => {});
 A Vitest test with `skipIf(false)`, `runIf(true)` or `{ skip: false }` always runs, so its marker is
 left over:
 
+With `framework: "vitest"`:
+
 <!-- example: invalid settings={"framework":"vitest"} -->
 
 ```js
@@ -88,6 +93,8 @@ test.skipIf(false)('fills a stop order when the market opens', () => {});
 ```
 
 Correct:
+
+With `lifecycleTags: true`:
 
 <!-- example: valid settings={"lifecycleTags":true} -->
 
@@ -99,7 +106,7 @@ test('saves a watchlist', async () => {});
 
 ```js
 test('places a limit order', async ({ page }) => {
-  // FIXME: the price field sometimes loses focus on slow machines
+  // FIXME: TRADE-81
   await page.goto('/orders');
 });
 ```
@@ -116,7 +123,7 @@ test.fixme('places a limit order', async ({ page }) => {
 ## Options
 
 This rule has no options of its own. It reads the shared options described in the
-[README](../../README.md#options). These change what it reports:
+[configuration reference](../configuration.md#options). These change what it reports:
 
 - `lifecycleTags`, `states` and `customStates`: which keywords are markers. `// NEW:` is a marker
   only while the `new` state is on, so with `lifecycleTags` off it is an ordinary comment.

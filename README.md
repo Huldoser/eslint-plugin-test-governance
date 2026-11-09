@@ -4,513 +4,184 @@
 [![CI](https://github.com/Huldoser/eslint-plugin-test-governance/actions/workflows/ci.yml/badge.svg)](https://github.com/Huldoser/eslint-plugin-test-governance/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/npm/l/eslint-plugin-test-governance)](LICENSE)
 
-ESLint rules that keep a Playwright, Jest, Vitest, Mocha, Cypress, WebdriverIO, `node:test` or Jasmine suite honest. Every skipped, fixme, todo, `@new`
-or `@quarantined` test must point at the ticket that tracks it:
+Require tracking tickets for disabled tests and TODO/FIXME comments with ESLint. Supports Playwright,
+Jest, Vitest, Mocha, Cypress, WebdriverIO, `node:test` and Jasmine. Lifecycle tags and retry tracking
+are optional.
 
 <!-- example: valid -->
 
-```ts
+```js
 // SKIP: TRADE-123
-test.skip('rejects a margin order above the buying power', async ({ page }) => {
-  // ...
-});
+test.skip('cancels an open order', () => {});
 ```
 
-Without the comment, `test-governance/require-ticket` fails the lint. When the test is fixed and the
-skip removed, `no-orphaned-marker` flags the leftover comment. The markers are plain
-comments, so `grep -rn "SKIP:" tests/` lists every disabled test and its ticket.
+Removing the skip leaves a stale marker, which the plugin reports too. Tickets can also come from
+[Playwright annotations or Vitest metadata](docs/configuration.md#tickets-from-annotations).
+Ticket formats are checked locally; the plugin does not verify that an issue exists or is open.
 
-The same check covers tests commented out by hand, `FIXME` and `TODO` comments in test files, and, once
-turned on, retried tests. The ticket can also go in the description of an `eslint-disable` comment, or in
-a Playwright annotation or Vitest `meta`, which reach the test report.
+**Start here:** [Install](#install) · [First lint run](#usage) · [Choose a framework](#frameworks) ·
+[Rules](#rules) · [Configuration](docs/configuration.md) · [Troubleshooting](docs/troubleshooting.md) ·
+[Upgrading](docs/upgrading.md)
 
-> **Status:** early release (0.x). Options may still change before 1.0. Coming from 0.5?
-> [Upgrading to 0.6](docs/upgrading.md#upgrading-to-06) shows what to change.
+> Early release (0.x): options may change before 1.0. Check the [upgrade guide](docs/upgrading.md)
+> when updating an existing configuration.
 
 ## Install
 
+Requires ESLint 9 or 10 with flat config. The plugin requires Node.js 22.12 or later; ESLint may
+require a newer version:
+
+| ESLint | Node.js requirement for this plugin and ESLint together |
+| ------ | ------------------------------------------------------- |
+| 9      | 22.12 or later                                          |
+| 10     | 22.13 or later within Node 22, or Node 24 and later     |
+
+See [ESLint's prerequisites](https://eslint.org/docs/latest/use/getting-started#prerequisites).
+Use a project that already has a supported test runner. Install the linter and plugin:
+
 ```sh
-npm install --save-dev eslint-plugin-test-governance
+npm install --save-dev eslint eslint-plugin-test-governance
 ```
 
-Requires ESLint 9 or 10 with flat config, and Node.js 22.12 or later. For TypeScript specs, also install
-`@typescript-eslint/parser` (or `typescript-eslint`).
+For TypeScript tests, follow the [TypeScript setup](docs/configuration.md#typescript), which also
+installs and configures a parser. The JavaScript quick start below needs no TypeScript parser.
 
 ## Usage
 
-Pick the config for the framework your tests use, `configs.playwright`, `configs.jest`,
-`configs.vitest`, `configs.mocha`, `configs.cypress`, `configs.webdriverio`, `configs['node-test']` for
-Node's built-in runner or `configs.jasmine`, and point it at those test files with `files`:
+This example uses Playwright and JavaScript tests in `tests/`. Choose your runner in the
+[framework table](#frameworks) and adjust `files` to match your test locations and extensions.
+If you already have an ESLint config, add this object to its array rather than replacing the file.
+
+1. Create `eslint.config.mjs` at the project root:
+
+<!-- config: javascript -->
 
 ```js
-// eslint.config.js
-import tsParser from '@typescript-eslint/parser';
+// eslint.config.mjs
 import testGovernance from 'eslint-plugin-test-governance';
 
-export default [
-  { files: ['**/*.ts'], languageOptions: { parser: tsParser } },
-  {
-    files: ['tests/**/*.{js,ts}'],
-    ...testGovernance.configs.playwright,
-  },
-];
+export default [{ files: ['tests/**/*.js'], ...testGovernance.configs.playwright }];
 ```
 
-There is no default config. Each framework declares, skips and tags tests its own way, so the rules
-need to know which one a file uses. In a Jest, Vitest, Mocha or Jasmine config, the framework's functions,
-such as `it` and `describe`, belong to it, whether they are globals or imported from `@jest/globals`,
-`vitest`, `mocha` or `jasmine-core`, the way the Jest, Vitest and Mocha ESLint plugins are set up. `node:test` has no globals, so in its config
-they are the names imported or required from `node:test`, and `test` and `it` from `testFunctions`.
+2. In `tests/order.spec.js`, a skipped test without a ticket is reported:
 
-Cypress and WebdriverIO run their tests on Mocha, so `configs.cypress` and `configs.webdriverio` read the
-same calls as `configs.mocha`. `webdriverio` means WebdriverIO's Mocha framework; for its Jasmine
-framework, use `configs.jasmine`. Karma runs Jasmine or Mocha tests, so use `configs.jasmine` with
-karma-jasmine, which Angular's karma builder sets up, and `configs.mocha` with karma-mocha. Puppeteer has
-no test functions of its own, so use the config of the runner its tests run on: `configs.jest` for
-jest-puppeteer, or `configs.vitest`, `configs.mocha`, `configs['node-test']` or `configs.jasmine`.
-
-With ESLint's `defineConfig()` (ESLint 9.22 or later), put the config in `extends`:
+<!-- example: invalid -->
 
 ```js
-// eslint.config.js
-import { defineConfig } from 'eslint/config';
-import tsParser from '@typescript-eslint/parser';
-import testGovernance from 'eslint-plugin-test-governance';
+import { test } from '@playwright/test';
 
-export default defineConfig([
-  { files: ['**/*.ts'], languageOptions: { parser: tsParser } },
-  {
-    files: ['tests/**/*.{js,ts}'],
-    extends: [testGovernance.configs.playwright],
-  },
-]);
+test.skip('cancels an open order', () => {});
 ```
 
-Any flat config file works. The package is ESM, and `require('eslint-plugin-test-governance')` in an
-`eslint.config.cjs` returns the plugin itself. Inside `defineConfig()`, once the plugin is registered
-under `plugins`, the string form `extends: ['test-governance/playwright']` works too. ESLint loads
-an `eslint.config.ts` through [`jiti`](https://github.com/unjs/jiti), so install it as a dev
-dependency too.
+3. Run ESLint from the project root:
 
-To change the defaults, use `configure()`. It takes the framework and your options, and returns that
-framework's config with the options stored in `settings['test-governance']`, which all the rules read:
+```sh
+npx eslint tests/order.spec.js
+```
+
+ESLint reports `test-governance/require-ticket` and exits with status 1. Add the marker directly above
+the test, then run the same command again:
+
+<!-- example: valid -->
 
 ```js
-export default [
-  {
-    files: ['tests/**/*.{js,ts}'],
-    ...testGovernance.configure({
-      framework: 'playwright',
-      // Only accept Jira keys from these projects (or Jira URLs).
-      ticket: { preset: 'jira', projects: ['TRADE', 'RISK'] },
-      // Turn on the @new and @quarantined states.
-      lifecycleTags: true,
-      // Any tag your team uses, with the same rules as the built-ins.
-      customStates: {
-        'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' },
-      },
-    }),
-  },
-];
+import { test } from '@playwright/test';
+
+// SKIP: TRADE-123
+test.skip('cancels an open order', () => {});
 ```
 
-`configure()` validates the options when the config file loads, so a mistake fails immediately
-with a clear message rather than being ignored:
-
-```text
-eslint-plugin-test-governance: invalid options:
-  - lifecycleTag is not a known option; did you mean "lifecycleTags"?
-  - ticket.preset must be one of "any", "jira", "github", … (got "jria")
-```
+With this config and file, ESLint prints nothing and exits with status 0. Use a real ticket from your
+tracker. The default accepts `PROJ-123`, `#123`, `owner/repo#123` or an http(s) URL; a
+[ticket preset](docs/configuration.md#ticket-presets) narrows the accepted format.
 
 ### Frameworks
 
-A project with tests in more than one framework gives each framework its own config, pointed at its
-files. To share options between them, pass the same options to each `configure()`:
+Each config enables the same rules, adapted to the runner. There is no `recommended` or default config.
+See [Framework syntax](docs/frameworks.md) for imports, supported calls and version-specific features.
 
-```js
-const options = { ticket: { preset: 'jira', projects: ['TRADE'] } };
+| Runner                                      | Config                 |
+| ------------------------------------------- | ---------------------- |
+| Playwright                                  | `configs.playwright`   |
+| Jest                                        | `configs.jest`         |
+| Vitest                                      | `configs.vitest`       |
+| Mocha                                       | `configs.mocha`        |
+| Cypress                                     | `configs.cypress`      |
+| WebdriverIO with Mocha                      | `configs.webdriverio`  |
+| Node's built-in runner                      | `configs['node-test']` |
+| Jasmine, including WebdriverIO with Jasmine | `configs.jasmine`      |
 
-export default [
-  // The e2e specs run on Playwright, the unit tests on Vitest.
-  { files: ['e2e/**/*.spec.ts'], ...testGovernance.configure({ framework: 'playwright', ...options }) },
-  { files: ['src/**/*.test.ts'], ...testGovernance.configure({ framework: 'vitest', ...options }) },
-];
-```
-
-This matters most for Jasmine next to Jest or Mocha, whose `it`, `xit` and `describe` look the same:
-only the `files` of each config tell them apart.
-
-Each framework's config, such as `configs.playwright`, sets only the framework, so one listed after a
-`configure()` for the same files keeps that config's options and changes only the framework. They all
-turn on the same rules. What puts a test in a state in each framework:
-
-| State (marker)                         | Playwright                                                                                                          | Jest                                                                 | Vitest                                                                                                                                                                                     | Mocha                                                                                                                                                                     | Cypress                                  | WebdriverIO | node-test                                                                                                                                                                                         | Jasmine                                                                                                                  |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `skip` (`// SKIP:`)                    | `test.skip(...)`, `test.describe.skip`, `test.skip()` in a body, `testInfo.skip()`, `test.step.skip`, `step.skip()` | `test.skip`, `it.skip`, `describe.skip`, `xit`, `xtest`, `xdescribe` | `test.skip`, `it.skip`, `describe.skip`, `suite.skip`, `skipIf(true)`, `runIf(false)`, `{ skip: true }`, `context.skip()`, `context.skip('note')` or `skip()` in a body or in `beforeEach` | `it.skip`, `specify.skip`, `describe.skip`, `context.skip`, `xit`, `xspecify`, `xdescribe`, `xcontext`, TDD `test.skip` and `suite.skip`, `this.skip()` in a test or hook | as Mocha                                 | as Mocha    | `test.skip`, `it.skip`, `describe.skip`, `suite.skip`, `skip()`, `{ skip: true }` or `{ skip: 'reason' }`, `t.skip()`, `t.skip('reason')` or `this.skip()` in a test, `beforeEach` or `afterEach` | `xit`, `xdescribe`, `pending()`, `pending('reason')` or `notApplicable('reason')` in a test, `beforeEach` or `afterEach` |
-| `todo` (`// TODO:`)                    |                                                                                                                     | `test.todo`, `it.todo`                                               | `test.todo`, `describe.todo`, `{ todo: true }`                                                                                                                                             | a test with only a title, `it('title')`, which Mocha runs as pending                                                                                                      | as Mocha                                 | as Mocha    | `test.todo`, `it.todo`, `describe.todo`, `suite.todo`, `todo()`, `{ todo: true }` or `{ todo: 'reason' }`, `t.todo()`, `this.todo()`                                                              | a test with only a title, `it('title')`, which Jasmine reports as pending                                                |
-| `fixme` (`// FIXME:`)                  | `test.fixme(...)`, `test.describe.fixme`, `testInfo.fixme()`                                                        |                                                                      |                                                                                                                                                                                            |                                                                                                                                                                           |                                          |             |                                                                                                                                                                                                   |                                                                                                                          |
-| `fail` (`// FAIL:`), off by default    | `test.fail(...)`, `testInfo.fail()`                                                                                 | `test.failing`                                                       | `test.fails`, `{ fails: true }`                                                                                                                                                            |                                                                                                                                                                           |                                          |             | `test.expectFailure`, `expectFailure()`, `{ expectFailure }`                                                                                                                                      |                                                                                                                          |
-| `slow` (`// SLOW:`), off by default    | `test.slow()`, `testInfo.slow()`                                                                                    |                                                                      |                                                                                                                                                                                            |                                                                                                                                                                           |                                          |             |                                                                                                                                                                                                   |                                                                                                                          |
-| `retry` (`// RETRY:`), off by default  | `test.describe.configure({ retries })`                                                                              | `jest.retryTimes()`                                                  | `{ retry }`                                                                                                                                                                                | `this.retries()` in a describe, test or hook written as a `function`                                                                                                      | as Mocha, and `{ retries }`              | as Mocha    |                                                                                                                                                                                                   |                                                                                                                          |
-| conditional skip, no ticket by default | `test.skip(condition)`, `if (...) test.skip()`, `(condition ? test.skip : test)(...)`                               | `(condition ? it.skip : it)(...)`                                    | `skipIf(condition)`, `runIf(condition)`, `{ skip: condition }`, `context.skip(condition)`, `if (...) context.skip()`, `(condition ? it.skip : it)(...)`                                    | `if (...) this.skip()`, `(condition ? it.skip : it)(...)`                                                                                                                 | as Mocha, and `{ browser: '!webkit' }`   | as Mocha    | `{ skip: condition }`, `{ todo: condition }`, `if (...) t.skip()`, `(condition ? it.skip : it)(...)`                                                                                              | `if (...) pending()`, `(condition ? xit : it)(...)`                                                                      |
-| tags such as `@new` (`// NEW:`)        | the title, `{ tag }`                                                                                                | the title                                                            | the title, `{ tags }`, where `'new'` and `'@new'` both mean `@new`                                                                                                                         | the title                                                                                                                                                                 | the title, `{ tags }` from @cypress/grep | the title   | the title, `{ tags }`, as in Vitest                                                                                                                                                               | the title                                                                                                                |
-
-Table-driven tests count too: `test.skip.each(table)(...)`, `describe.skip.each` and Vitest's `.for`.
-A test or describe whose function a condition picks, as in `(isMobile ? test.skip : test)('title', fn)`,
-is a conditional skip in every framework.
-A literal condition decides on its own: `skipIf(true)` and `runIf(false)` always skip, and `skipIf(false)`,
-`runIf(true)` and `{ skip: false }` never do.
-In Vitest, Mocha and `node:test`, `test.skip('title')` and `describe.skip('title')` with no body are skipped too,
-as is `xit('title')` in Jasmine.
-In Mocha, `this.skip()` counts in a test or hook written as a `function`; an arrow function gets no
-Mocha context, so its `this` is not the test's. `this.slow(ms)` only sets Mocha's speed threshold, so
-it isn't the `slow` state.
-Vitest, and `node:test` since Node 26.2, write tag names without the `@`, as in `{ tags: ['flaky'] }`, so a
-name in `tags` counts as the tag with an `@` in front: `'flaky'` is `@flaky`, and a custom state with
-`when: '@flaky'` matches it.
-In `node:test`, an option counts with any value but `false` or `undefined`, as Node reads it, so
-`{ skip: 'broker sandbox is down' }` always skips. `t.skip()` and `t.todo()` take a message, not a
-condition, and in a test or hook written as a `function`, `this.skip()` and `this.todo()` do the same.
-Subtests declared with `t.test('title', options, fn)` are checked like tests, and a test or describe can
-leave out its title and start with its options or body, as in `test({ skip: true }, fn)`.
-A test with no function, `test('title')`, passes in Node, so it isn't a todo. A describe's body, and
-`before` and `after` inside it, get the suite's context, which can't skip. Node reports a test in one
-state only, skip before todo before `expectFailure`, so `describe.skip('title', { todo: 'why' }, fn)`
-needs only a `// SKIP:` marker.
-In Jasmine, `pending()` and Jasmine 7's `notApplicable()` stop the running test, so they count in a test,
-`beforeEach` or `afterEach`; in `beforeAll`, `afterAll` or a describe's body Jasmine fails the suite
-instead, so they are left alone there. Like `t.skip('reason')`, `pending('reason')` takes a reason, not a
-condition. A function or variable of your own called `pending` is not Jasmine's.
+For mixed suites, give each framework its own `files` pattern. See
+[multiple frameworks](docs/configuration.md#multiple-frameworks).
 
 ## Rules
 
+All framework configs use the severities in [Defaults](#defaults).
+
 <!-- begin auto-generated rules list -->
 
-💼 [Configurations](https://github.com/Huldoser/eslint-plugin-test-governance#usage) enabled in.\
-⚠️ [Configurations](https://github.com/Huldoser/eslint-plugin-test-governance#usage) set to warn in.\
-🌲 Set in the `cypress` [configuration](https://github.com/Huldoser/eslint-plugin-test-governance#usage).\
-🌼 Set in the `jasmine` [configuration](https://github.com/Huldoser/eslint-plugin-test-governance#usage).\
-🃏 Set in the `jest` [configuration](https://github.com/Huldoser/eslint-plugin-test-governance#usage).\
-☕ Set in the `mocha` [configuration](https://github.com/Huldoser/eslint-plugin-test-governance#usage).\
-🟢 Set in the `node-test` [configuration](https://github.com/Huldoser/eslint-plugin-test-governance#usage).\
-🎭 Set in the `playwright` [configuration](https://github.com/Huldoser/eslint-plugin-test-governance#usage).\
-⚡ Set in the `vitest` [configuration](https://github.com/Huldoser/eslint-plugin-test-governance#usage).\
-🤖 Set in the `webdriverio` [configuration](https://github.com/Huldoser/eslint-plugin-test-governance#usage).\
-🔧 Automatically fixable by the [`--fix` CLI option](https://eslint.org/docs/user-guide/command-line-interface#--fix).\
-💡 Manually fixable by [editor suggestions](https://eslint.org/docs/latest/use/core-concepts#rule-suggestions).
-
-| Name                                                                                           | Description                                                                       | 💼                      | ⚠️                      | 🔧  | 💡  |
-| :--------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------- | :---------------------- | :---------------------- | :-- | :-- |
-| [marker-matches-state](docs/rules/marker-matches-state.md)                                     | Require the marker keyword to match the test's state                              | 🌲 🌼 🃏 ☕ 🟢 🎭 ⚡ 🤖 |                         |     | 💡  |
-| [no-conflicting-states](docs/rules/no-conflicting-states.md)                                   | Disallow state tags that contradict each other, differ in case or look like typos |                         | 🌲 🌼 🃏 ☕ 🟢 🎭 ⚡ 🤖 | 🔧  |     |
-| [no-orphaned-marker](docs/rules/no-orphaned-marker.md)                                         | Disallow marker comments that no longer match a test state                        | 🌲 🌼 🃏 ☕ 🟢 🎭 ⚡ 🤖 |                         |     | 💡  |
-| [require-ticket](docs/rules/require-ticket.md)                                                 | Require a ticket for skipped, fixme, todo, retried and tagged tests               | 🌲 🌼 🃏 ☕ 🟢 🎭 ⚡ 🤖 |                         |     | 💡  |
-| [require-ticket-for-commented-out-tests](docs/rules/require-ticket-for-commented-out-tests.md) | Require a ticket marker on commented-out tests                                    |                         | 🌲 🌼 🃏 ☕ 🟢 🎭 ⚡ 🤖 |     | 💡  |
-| [require-ticket-in-comments](docs/rules/require-ticket-in-comments.md)                         | Require FIXME and TODO comments in test files to start with a ticket              | 🌲 🌼 🃏 ☕ 🟢 🎭 ⚡ 🤖 |                         |     | 💡  |
+| Name                                                                                           | Description                                                                       |
+| :--------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------- |
+| [marker-matches-state](docs/rules/marker-matches-state.md)                                     | Require the marker keyword to match the test's state                              |
+| [no-conflicting-states](docs/rules/no-conflicting-states.md)                                   | Disallow state tags that contradict each other, differ in case or look like typos |
+| [no-orphaned-marker](docs/rules/no-orphaned-marker.md)                                         | Disallow marker comments that no longer match a test state                        |
+| [require-ticket](docs/rules/require-ticket.md)                                                 | Require a ticket for skipped, fixme, todo, retried and tagged tests               |
+| [require-ticket-for-commented-out-tests](docs/rules/require-ticket-for-commented-out-tests.md) | Require a ticket marker on commented-out tests                                    |
+| [require-ticket-in-comments](docs/rules/require-ticket-in-comments.md)                         | Require FIXME and TODO comments in test files to start with a ticket              |
 
 <!-- end auto-generated rules list -->
 
 ## Defaults
 
-The defaults follow how most teams already work, so each framework config is useful with no options.
+| Setting                   | Default                                                                                                  |
+| ------------------------- | -------------------------------------------------------------------------------------------------------- |
+| States that need a ticket | `skip`, `fixme`; in the other frameworks `skip`, `todo`                                                  |
+| `@new`, `@quarantined`    | off; `lifecycleTags: true` turns both on                                                                 |
+| Conditional skips         | no ticket or reason required; opt in with `requireTicketForConditional` or `requireReasonForConditional` |
+| `fail`, `slow`, `retry`   | off; enable the states your framework supports with `states`                                             |
+| Marker format             | uppercase keyword and colon, then comma-separated tickets: `// SKIP: TRADE-123, TRADE-124`               |
+| Notes after the ticket    | not allowed; `allowNotes: true` allows them                                                              |
+| `FIXME` / `TODO` comments | require tickets in test files; `comments: false` turns this check off                                    |
+| Placement                 | comment block directly above the test or skip call; a blank line breaks it                               |
+| Placeholder tickets       | rejected: `TODO`, `TBD`, `XXX-*`, and any ticket numbered 0                                              |
+| Describe blocks           | a marker on a skipped or tagged describe covers its tests                                                |
+| Severity                  | `no-conflicting-states` and `require-ticket-for-commented-out-tests`: warn; every other rule: error      |
 
-| Setting                                                                                                   | Default                                                                                             | Why                                                                                                                                                                          |
-| --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| States that need a ticket                                                                                 | `skip`, `fixme`; in the other frameworks `skip`, `todo`                                             | Every team skips tests. Chromium DevTools, GitLab and Slack all require a bug link on disabled tests.                                                                        |
-| `@new`, `@quarantined`                                                                                    | off; `lifecycleTags: true` turns both on                                                            | A promotion workflow is not universal. Teams that say `@flaky` instead [rename the tag](#tag-names).                                                                         |
-| Conditional skips (`test.skip(browserName === 'webkit', ...)`, `if (...) test.skip()`, a skip in `catch`) | no ticket needed                                                                                    | These are usually permanent platform limits, not bugs. `requireTicketForConditional: true` asks for a ticket, `requireReasonForConditional: true` for a reason.              |
-| `test.fail`, `test.slow`, Jest's `test.failing`, Vitest's `test.fails`                                    | off                                                                                                 | They don't remove coverage. Turn them on with `states: { fail: true, slow: true }`.                                                                                          |
-| Retries: `describe.configure({ retries })`, `jest.retryTimes()`, `retry`, `this.retries()`                | off                                                                                                 | Retries hide flaky tests. `states: { retry: true }` needs a ticket wherever tests retry, even only on CI.                                                                    |
-| Marker format                                                                                             | `// SKIP: TRADE-123` or `// SKIP: TRADE-123, TRADE-124`                                             | Uppercase keyword and colon, like `TODO:`. Easy to grep.                                                                                                                     |
-| Notes after the ticket                                                                                    | not allowed; `allowNotes: true` allows them                                                         | The ticket is the source of truth. A note in a comment goes stale while the ticket stays current.                                                                            |
-| `FIXME` / `TODO` comments                                                                                 | must start with a ticket, e.g. `// TODO: TRADE-123` or `// TODO(TRADE-123)`                         | The ticket is the source of truth; an untracked `TODO` is never done. `comments: false` turns this off.                                                                      |
-| Placement                                                                                                 | comment block directly above; other comments allowed; a blank line breaks it                        | Survives `eslint-disable-next-line` and Prettier.                                                                                                                            |
-| Ticket format                                                                                             | `any`: `PROJ-123`, `#123`, `owner/repo#123`, or an http(s) URL                                      | Works for Jira, Linear, GitHub and GitLab out of the box. Narrow it with a preset.                                                                                           |
-| Placeholder tickets                                                                                       | rejected: `TODO`, `TBD`, `XXX-*`, and any ticket numbered 0 (`PROJ-0`, `#0`)                        | A fake ticket is worse than none, and no tracker issues number 0.                                                                                                            |
-| Describe blocks                                                                                           | a marker on a skipped or tagged describe covers its tests                                           | One ticket per skipped suite.                                                                                                                                                |
-| Severity                                                                                                  | `no-conflicting-states` and `require-ticket-for-commented-out-tests`: warn; every other rule: error | A marker must always match a real state, so a missing, wrong or leftover marker fails the lint. Tag spelling is cleanup, and commented-out tests are read from comment text. |
+Lifecycle tags describe stages in your team's workflow. Enabling them checks tickets and tag
+consistency; it does not change how the test runner runs or quarantines tests. Warnings normally
+allow a successful lint run, but an existing `--max-warnings 0` policy makes them fail too.
 
 ## Options
 
-All options go in `configure({...})`, or in `settings['test-governance']` if you build the config
-yourself. `framework` is required, and every other option has a default. The rules have no options
-of their own: they all read these shared settings, so they always agree on ticket formats, states
-and markers. To turn a rule off, set it to `'off'` as usual.
+Use [`configure()`](docs/configuration.md#change-the-shared-policy) to change shared settings, or
+[override rule severity](docs/troubleshooting.md#adopt-in-an-existing-suite). Options belong to the
+plugin's shared settings, not individual rules.
 
-| Option                        | Type                                                                                                      | Default                           | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `framework`                   | `'playwright' \| 'jest' \| 'vitest' \| 'mocha' \| 'cypress' \| 'webdriverio' \| 'node-test' \| 'jasmine'` | required                          | The test framework of the files the config applies to. Each framework's config, such as `configs.playwright`, sets it, and `configure()` needs it. See [Frameworks](#frameworks).                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `ticket`                      | `TicketSpec \| TicketSpec[]`                                                                              | `{ preset: 'any' }`               | Accepted ticket formats. An array accepts a ticket that matches any entry. See [Ticket presets](#ticket-presets).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `placeholders`                | `string[]`                                                                                                | see above                         | Tickets rejected as placeholders. `*` matches any characters. Case-insensitive, and a leading `#` on the ticket or the placeholder is ignored. Your list replaces the default one, so repeat the defaults you want to keep. Tickets numbered 0 are always rejected.                                                                                                                                                                                                                                                                                                                                                             |
-| `lifecycleTags`               | `boolean`                                                                                                 | `false`                           | Turns on the `new` (`@new`) and `quarantined` (`@quarantined`) states.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `states`                      | `{ [state]: boolean \| { enabled?, tag?, marker?, ticket? } }`                                            | `skip`, `fixme` and `todo` on     | Turns built-in states (`skip`, `fixme`, `fail`, `slow`, `todo`, `retry`, `new`, `quarantined`) on or off, renames their tag or marker, or gives them their own ticket format. `fail`, `slow` and `retry` are off by default; a setting for `new` or `quarantined` here wins over `lifecycleTags`. Only `new` and `quarantined` have a tag to rename; see [Tag names](#tag-names). `fixme` and `slow` exist only in Playwright, `todo` in every framework but Playwright, `fail` in Playwright, Jest, Vitest and node:test, and `retry` in every framework but node:test and Jasmine, so turning one on elsewhere has no effect. |
-| `customStates`                | `{ [name]: { when, marker, ticket? } }`                                                                   | `{}`                              | Adds a state for a tag, e.g. `{ 'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' } }`. `when` is a tag and `marker` an uppercase keyword; neither can be shared with another state.                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `knownTags`                   | `string[]`                                                                                                | `[]`                              | Your team's other tags, such as `['@smoke', '@regression']`, written with the `@`. `no-conflicting-states` reports them in the wrong case or misspelled, as it does state tags, and never reports a listed tag as a typo of a state tag.                                                                                                                                                                                                                                                                                                                                                                                        |
-| `requireTicketForConditional` | `boolean`                                                                                                 | `false`                           | Require a ticket for conditional skips too: `test.skip(condition, ...)`, `if (...) test.skip()`, `(condition ? test.skip : test)(...)`, a skip in a `catch` block, after other code in a `try` block with a `catch`, or after an early `return` or `throw`.                                                                                                                                                                                                                                                                                                                                                                     |
-| `requireReasonForConditional` | `boolean`                                                                                                 | `false`                           | Require a reason, but no ticket, for conditional skips: a comment above the skip or at the end of its line, above the `if` around it or above its hook, step or test, or the reason the call takes, as `test.skip(condition, 'why')`. See [require-ticket](docs/rules/require-ticket.md#reasons-for-conditional-skips).                                                                                                                                                                                                                                                                                                         |
-| `allowBlankLine`              | `boolean`                                                                                                 | `false`                           | Let blank lines separate a marker from its test.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `allowNotes`                  | `boolean`                                                                                                 | `false`                           | Allow free text after the tickets, e.g. `// SKIP: TRADE-123 flaky on CI`. Applies to markers and to `FIXME` / `TODO` comments.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `comments`                    | `false \| { keywords?: string[] }`                                                                        | `{ keywords: ['FIXME', 'TODO'] }` | Comment keywords that must start with a ticket anywhere in a test file, e.g. `// TODO: TRADE-123`. Your keywords replace the default ones. `false` allows free-form comments.                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `annotations`                 | `false \| { type?: string, only?: boolean }`                                                              | `{ type: 'issue' }`               | Accept the ticket from a test annotation as well: Playwright's `annotation` of the given type or Vitest's `meta` key of that name. One valid annotation covers every state the test is in, and a describe's covers its tests. `only: true` makes it the only place for a test's or describe's ticket. See [Tickets from annotations](#tickets-from-annotations).                                                                                                                                                                                                                                                                |
-| `testFunctions`               | `string[]`                                                                                                | `['test']`                        | Names treated as the framework's `test`. Jest, Vitest and node:test default to `['test', 'it']`, Mocha, Cypress and WebdriverIO to `['it', 'specify', 'test']`, and Jasmine to `['it']`. Your list replaces the default one, so include those names if you still need them. See below.                                                                                                                                                                                                                                                                                                                                          |
-| `reportUnreadableTags`        | `boolean`                                                                                                 | `false`                           | When a tag state is on, report titles that aren't static text, and tags or details that can't be read in the file, such as ones imported from another module, since their tags can't be checked.                                                                                                                                                                                                                                                                                                                                                                                                                                |
+<a name="tag-names"></a>
+<a name="ticket-presets"></a>
+<a name="tickets-from-annotations"></a>
+<a name="markers-in-eslint-disable-comments"></a>
 
-### Tag names
+- [Tag names and lifecycle states](docs/configuration.md#tag-names)
+- [Ticket presets](docs/configuration.md#ticket-presets)
+- [Tickets from annotations](docs/configuration.md#tickets-from-annotations)
+- [Markers in ESLint directives](docs/configuration.md#markers-in-eslint-disable-comments)
 
-Teams name the stages of a test differently, so `states` can rename the tag of `new` and
-`quarantined`. The marker keeps its name unless you rename it too:
+<a name="which-functions-count-as-test"></a>
+<a name="syntax-the-rules-understand"></a>
 
-```js
-testGovernance.configure({
-  framework: 'playwright',
-  lifecycleTags: true,
-  states: { quarantined: { tag: '@flaky', marker: 'FLAKY' } },
-});
-```
-
-<!-- example: valid settings={"lifecycleTags":true,"states":{"quarantined":{"tag":"@flaky","marker":"FLAKY"}}} -->
-
-```ts
-// FLAKY: TRADE-311
-test('streams level 2 quotes @flaky', async ({ page }) => {
-  // ...
-});
-```
-
-The new tag replaces the default one, so `@quarantined` no longer puts a test in the state, and the
-rules check `@flaky` as they checked `@quarantined`: `@new` together with `@flaky` is reported, and so
-is a near-miss such as `@flakey`. For a tag that isn't one of these stages, such as `@needs-data`, add
-a `customStates` entry.
-
-### Ticket presets
-
-| Preset         | Accepts                                                                                                                                                                        | Options                                                                                                                            |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `any`          | `PROJ-123`, `#123`, `owner/repo#123`, any http(s) URL                                                                                                                          |                                                                                                                                    |
-| `jira`         | `TRADE-123`, `https://<host>/browse/TRADE-123` (also under a path, as in `/jira/browse/TRADE-123`), board URLs with `selectedIssue=TRADE-123`                                  | `projects`; `host` (any host by default)                                                                                           |
-| `github`       | `#123`, `owner/repo#123`, `https://github.com/owner/repo/issues/123` (or `/pull/`)                                                                                             | `host` for GitHub Enterprise (`github.com` by default)                                                                             |
-| `gitlab`       | `#123`, `group/project#123`, `https://gitlab.com/group/project/-/issues/123`                                                                                                   | `host` for self-managed (`gitlab.com` by default)                                                                                  |
-| `linear`       | `RISK-123`, `https://linear.app/<workspace>/issue/RISK-123/...`                                                                                                                | `teams`                                                                                                                            |
-| `azure-devops` | `AB#123`, `#123`, `https://dev.azure.com/<org>/<project>/_workitems/edit/123`                                                                                                  | `host` for Azure DevOps Server (`dev.azure.com` and `*.visualstudio.com` by default)                                               |
-| `trello`       | card links, `https://trello.com/c/nqPiDKmw` with or without the `/9-title` after it                                                                                            |                                                                                                                                    |
-| `notion`       | Unique IDs such as `TASK-123`, `https://www.notion.so/TASK-123`, page links that end in the page ID (also `https://app.notion.com/p/...`), database links with `?p=<page ID>`  | `prefixes`; `host` for a custom domain (`notion.so`, `www.notion.so`, `app.notion.com` and `*.notion.site` by default)             |
-| `asana`        | task links, `https://app.asana.com/0/<project>/<task>` and the newer `https://app.asana.com/1/<workspace>/.../task/<task>`                                                     |                                                                                                                                    |
-| `clickup`      | `CU-86abc123`, `#86abc123` (not `#123`), custom IDs like `DEV-123`, `https://app.clickup.com/t/86abc123` or `/t/<workspace>/DEV-123`, view links `?p=<task>`                   | `prefixes` for custom IDs                                                                                                          |
-| `redmine`      | `#123`, `#123-4` and `#123#note-4` (a note), `##123`; with `host`, `https://<host>/issues/123` (also under a path)                                                             | `host`, needed for links                                                                                                           |
-| `monday`       | item links, `https://<account>.monday.com/boards/<board>/pulses/<item>`, and custom keys such as `TIX-001`                                                                     | `prefixes` for custom keys                                                                                                         |
-| `youtrack`     | `KT-123`, `https://<host>/issue/KT-123/...` or `/projects/KT/issues/KT-123` (also under a path, as in `/youtrack/issue/KT-123`)                                                | `projects`; `host` for Server or a custom domain (`youtrack.jetbrains.com`, `*.youtrack.cloud` and `*.myjetbrains.com` by default) |
-| `basecamp`     | to-do and card links, `https://3.basecamp.com/<account>/buckets/<project>/todos/<id>` or `/card_tables/cards/<id>`                                                             |                                                                                                                                    |
-| `shortcut`     | `sc-123`, `[sc-123]`, `https://app.shortcut.com/<workspace>/story/123/...`                                                                                                     |                                                                                                                                    |
-| `openproject`  | `#4821` and per-project IDs such as `AGILE-1`; with `host`, `https://<host>/projects/<identifier>/work_packages/AGILE-1` (also `/work_packages/4821` and the short `/wp/4821`) | `host`, needed for links                                                                                                           |
-| `bugzilla`     | bug numbers `4821`; with `host`, `https://<host>/show_bug.cgi?id=4821`, also under a path as in `/bugzilla/show_bug.cgi`                                                       | `host`, needed for links                                                                                                           |
-| `phabricator`  | task monograms `T4821`; with `host`, `https://<host>/T4821`. Phorge, Phabricator's maintained fork, shares the format                                                          | `host`, needed for links                                                                                                           |
-| `rally`        | formatted IDs `US4821`, `DE4821`, `TA4821`, `TC4821`, never zero-padded (so MITRE ATT&CK's `TA0006` isn't one)                                                                 |                                                                                                                                    |
-| `servicenow`   | record numbers `STRY0010001` for the prefixes you list, any digit count                                                                                                        | `prefixes`, required: record-number prefixes such as `STRY`                                                                        |
-| `plane`        | `WEB-142`; `https://app.plane.so/<workspace>/<project>/issues/WEB-142` (or a UUID), and the same on a `host` for self-hosted                                                   | `projects`; `host` for self-hosted (`app.plane.so` by default)                                                                     |
-| `url`          | links to the hosts you list, and nothing else                                                                                                                                  | `hosts`, required: host names such as `tasks.example.com`, with no scheme, port or path; `*.example.com` matches its subdomains    |
-| `numeric`      | `4821`                                                                                                                                                                         | `minLength` (1), `maxLength` (20)                                                                                                  |
-| `pattern`      | anything matching your regex, anchored at both ends                                                                                                                            | `pattern`, `flags`                                                                                                                 |
-
-`projects` (Jira, YouTrack, Plane), `teams` (Linear) and `prefixes` (Notion, ClickUp, monday.com,
-ServiceNow) are keys as they appear in tickets, in uppercase: `TRADE` for `TRADE-123`, `STRY` for
-`STRY0010001`. YouTrack project IDs may also start with a digit, as `4DM`. Without them, any key passes;
-ServiceNow's list is required. `host` is a host name such as `jira.example.com`, or `*.example.com` for
-every subdomain, as in `{ preset: 'jira', host: '*.atlassian.net' }`. Every preset that takes `host`
-requires a plain host name: a value with a scheme, port or path never matched a link, so it is an error.
-Each preset
-takes only its own options, so `host` on the `any` preset fails with a clear message instead of being
-ignored. A `pattern` always matches the whole ticket, so the `g` and `y` flags make no difference and are
-ignored.
-
-A preset rejects links that aren't one ticket in its tracker, such as a Trello board, an Asana project or
-a Notion database view. Redmine runs on your own server, and `/issues/123` is also GitHub's path, so its
-links pass only once `host` is set. The same holds for OpenProject, Bugzilla and Phabricator, which also
-run on their own servers.
-
-For a tracker without a preset, use `url` with its host, for example
-`{ preset: 'url', hosts: ['www.wrike.com'] }` for Wrike links such as
-`https://www.wrike.com/open.htm?id=4821`; a link with `?id=0`, or a path that ends in `/0`, is a
-placeholder. It works the same for Microsoft Planner (`tasks.office.com`), Airtable (`airtable.com`),
-Smartsheet (`app.smartsheet.com`) and trackers of your own. For another
-tracker's keys, such as `WEB-12`, `any` or `pattern` works. Gitea, Forgejo and Codeberg use GitHub's link layout,
-so the `github` preset with their `host` covers them. Bitbucket has no issue tracker since August 2026,
-so it has no preset.
-
-Presets combine, and each state can have its own format. For example, bugs in Jira and flaky-test
-reports in GitHub:
-
-```js
-testGovernance.configure({
-  framework: 'playwright',
-  ticket: { preset: 'jira', projects: ['TRADE'] },
-  lifecycleTags: true,
-  states: { quarantined: { ticket: { preset: 'github' } } },
-});
-```
-
-The built-in presets are written to run in linear time. A `pattern` preset runs your regex as given,
-so keep it free of nested quantifiers.
-
-### Tickets from annotations
-
-A comment never reaches a test report. Playwright and Vitest can carry the ticket in data that does, so
-`annotations` accepts it from there as well:
-
-```js
-test.skip(
-  'rejects a margin order above the buying power',
-  {
-    annotation: { type: 'issue', description: 'TRADE-123' },
-  },
-  async () => {},
-);
-```
-
-```js
-// Vitest: the ticket is the `issue` key of `meta`.
-test.skip('rejects a margin order above the buying power', { meta: { issue: 'TRADE-123' } }, () => {});
-```
-
-The `type` names Playwright's annotation type and Vitest's `meta` key; `'issue'` by default, matched
-exactly. The value must be the ticket and nothing else, as in a marker. One valid annotation covers every
-state the test is in, and a describe's annotation covers its tests. An annotation of another type is
-left alone, and an annotation whose ticket isn't static text is reported with `reportUnreadableTags`.
-`annotations: false` turns it off. A marker comment still works everywhere, and when both are written,
-both must be valid. Jest, Mocha, Jasmine, node:test and Cypress have no annotations, so for them it is
-comments only.
-
-With `annotations: { only: true }`, a test or describe in Playwright or Vitest must carry its ticket in the
-annotation, and a marker comment above it is reported, with a suggestion that moves its tickets into
-`annotation` or `meta`. A runtime skip such as `test.skip()` in a body, and a step, can't carry an
-annotation, so their comments still count. `only` with another framework is a configuration error.
-
-### Markers in `eslint-disable` comments
-
-If you also run a rule that bans skipped tests, such as `jest/no-disabled-tests`, the comment that turns it off
-can hold the marker in its description, after `--`:
-
-```js
-// eslint-disable-next-line jest/no-disabled-tests -- SKIP: TRADE-123
-test.skip('rejects a margin order above the buying power', () => {});
-```
-
-The description is read as a marker comment, with the same tickets and notes rules. It works in an
-`eslint-disable-next-line` above the test, an `eslint-disable-line` on the line the test starts on, and an
-`eslint-disable` block comment, whose marker covers every test up to the `eslint-enable` of one of its rules, or of
-every rule. A suggestion that removes or adds a marker keeps the directive working.
-
-### Which functions count as `test`
-
-In Playwright files:
-
-- `test` imported from `@playwright/test`, `playwright/test` or a component-testing package such as
-  `@playwright/experimental-ct-react`, including the default import, aliases such as
-  `import { test as it }` or `const it = test`, and `const { test } = require('@playwright/test')`.
-- `pw.test` on the whole module, after `import * as pw from '@playwright/test'`. The default import
-  and `const pw = require('@playwright/test')` are `test` itself, so `pw.skip(...)` and
-  `pw.test.skip(...)` both count.
-- Fixtures made with `.extend()` or `mergeTests()` in the same file, such as
-  `const test = base.extend({...})`.
-- Any name in `testFunctions`, for fixtures imported from your own modules. The default `['test']`
-  covers the common `import { test } from './fixtures'`.
-
-In Jest and Vitest files:
-
-- The globals `test`, `it` and `describe`, Jest's `xit`, `xtest`, `fit`, `xdescribe` and
-  `fdescribe`, and Vitest's `suite`, and the same names imported or required from `@jest/globals` or
-  `vitest`, including aliases and `import * as vi from 'vitest'`.
-- Vitest fixtures made with `test.extend()` in the same file.
-- Any name in `testFunctions`, which defaults to `['test', 'it']`.
-
-In Mocha, Cypress and WebdriverIO files:
-
-- The globals `it`, `specify`, `describe` and `context`, their `x` forms, the TDD names `suite` and
-  `test`, and the hooks `before`, `beforeEach`, `after`, `afterEach`, `suiteSetup`, `setup`,
-  `suiteTeardown` and `teardown`.
-- The names imported or required from `mocha`, including aliases, and the whole module, as `mocha.it`
-  after `import * as mocha from 'mocha'`, `import mocha from 'mocha'` or `const mocha = require('mocha')`.
-- Any name in `testFunctions`, which defaults to `['it', 'specify', 'test']`.
-
-In `node:test` files:
-
-- `test`, `it`, `describe`, `suite`, the hooks `before`, `beforeEach`, `after` and `afterEach`, and
-  the members exported by name, `skip`, `todo`, `only` and `expectFailure`, imported or required from
-  `node:test`, including aliases and `import * as nodeTest from 'node:test'`. The module is `test`
-  itself, so after `import test from 'node:test'` or `const test = require('node:test')`,
-  `test.describe(...)` is a describe.
-- Subtests: `t.test(...)` on the context a test's body receives.
-- Any name in `testFunctions`, which defaults to `['test', 'it']`. `node:test` has no globals.
-
-In Jasmine files:
-
-- The globals `it`, `xit`, `fit`, `describe`, `xdescribe`, `fdescribe`, and the hooks `beforeEach`,
-  `afterEach`, `beforeAll` and `afterAll`. With the runner's `globals: false`, Jasmine 7 takes the same
-  names from `jasmine-core`, so names imported or required from it count too, including aliases and
-  the whole module, as `core.xit` after `const core = require('jasmine-core')`.
-- `pending()` and `notApplicable()`, as globals or imported by name.
-- Any name in `testFunctions`, which defaults to `['it']`. Jasmine has no `test`.
-
-A name imported or required from another test runner (Playwright, `vitest`, `@jest/globals`,
-`node:test`, `jasmine-core`, `bun:test`, `mocha`, `ava`, `tap`, `uvu`), or a variable set from one such as
-`const test = require('ava')`, is never treated as the framework's `test`, and neither is a local
-variable or function declared inside a function that happens to be called `test`.
-
-### Syntax the rules understand
-
-The [Frameworks](#frameworks) table lists what each framework's tests can do. In Playwright:
-
-- `test.skip('title', fn)`, `test.fixme(...)`, `test.fail(...)`, with or without a details object,
-  and with a body defined elsewhere, as in `test.skip('places a limit order', placeLimitOrder)`. The
-  title can also be a `const` declared in the same file.
-- `test.describe.skip(...)` and `test.describe.fixme(...)`, including `serial` and `parallel` variants,
-  and `describe.skip(...)` after `const { describe } = test`. The state covers every test inside.
-- Runtime calls inside a test, a describe or a hook such as `test.beforeEach`: `test.skip()`,
-  `test.skip(true)`, `test.fixme()`, `test.fail()`, `test.slow()`, the same methods on `testInfo`,
-  and `test.info().skip()`.
-- Skipped steps: `test.step.skip('title', fn)`, and `step.skip()` on the `TestStepInfo` a step's body
-  receives. Only the step is skipped, so a marker above the step or above a skipped test around it
-  covers it.
-- Tags in titles (string or template literal) and in `{ tag: '@new' }` / `{ tag: [...] }`, inherited
-  from enclosing describes. Tags, titles and details can also come from a `const` or an enum declared
-  in the same file, as in `{ tag: TAGS.NEW }` after `const TAGS = { NEW: '@new' } as const`, including
-  arrays and spreads of them.
-
-Not covered in this version: tests generated in loops with dynamic titles, and tags or details imported
-from other modules (see `reportUnreadableTags`), fixtures imported from other modules under a name not in
-`testFunctions`, a Vitest test with only a title, which Vitest runs as a todo but which looks the same as a
-helper called `test`, Cypress tests skipped with @cypress/skip-test's `skipOn()` and `onlyOn()`, `node:test`'s
-`getTestContext()`, Jasmine's `pending()` in a helper function that tests call, Jasmine 5 and 6's
-`require('jasmine-core').noGlobals()`, and other runners such as Bun.
+See [recognized test functions and syntax](docs/frameworks.md), including
+[static analysis limits](docs/frameworks.md#static-analysis-limits).
 
 ## TypeScript
 
-The package ships its own type declarations, which work with TypeScript 5.0 or later. Besides the
-plugin, it exports these types: `GovernanceOptions` (the options of `configure()`), `TicketSpec`,
-`CustomState`, `StateOverride`, `FrameworkName`, `RuleName`, `ConfigName`, `FlatConfig` and
-`TestGovernancePlugin`.
-
-```ts
-// eslint.config.ts
-import tsParser from '@typescript-eslint/parser';
-import testGovernance, { type GovernanceOptions } from 'eslint-plugin-test-governance';
-
-const options: GovernanceOptions = {
-  framework: 'playwright',
-  lifecycleTags: true,
-  ticket: { preset: 'jira', projects: ['TRADE'] },
-};
-
-export default [
-  { files: ['**/*.ts'], languageOptions: { parser: tsParser } },
-  { files: ['tests/**/*.ts'], ...testGovernance.configure(options) },
-];
-```
+See [TypeScript setup and exported types](docs/configuration.md#typescript). TypeScript test files
+need a parser; TypeScript config files also need an appropriate config loader.
 
 ## Contributing
 
-Bug reports and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) explains the setup and
-the checks every pull request runs, and [CHANGELOG.md](CHANGELOG.md) lists the changes in each release.
+[CONTRIBUTING.md](CONTRIBUTING.md) covers setup, checks and documentation maintenance.
+[CHANGELOG.md](CHANGELOG.md) lists releases; [SECURITY.md](SECURITY.md) explains private vulnerability reports.
 
 ## License
 

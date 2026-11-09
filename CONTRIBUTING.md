@@ -5,15 +5,20 @@ use the issue forms.
 
 ## Setup
 
-Requires Node.js 22.12 or later.
+Use Node.js 24 or 26 for development, matching the CI matrix. The plugin's oldest supported Node.js
+version is 22.12. Testing on that version needs the type-stripping flag shown below.
 
 ```sh
 git clone https://github.com/Huldoser/eslint-plugin-test-governance.git
 cd eslint-plugin-test-governance
-npm install
+npm ci
 ```
 
 ## Checks
+
+On Node 22.12, run the TypeScript tests with `NODE_OPTIONS=--experimental-strip-types npm test`.
+The default ESLint 10 development dependency needs Node 22.13+ within Node 22, or Node 24+.
+CI's oldest-version job uses ESLint 9.0.0; use Node 24 or 26 for the full contributor checks below.
 
 Every pull request runs these in CI (tests on Node 22, 24 and 26 with ESLint 9 and 10, plus the oldest supported
 versions, Node 22.12 with ESLint 9.0.0, and the tests and packing on Windows):
@@ -54,7 +59,13 @@ reached, remove it rather than excluding it.
   case, and assert the full message data and any suggestion output.
 - Each rule has a page in `docs/rules/`. Examples marked `<!-- example: valid -->` or
   `<!-- example: invalid -->` run as tests, so keep them correct. Code samples in the README marked
-  the same way run with all the rules on.
+  the same way run with all the rules on. Show an example's settings in visible prose as well as its
+  test marker. Correct rule-page examples must also pass the complete framework preset.
+- `README.md` holds the first-run instructions and default policy. Keep shared options and ticket
+  formats in [docs/configuration.md](docs/configuration.md), runner syntax in
+  [docs/frameworks.md](docs/frameworks.md), and diagnostic recipes in
+  [docs/troubleshooting.md](docs/troubleshooting.md). Complete config blocks marked
+  `<!-- config: name -->` are exercised by `tests/docs-configs.test.ts`; add a case there for a new path.
 - The rules list in the README and the header of each rule page are generated. After changing rule
   metadata, run `npm run docs` and commit the result.
 - If the change affects what the sample project reports, update the snapshot with
@@ -62,24 +73,26 @@ reached, remove it rather than excluding it.
 
 ## Keeping the docs current
 
-Docs change in the same pull request as the code. Most of what they say about the code is checked by
-`tests/docs.test.ts` or `npm run docs:check`, so CI fails when they fall behind.
+Docs change in the same pull request as the code. Facts repeated in the docs are checked by
+`tests/docs.test.ts` or `npm run docs:check`: names, defaults, selected examples and local links.
+`tests/docs-configs.test.ts` runs the complete marked configs against failing and passing samples.
+These checks do not verify every behavioral statement or execute the test runners themselves.
 
-| When you change                                     | Update                                                                                                                               | Checked by                                                   |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
-| A rule's metadata (description, fixable, severity)  | run `npm run docs`; the Severity row of the README Defaults table                                                                    | `docs:check`, docs tests                                     |
-| What a rule reports                                 | its page in `docs/rules/`, with an example for the new case                                                                          | the examples run                                             |
-| The list of rules                                   | run `npm run docs`; the rule's page; the rule list in `.github/ISSUE_TEMPLATE/1-false-report.yml`                                    | `docs:check`, docs tests                                     |
-| An option, its type or its default                  | the README Options and Defaults tables, its doc comment in `src/utils/options.ts`, and the Options list of each rule page it changes | docs tests                                                   |
-| A ticket preset or the options it takes             | the README Ticket presets table                                                                                                      | docs tests                                                   |
-| A framework, or syntax a framework's tests can use  | the README framework table and "Syntax the rules understand", rule page examples, `package.json` keywords and description            | partly: the table's columns and the keywords, not the syntax |
-| Exported types                                      | the README TypeScript section                                                                                                        | docs tests                                                   |
-| The supported Node.js, ESLint or TypeScript version | `package.json`, the README, this file and the CI matrix                                                                              | docs tests                                                   |
-| A heading                                           | the links to it                                                                                                                      | docs tests                                                   |
-| A breaking change                                   | a section in `docs/upgrading.md` with a before and after, and the error an old config gives                                          | docs tests, for the errors                                   |
-| Anything users will notice                          | an entry under `[Unreleased]` in `CHANGELOG.md`                                                                                      | the Changelog check, for changes to `src/`                   |
+| When you change                                     | Update                                                                                                                                                            | Checked by                                                              |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| A rule's metadata (description, fixable, severity)  | run `npm run docs`; the Severity row of the README Defaults table                                                                                                 | `docs:check`, docs tests                                                |
+| What a rule reports                                 | its page in `docs/rules/`, with an example for the new case                                                                                                       | the examples run                                                        |
+| The list of rules                                   | run `npm run docs`; the rule's page; the rule list in `.github/ISSUE_TEMPLATE/1-false-report.yml`                                                                 | `docs:check`, docs tests                                                |
+| An option, its type or its default                  | the configuration reference Options table and README Defaults table, its doc comment in `src/utils/options.ts`, and the Options list of each rule page it changes | docs tests                                                              |
+| A ticket preset or the options it takes             | the configuration reference Ticket presets table                                                                                                                  | docs tests                                                              |
+| A framework, or syntax a framework's tests can use  | the README config map and docs/frameworks.md, rule page examples, `package.json` keywords and description                                                         | partly: the reference headings, config map and keywords, not all syntax |
+| Exported types                                      | the configuration reference Exported types section                                                                                                                | docs tests                                                              |
+| The supported Node.js, ESLint or TypeScript version | `package.json`, the README, this file and the CI matrix                                                                                                           | docs tests                                                              |
+| A heading                                           | the links to it                                                                                                                                                   | docs tests                                                              |
+| A breaking change                                   | a section in `docs/upgrading.md` with a before and after, and the error an old config gives                                                                       | docs tests, for the errors                                              |
+| Anything users will notice                          | an entry under `[Unreleased]` in `CHANGELOG.md`                                                                                                                   | the Changelog check, for changes to `src/`                              |
 
-What the README and rule pages say about behaviour, such as which syntax each framework supports,
+What the framework reference and rule pages say about behaviour, such as which syntax each framework supports,
 can't be checked this way. Adding an example for it to a rule page makes it one that is.
 
 ## Commits and pull requests

@@ -1,10 +1,8 @@
 # Require a ticket marker on commented-out tests (`test-governance/require-ticket-for-commented-out-tests`)
 
-📝 Require a ticket marker on commented-out tests.
+Enabled as **warn** in every [framework config](../../README.md#frameworks).
 
-⚠️ This rule _warns_ in the following [configs](https://github.com/Huldoser/eslint-plugin-test-governance#usage): 🌲 `cypress`, 🌼 `jasmine`, 🃏 `jest`, ☕ `mocha`, 🟢 `node-test`, 🎭 `playwright`, ⚡ `vitest`, 🤖 `webdriverio`.
-
-💡 This rule is manually fixable by [editor suggestions](https://eslint.org/docs/latest/use/core-concepts#rule-suggestions).
+Offers editor suggestions; these do not run with `--fix`.
 
 <!-- end auto-generated rule header -->
 
@@ -12,12 +10,8 @@ Commenting a test out skips it by hand, with nothing in the test report to say s
 commented-out test for the same `// SKIP: <ticket>` marker a skipped test needs, so it is tracked like one,
 or deleted.
 
-```ts
-// SKIP: TRADE-512                                    ✓ the marker covers the block it is in
-// test('rejects a margin order', async () => {});
-
-// test('rejects a margin order', async () => {});    ✖ no marker
-```
+Put the marker in the same consecutive block of comments as the disabled test. A separate block
+without its own marker is reported; see the [examples](#examples).
 
 How comments are read:
 
@@ -39,6 +33,9 @@ The rule reads comment text rather than code, so a sentence that starts like a c
 covers this`, is reported too. That is why the configs set it to warn.
 
 ## Examples
+
+Examples use Playwright unless noted. Settings shown with an example go in `configure()` alongside
+`framework`. Incorrect examples illustrate this rule; other enabled rules may report them too.
 
 Incorrect:
 
@@ -74,7 +71,7 @@ test('places a limit order', async ({ page }) => {});
 ## Options
 
 This rule has no options of its own. It reads the shared options described in the
-[README](../../README.md#options):
+[configuration reference](../configuration.md#options):
 
 - `states`: the `skip` state's marker and ticket format, such as `{ skip: { marker: 'PARKED' } }`.
   `{ skip: false }` turns the check off, and so does turning the rule off in your config.
