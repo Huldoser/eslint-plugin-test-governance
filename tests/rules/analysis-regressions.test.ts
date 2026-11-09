@@ -6,7 +6,9 @@ const missing = (state = 'skip', marker = 'SKIP') => ({
   messageId: 'missingMarker' as const,
   data: { subject: 'This test', state, marker, example: 'PROJ-123' },
 });
-const lifecycle = settings({ lifecycleTags: true });
+const lifecycle = settings({
+  customStates: { new: { when: '@new', marker: 'NEW' }, quarantined: { when: '@quarantined', marker: 'QUARANTINED' } },
+});
 
 runRule('require-ticket (analysis regressions)', rule, {
   valid: [

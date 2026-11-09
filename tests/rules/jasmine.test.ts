@@ -1,5 +1,5 @@
 import markerMatchesState from '../../src/rules/marker-matches-state.ts';
-import noConflictingStates from '../../src/rules/no-conflicting-states.ts';
+import consistentTagNames from '../../src/rules/consistent-tag-names.ts';
 import noOrphanedMarker from '../../src/rules/no-orphaned-marker.ts';
 import requireTicket from '../../src/rules/require-ticket.ts';
 import { runRule, settings, withOptions } from '../helpers.ts';
@@ -167,22 +167,26 @@ runRule('no-orphaned-marker (Jasmine)', noOrphanedMarker, {
   ]),
 });
 
-runRule('no-conflicting-states (Jasmine)', noConflictingStates, {
-  valid: withOptions({ ...jasmine, lifecycleTags: true }, [
-    // Angular's `@if` and `@Input` in a title aren't state tags.
-    "it('renders @if blocks and @Input() bindings', () => {});",
-    "it('fills a limit order @new', () => {\n  if (isNode) pending();\n});",
-  ]),
-  invalid: withOptions({ ...jasmine, lifecycleTags: true }, [
+runRule('consistent-tag-names (Jasmine)', consistentTagNames, {
+  valid: withOptions(
     {
-      code: "xit('fills a limit order @new', () => {});",
-      errors: [{ messageId: 'newSkipped' }],
+      ...jasmine,
+      customStates: {
+        new: { when: '@new', marker: 'NEW' },
+        quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+      },
     },
-    {
-      code: "it('settles at T+1 @new', () => {\n  pending('needs the clearing API');\n});",
-      errors: [{ messageId: 'newSkipped' }],
-    },
-  ]),
+    [
+      // Angular's `@if` and `@Input` in a title aren't state tags.
+      "it('renders @if blocks and @Input() bindings', () => {});",
+      "it('fills a limit order @new', () => {\n  if (isNode) pending();\n});",
+
+      // Custom tags do not impose lifecycle conflicts.
+      { code: "xit('fills a limit order @new', () => {});" },
+      { code: "it('settles at T+1 @new', () => {\n  pending('needs the clearing API');\n});" },
+    ],
+  ),
+  invalid: [],
 });
 
 // Only Jasmine reads `pending()` and `notApplicable()`.

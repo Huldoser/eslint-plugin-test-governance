@@ -1,7 +1,9 @@
 import rule from '../../src/rules/marker-matches-state.ts';
 import { runRule, settings } from '../helpers.ts';
 
-const lifecycle = settings({ lifecycleTags: true });
+const lifecycle = settings({
+  customStates: { new: { when: '@new', marker: 'NEW' }, quarantined: { when: '@quarantined', marker: 'QUARANTINED' } },
+});
 
 runRule('marker-matches-state', rule, {
   valid: [

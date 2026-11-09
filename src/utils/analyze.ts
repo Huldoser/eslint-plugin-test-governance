@@ -9,8 +9,6 @@ type SourceCode = Readonly<TSESLint.SourceCode>;
 
 const TEST: Root = { kind: 'test', modifiers: [] };
 const DESCRIBE: Root = { kind: 'describe', modifiers: [] };
-/** Modifiers that keep a test from running. */
-const SKIPPING_MODIFIERS = new Set(['skip', 'fixme', 'todo']);
 /** What a step's `TestStepInfo` can do at runtime: `step.skip()`. */
 const STEP_INFO_METHODS = new Set(['skip']);
 const MARKER_LINE_RE = /^\s*\*?\s*([A-Za-z][\w-]*)\s*:(.*)$/;
@@ -190,8 +188,6 @@ export interface Subject {
   commented: boolean;
   /** Every tag written on this node, known or not. */
   tags: TagOccurrence[];
-  /** Tags this node inherits from enclosing describes. */
-  inheritedTags: Set<string>;
   /** Tag values, or a whole details object, on this node that can't be read, as `{ tag: TAGS.NEW }` with `TAGS` imported. */
   unreadTags: Node[];
   /**
@@ -204,9 +200,6 @@ export interface Subject {
    * describe, `describe('d', () => test.skip(...))`, so a marker for them isn't left over here.
    */
   sharedStates: Set<string>;
-  /** True when this node is skipped or fixme'd by any means, whether or not those states are on. */
-  skipped: boolean;
-  ownSkip: boolean;
   markers: Marker[];
   /** Markers of the `eslint-disable` regions this node is in, other than those in its own block. */
   regionMarkers: Marker[];
@@ -1787,7 +1780,6 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       sources.push(source);
     }
     const inherited = new Set<string>();
-    const inheritedTags = new Set<string>();
     const unknownStates = new Set<string>();
     if (parent && kind !== 'runtime') {
       for (const name of parent.inherited) inherited.add(name);
@@ -1801,15 +1793,6 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
           : tagInfo.opaqueDetails && optionModifiers.has(state.modifier);
       if (unknown) unknownStates.add(state.name);
     }
-    // Tags belong to tests: a step in a `@new` test is not itself new.
-    if (parent && (kind === 'test' || kind === 'describe')) {
-      for (const tag of parent.inheritedTags) inheritedTags.add(tag);
-      for (const tag of parent.tags) inheritedTags.add(tag.tag);
-    }
-    const ownSkip = [...modifiers].some(
-      ([modifier, always]) =>
-        always && SKIPPING_MODIFIERS.has(modifier) && !(modifier === 'todo' && framework.name === 'node-test'),
-    );
     const subject: Subject = {
       kind,
       node: call,
@@ -1820,12 +1803,9 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       inherited,
       runtimeStates: new Set(),
       tags: tagInfo.tags,
-      inheritedTags,
       unreadTags: tagInfo.unread,
       unknownStates,
       sharedStates: new Set(),
-      skipped: ownSkip || (kind !== 'runtime' && parent?.skipped === true),
-      ownSkip,
       markers: block.flatMap((comment) => (regionComments.has(comment) ? [] : parseMarkers(comment, states))),
       regionMarkers: inRegions.flatMap((r) => r.markers),
       annotationTickets: tagInfo.annotations,
@@ -2280,7 +2260,6 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const parent = subject.parent;
     if (parent) {
       parent.runtimeStates.add(subject.states[0].state.name);
-      if (subject.skipped) parent.skipped = true;
     }
     return subject;
   };

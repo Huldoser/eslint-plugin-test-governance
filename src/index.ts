@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 import type { ESLint, Rule } from 'eslint';
 import markerMatchesState from './rules/marker-matches-state.ts';
-import noConflictingStates from './rules/no-conflicting-states.ts';
+import consistentTagNames from './rules/consistent-tag-names.ts';
 import noOrphanedMarker from './rules/no-orphaned-marker.ts';
 import requireTicketForCommentedOutTests from './rules/require-ticket-for-commented-out-tests.ts';
 import requireTicketInComments from './rules/require-ticket-in-comments.ts';
@@ -22,7 +22,7 @@ export type RuleName =
   | 'require-ticket'
   | 'marker-matches-state'
   | 'no-orphaned-marker'
-  | 'no-conflicting-states'
+  | 'consistent-tag-names'
   | 'require-ticket-in-comments'
   | 'require-ticket-for-commented-out-tests';
 
@@ -30,7 +30,7 @@ const ruleModules: Record<RuleName, { meta: { docs: { recommended: 'error' | 'wa
   'require-ticket': requireTicket,
   'marker-matches-state': markerMatchesState,
   'no-orphaned-marker': noOrphanedMarker,
-  'no-conflicting-states': noConflictingStates,
+  'consistent-tag-names': consistentTagNames,
   'require-ticket-in-comments': requireTicketInComments,
   'require-ticket-for-commented-out-tests': requireTicketForCommentedOutTests,
 };
@@ -129,6 +129,15 @@ Object.defineProperty(plugin.configs, 'recommended', {
   get(): never {
     throw new ConfigError(
       "configs.recommended was removed in 0.5.0. Use the config for your framework: configs.playwright, configs.jest, configs.vitest, configs.mocha, configs.cypress, configs.webdriverio, configs['node-test'] or configs.jasmine. See https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/upgrading.md",
+    );
+  },
+});
+
+// Keep old rule configurations from silently losing their checks during migration.
+Object.defineProperty(rules, 'no-conflicting-states', {
+  get(): never {
+    throw new ConfigError(
+      'no-conflicting-states was renamed to consistent-tag-names. Stage-specific conflict checks were removed. See https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/upgrading.md',
     );
   },
 });

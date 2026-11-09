@@ -1,5 +1,5 @@
 import markerMatchesState from '../../src/rules/marker-matches-state.ts';
-import noConflictingStates from '../../src/rules/no-conflicting-states.ts';
+import consistentTagNames from '../../src/rules/consistent-tag-names.ts';
 import noOrphanedMarker from '../../src/rules/no-orphaned-marker.ts';
 import requireTicket from '../../src/rules/require-ticket.ts';
 import { runRule, settings, withOptions } from '../helpers.ts';
@@ -109,12 +109,22 @@ runRule('require-ticket (Vitest)', requireTicket, {
     // Tags in the title and in `tags`.
     {
       code: "// NEW: TRADE-1\ntest('fills a limit order', { tags: ['@new', 'smoke'] }, () => {});\n// NEW: TRADE-2\ntest('fills a market order @new', () => {});",
-      settings: settings({ lifecycleTags: true }),
+      settings: settings({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     // Vitest tag names are written without the `@`: `new` is the `@new` tag.
     {
       code: "// NEW: TRADE-1\ntest('fills a limit order', { tags: ['new', `smoke`] }, () => {});",
-      settings: settings({ lifecycleTags: true }),
+      settings: settings({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: "const QUARANTINE = 'quarantine';\n// QUARANTINE: TRADE-1\ndescribe('order book', { tags: [QUARANTINE] }, () => {});",
@@ -270,23 +280,40 @@ runRule('require-ticket (Vitest)', requireTicket, {
     },
     {
       code: "test('fills a limit order', { tags: '@new' }, () => {});",
-      settings: settings({ lifecycleTags: true }),
+      settings: settings({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [missing('new', 'NEW')],
     },
     {
       code: "test('fills a limit order', { tags: 'quarantined' }, () => {});",
-      settings: settings({ lifecycleTags: true }),
+      settings: settings({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [missing('quarantined', 'QUARANTINED')],
     },
     {
       code: "test('fills a limit order', { tags: ['flaky'] }, () => {});",
-      settings: settings({ lifecycleTags: true, states: { quarantined: { tag: '@flaky' } } }),
+      settings: settings({
+        customStates: { new: { when: '@new', marker: 'NEW' }, quarantined: { when: '@flaky', marker: 'QUARANTINED' } },
+      }),
       errors: [missing('quarantined', 'QUARANTINED')],
     },
     // Members that change no state keep the tags in the title.
     {
       code: "test.only('fills a limit order @new', () => {});\ntest.sequential('fills a market order @new', () => {});\ndescribe.only('order book @new', () => {});\ndescribe.concurrent('quotes @new', () => {});\ndescribe.sequential('fills @new', () => {});\ndescribe.shuffle('cancels @new', () => {});",
-      settings: settings({ lifecycleTags: true }),
+      settings: settings({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [
         missing('new', 'NEW'),
         missing('new', 'NEW'),
@@ -339,7 +366,12 @@ runRule('no-orphaned-marker (Vitest)', noOrphanedMarker, {
     "import { orderOptions } from './options';\n// SKIP: TRADE-1\ntest('fills a limit order', orderOptions, () => {});",
     {
       code: "// NEW: TRADE-1\ntest('fills a limit order', { tags: ['new'] }, () => {});",
-      settings: settings({ lifecycleTags: true }),
+      settings: settings({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
   ]),
   invalid: withOptions(vitest, [
@@ -370,7 +402,12 @@ runRule('no-orphaned-marker (Vitest)', noOrphanedMarker, {
     },
     {
       code: "// NEW: TRADE-1\ntest('fills a limit order', { tags: ['smoke'] }, () => {});",
-      settings: settings({ lifecycleTags: true }),
+      settings: settings({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [
         {
           messageId: 'orphaned',
@@ -384,39 +421,56 @@ runRule('no-orphaned-marker (Vitest)', noOrphanedMarker, {
   ]),
 });
 
-runRule('no-conflicting-states (Vitest)', noConflictingStates, {
-  valid: withOptions({ ...vitest, lifecycleTags: true }, [
-    // A conditional skip leaves the test running elsewhere.
-    "test.skipIf(isMobile)('fills a limit order @new', () => {});",
-    "test('fills a limit order @new', { skip: isMobile }, () => {});",
-    "test('fills a limit order', { tags: ['@new'] }, ({ skip }) => {\n  if (isMobile) skip();\n});",
-  ]),
-  invalid: withOptions({ ...vitest, lifecycleTags: true }, [
-    { code: "test('fills a limit order @new', { skip: true }, () => {});", errors: [{ messageId: 'newSkipped' }] },
+runRule('consistent-tag-names (Vitest)', consistentTagNames, {
+  valid: withOptions(
     {
-      code: "test('fills a limit order', { tags: ['@new'] }, ({ skip }) => {\n  skip();\n});",
-      errors: [{ messageId: 'newSkipped' }],
+      ...vitest,
+      customStates: {
+        new: { when: '@new', marker: 'NEW' },
+        quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+      },
     },
+    [
+      // A conditional skip leaves the test running elsewhere.
+      "test.skipIf(isMobile)('fills a limit order @new', () => {});",
+      "test('fills a limit order @new', { skip: isMobile }, () => {});",
+      "test('fills a limit order', { tags: ['@new'] }, ({ skip }) => {\n  if (isMobile) skip();\n});",
+
+      // Custom tags do not impose lifecycle conflicts.
+      { code: "test('fills a limit order @new', { skip: true }, () => {});" },
+      { code: "test('fills a limit order', { tags: ['@new'] }, ({ skip }) => {\n  skip();\n});" },
+    ],
+  ),
+  invalid: withOptions(
     {
-      code: "test('fills a limit order', { tags: ['@New'] }, () => {});",
-      output: "test('fills a limit order', { tags: ['@new'] }, () => {});",
-      errors: [{ messageId: 'tagCase' }],
+      ...vitest,
+      customStates: {
+        new: { when: '@new', marker: 'NEW' },
+        quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+      },
     },
-    // A tag name is shown and fixed without the `@` it is written without.
-    {
-      code: "test('fills a limit order', { tags: ['New', 'quarantiend'] }, () => {});",
-      output: "test('fills a limit order', { tags: ['new', 'quarantiend'] }, () => {});",
-      errors: [
-        { messageId: 'tagCase', data: { found: 'New', expected: 'new' } },
-        { messageId: 'tagTypo', data: { found: 'quarantiend', expected: 'quarantined' } },
-      ],
-    },
-    {
-      code: "const QUEUE = 'New';\ntest('fills a limit order', { tags: [QUEUE, 'N\\u0065w'] }, () => {});",
-      errors: [
-        { messageId: 'tagCase', data: { found: 'New', expected: 'new' }, column: 38 },
-        { messageId: 'tagCase', data: { found: 'New', expected: 'new' }, column: 45 },
-      ],
-    },
-  ]),
+    [
+      {
+        code: "test('fills a limit order', { tags: ['@New'] }, () => {});",
+        output: "test('fills a limit order', { tags: ['@new'] }, () => {});",
+        errors: [{ messageId: 'tagCase' }],
+      },
+      // A tag name is shown and fixed without the `@` it is written without.
+      {
+        code: "test('fills a limit order', { tags: ['New', 'quarantiend'] }, () => {});",
+        output: "test('fills a limit order', { tags: ['new', 'quarantiend'] }, () => {});",
+        errors: [
+          { messageId: 'tagCase', data: { found: 'New', expected: 'new' } },
+          { messageId: 'tagTypo', data: { found: 'quarantiend', expected: 'quarantined' } },
+        ],
+      },
+      {
+        code: "const QUEUE = 'New';\ntest('fills a limit order', { tags: [QUEUE, 'N\\u0065w'] }, () => {});",
+        errors: [
+          { messageId: 'tagCase', data: { found: 'New', expected: 'new' }, column: 38 },
+          { messageId: 'tagCase', data: { found: 'New', expected: 'new' }, column: 45 },
+        ],
+      },
+    ],
+  ),
 });

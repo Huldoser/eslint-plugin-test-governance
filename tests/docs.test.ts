@@ -229,7 +229,7 @@ describe('README and configuration reference', () => {
         .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
         .replaceAll('…', '.*')}$`,
     );
-    const options = { framework: 'playwright', lifecycleTag: true, ticket: { preset: 'jria' } };
+    const options = { framework: 'playwright', customState: true, ticket: { preset: 'jria' } };
     assert.throws(
       () => testGovernance.configure(options as never),
       (error: Error) => pattern.test(error.message),
@@ -323,9 +323,28 @@ describe('docs/upgrading.md', () => {
     return assert.fail('expected an error');
   };
 
+  it('keeps the ticket policies shown in the custom tag migration', () => {
+    const sample = /<!-- migration: custom-tags -->\n+```js\n([\s\S]*?)```/.exec(read('docs/upgrading.md'))?.[1];
+    assert.ok(sample);
+    const config = runInNewContext(sample, { testGovernance }) as ReturnType<typeof testGovernance.configure>;
+    const options = compileOptions(config.settings?.['test-governance'] as GovernanceOptions);
+    const tags = options.states.filter((state) => state.tag !== undefined);
+    assert.deepEqual(
+      tags.map(({ name, tag, marker }) => ({ name, tag, marker })),
+      [
+        { name: 'new', tag: '@new', marker: 'NEW' },
+        { name: 'quarantined', tag: '@flaky', marker: 'FLAKY' },
+      ],
+    );
+    assert.equal(tags[0].ticket.check('TRADE-123'), 'ok');
+    assert.equal(tags[1].ticket.check('TRADE-123'), 'format');
+    assert.equal(tags[1].ticket.check('#123'), 'ok');
+  });
+
   it('shows the errors an old config really gives', () => {
     const samples = [...read('docs/upgrading.md').matchAll(/```text\n([\s\S]*?)```/g)].map((m) => m[1].trimEnd());
     assert.deepEqual(samples, [
+      thrown(() => testGovernance.configure({ framework: 'playwright', lifecycleTags: true } as never)),
       thrown(() => testGovernance.configure({ framework: 'playwright', states: { unstable: true } } as never)),
       thrown(() => (testGovernance.configs as Record<string, unknown>).recommended),
       thrown(() => testGovernance.configure({ ticket: { preset: 'jira' } } as never)),

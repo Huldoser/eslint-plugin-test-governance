@@ -15,6 +15,18 @@ that reuses the same ticket.
 
 ## Examples
 
+Tag examples on this page use this policy:
+
+```js
+testGovernance.configure({
+  framework: 'playwright',
+  customStates: {
+    review: { when: '@needs-review', marker: 'REVIEW' },
+    blocked: { when: '@blocked', marker: 'BLOCKED' },
+  },
+});
+```
+
 Examples use Playwright unless noted. Settings shown with an example go in `configure()` alongside
 `framework`. Incorrect examples illustrate this rule; other enabled rules may report them too.
 
@@ -27,13 +39,13 @@ Incorrect:
 test.fixme('shows the unfilled quantity of a partly filled order', async () => {});
 ```
 
-With `lifecycleTags: true`:
+With the custom tag policy above:
 
-<!-- example: invalid settings={"lifecycleTags":true} -->
+<!-- example: invalid settings={"customStates":{"review":{"when":"@needs-review","marker":"REVIEW"},"blocked":{"when":"@blocked","marker":"BLOCKED"}}} -->
 
 ```js
 // SKIP: TRADE-500
-test.skip('shows the unfilled quantity of a partly filled order @quarantined', async () => {});
+test.skip('shows the unfilled quantity of a partly filled order @blocked', async () => {});
 ```
 
 Correct:
@@ -45,14 +57,14 @@ Correct:
 test.fixme('shows the unfilled quantity of a partly filled order', async () => {});
 ```
 
-With `lifecycleTags: true`:
+With the custom tag policy above:
 
-<!-- example: valid settings={"lifecycleTags":true} -->
+<!-- example: valid settings={"customStates":{"review":{"when":"@needs-review","marker":"REVIEW"},"blocked":{"when":"@blocked","marker":"BLOCKED"}}} -->
 
 ```js
 // SKIP: TRADE-500
-// QUARANTINED: TRADE-500
-test.skip('shows the unfilled quantity of a partly filled order @quarantined', async () => {});
+// BLOCKED: TRADE-500
+test.skip('shows the unfilled quantity of a partly filled order @blocked', async () => {});
 ```
 
 ## Options
@@ -60,7 +72,7 @@ test.skip('shows the unfilled quantity of a partly filled order @quarantined', a
 This rule has no options of its own. It reads the shared options described in the
 [configuration reference](../configuration.md#options). These change what it reports:
 
-- `lifecycleTags`, `states` and `customStates`: which states are on, and the marker keyword each
+- `states` and `customStates`: which states are on, and the marker keyword each
   one expects.
 - `requireTicketForConditional`: conditional skips such as `test.skip(browserName === 'webkit')`
   need a marker only when this is set, so only then is a wrong marker above one reported.

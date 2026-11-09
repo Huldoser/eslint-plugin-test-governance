@@ -29,22 +29,32 @@ describe('compileOptions', () => {
     assert.deepEqual(compile({ annotations: { only: true } }).annotations, { type: 'issue', only: true });
   });
 
-  it('turns on @new and @quarantined with lifecycleTags', () => {
-    assert.deepEqual(stateNames({ lifecycleTags: true }), ['skip', 'fixme', 'new', 'quarantined']);
-    assert.deepEqual(stateNames({ lifecycleTags: false }), ['skip', 'fixme']);
+  it('accepts formerly built-in lifecycle names as explicit custom states', () => {
+    assert.deepEqual(
+      stateNames({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
+      ['skip', 'fixme', 'new', 'quarantined'],
+    );
+    assert.deepEqual(stateNames({}), ['skip', 'fixme']);
   });
 
-  it('lets states override lifecycleTags and defaults', () => {
+  it('combines native state overrides with custom tags', () => {
     assert.deepEqual(
-      stateNames({ lifecycleTags: true, states: { quarantined: false, fail: true, skip: { enabled: false } } }),
+      stateNames({
+        states: { fail: true, skip: { enabled: false } },
+        customStates: { new: { when: '@new', marker: 'NEW' } },
+      }),
       ['fixme', 'fail', 'new'],
     );
   });
 
-  it('renames the tag and marker of a tag state, and only those it is given', () => {
+  it('uses the tag and marker chosen for each custom state', () => {
     const resolved = compile({
-      lifecycleTags: true,
-      states: { new: { tag: '@candidate' }, quarantined: { tag: '@flaky', marker: 'FLAKY' } },
+      customStates: { new: { when: '@candidate', marker: 'NEW' }, quarantined: { when: '@flaky', marker: 'FLAKY' } },
     });
     assert.deepEqual(
       resolved.states.slice(-2).map(({ name, tag, marker }) => ({ name, tag, marker })),
@@ -144,24 +154,39 @@ describe('compileOptions', () => {
       /customStates\.x\.marker must be an uppercase keyword/,
     ],
     [{ states: { skip: { marker: 'Skip' } } }, /states\.skip\.marker must be an uppercase keyword/],
-    [{ lifecycleTag: true }, /lifecycleTag is not a known option; did you mean "lifecycleTags"\?/],
+    [{ customState: true }, /customState is not a known option; did you mean "customStates"\?/],
     [{ annotations: 'yes' }, /annotations/],
     [{ ticket: { preset: 'numeric', minLength: 5, maxLength: 3 } }, /minLength \(5\) is greater than maxLength \(3\)/],
     [{ ticket: { preset: 'pattern' } }, /"pattern" ticket preset needs a `pattern` regex string/],
     [{ customStates: { x: { when: '@x', marker: 'SKIP' } } }, /two states use the marker "SKIP"/],
-    [{ lifecycleTags: true, customStates: { x: { when: '@new', marker: 'X' } } }, /two states use the tag "@new"/],
     [
-      { lifecycleTags: true, states: { quarantined: { tag: '@new', marker: 'FLAKY' } } },
+      {
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+          x: { when: '@new', marker: 'X' },
+        },
+      },
       /two states use the tag "@new"/,
     ],
-    [{ states: { quarantined: { tag: 'flaky' } } }, /states\.quarantined\.tag must be a tag such as @needs-data/],
+    [
+      { customStates: { new: { when: '@new', marker: 'NEW' }, quarantined: { when: '@new', marker: 'FLAKY' } } },
+      /two states use the tag "@new"/,
+    ],
+    [
+      { customStates: { flaky: { when: 'flaky', marker: 'FLAKY' } } },
+      /customStates\.flaky\.when must be a tag such as @needs-data/,
+    ],
     [{ knownTags: ['@smoke', 'regression'] }, /knownTags\[1\] must be a tag such as @needs-data \(got "regression"\)/],
-    // Only a state that a tag puts a test in has a tag to rename.
+    // Native runner states cannot be renamed to tags.
     [
       { states: { skip: { tag: '@skipped' } } },
       /states\.skip\.tag is not a known option \(expected one of: enabled, marker, ticket\)/,
     ],
-    [{ states: { unstable: true } }, /states\.unstable was renamed to "quarantined"/],
+    [
+      { states: { unstable: true } },
+      /states\.unstable was removed; configure a customStates entry with when and marker instead/,
+    ],
     [
       { ticket: { preset: 'jira', projects: ['trade'] } },
       /ticket\.projects\[0\] must be an uppercase key as it appears in tickets, such as WEB for WEB-123 \(got "trade"\)/,
@@ -203,7 +228,10 @@ describe('compileOptions', () => {
     ],
     [{ ticket: [{ preset: 'jira' }, { preset: 'url' }] }, /ticket\[1\]\.hosts is required by the "url" preset/],
     // A state that is off still has its options checked, so the mistake shows before someone turns it on.
-    [{ states: { new: { ticket: { preset: 'url' } } } }, /states\.new\.ticket\.hosts is required by the "url" preset/],
+    [
+      { states: { fail: { ticket: { preset: 'url' } } } },
+      /states\.fail\.ticket\.hosts is required by the "url" preset/,
+    ],
     [{ ticket: { preset: 'url', hosts: ['*.com'] } }, /ticket\.hosts\[0\] must be a host name/],
     [{ ticket: { preset: 'url', hosts: ['-acme.io'] } }, /ticket\.hosts\[0\] must be a host name/],
     [{ ticket: { preset: 'url', hosts: ['acme-.io'] } }, /ticket\.hosts\[0\] must be a host name/],
@@ -397,7 +425,14 @@ describe('framework', () => {
     it(`turns on skip and todo for ${framework}, and has no fixme, fail or slow`, () => {
       assert.deepEqual(stateNames({ framework }), ['skip', 'todo']);
       assert.deepEqual(
-        stateNames({ framework, lifecycleTags: true, states: { fixme: true, slow: true, fail: true } }),
+        stateNames({
+          framework,
+          states: { fixme: true, slow: true, fail: true },
+          customStates: {
+            new: { when: '@new', marker: 'NEW' },
+            quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+          },
+        }),
         ['skip', 'todo', 'new', 'quarantined'],
       );
       assert.deepEqual([...compile({ framework }).testFunctions], ['it', 'specify', 'test']);
@@ -409,7 +444,14 @@ describe('framework', () => {
     it(`turns on skip and todo for ${framework}, and has no fixme or slow`, () => {
       assert.deepEqual(stateNames({ framework }), ['skip', 'todo']);
       assert.deepEqual(
-        stateNames({ framework, lifecycleTags: true, states: { fixme: true, slow: true, fail: true } }),
+        stateNames({
+          framework,
+          states: { fixme: true, slow: true, fail: true },
+          customStates: {
+            new: { when: '@new', marker: 'NEW' },
+            quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+          },
+        }),
         ['skip', 'fail', 'todo', 'new', 'quarantined'],
       );
       assert.deepEqual([...compile({ framework }).testFunctions], ['test', 'it']);
@@ -420,7 +462,14 @@ describe('framework', () => {
   it('turns on skip and todo for jasmine, and reads only `it` by default', () => {
     assert.deepEqual(stateNames({ framework: 'jasmine' }), ['skip', 'todo']);
     assert.deepEqual(
-      stateNames({ framework: 'jasmine', lifecycleTags: true, states: { fixme: true, slow: true, fail: true } }),
+      stateNames({
+        framework: 'jasmine',
+        states: { fixme: true, slow: true, fail: true },
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       ['skip', 'todo', 'new', 'quarantined'],
     );
     assert.deepEqual([...compile({ framework: 'jasmine' }).testFunctions], ['it']);
@@ -447,7 +496,16 @@ describe('framework', () => {
 
 describe('resolveOptions', () => {
   it('compiles shared settings once per settings object', () => {
-    const settings = { 'test-governance': { framework: 'playwright', lifecycleTags: true, allowBlankLine: true } };
+    const settings = {
+      'test-governance': {
+        framework: 'playwright',
+        allowBlankLine: true,
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      },
+    };
     const resolved = resolveOptions(settings);
     assert.equal(resolved.allowBlankLine, true);
     assert.ok(resolved.states.map((s) => s.name).includes('new'));

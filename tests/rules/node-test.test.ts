@@ -1,5 +1,5 @@
 import markerMatchesState from '../../src/rules/marker-matches-state.ts';
-import noConflictingStates from '../../src/rules/no-conflicting-states.ts';
+import consistentTagNames from '../../src/rules/consistent-tag-names.ts';
 import noOrphanedMarker from '../../src/rules/no-orphaned-marker.ts';
 import requireTicket from '../../src/rules/require-ticket.ts';
 import { runRule, settings, withOptions } from '../helpers.ts';
@@ -25,7 +25,12 @@ runRule('require-ticket (node:test)', requireTicket, {
     "import { test, describe } from 'node:test';\ntest('fills a limit order', { skip: process.platform === 'win32' }, () => {});\ndescribe('order book', { skip }, () => {});\ntest('cancels', { todo: !ready && 'needs the clearing API' }, () => {});",
     {
       code: "import { test, describe } from 'node:test';\n// NEW: TRADE-1\ntest('fills a limit order', { tags: ['new'] }, () => {});\n// QUARANTINED: TRADE-2\ndescribe('order book', { tags: ['quarantined'] }, () => {\n  test('settles', () => {});\n});",
-      settings: settings({ lifecycleTags: true }),
+      settings: settings({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     // `t.skip()` and `t.todo()` take a message, so with or without one they always apply.
     "import { test } from 'node:test';\ntest('fills a limit order', (t) => {\n  // SKIP: TRADE-1\n  t.skip('broker sandbox is down');\n});",
@@ -309,7 +314,12 @@ runRule('require-ticket (node:test)', requireTicket, {
     },
     {
       code: "import { test, describe } from 'node:test';\ntest('fills a limit order @new', () => {});\ndescribe('order book @quarantined', () => {});",
-      settings: settings({ lifecycleTags: true }),
+      settings: settings({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [
         { ...missing('new', 'NEW'), line: 2 },
         { ...missing('quarantined', 'QUARANTINED', 'This describe block'), line: 3 },
@@ -318,7 +328,12 @@ runRule('require-ticket (node:test)', requireTicket, {
     // Node 26.2's `tags` option holds names without their `@`, as Vitest's does, also when the options come first.
     {
       code: "import { test, describe } from 'node:test';\ntest('fills a limit order', { tags: ['new', 'db'] }, () => {});\ndescribe('order book', { tags: ['quarantined'] }, () => {});\ntest({ tags: ['new'] }, () => {});",
-      settings: settings({ lifecycleTags: true }),
+      settings: settings({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [
         { ...missing('new', 'NEW'), line: 2 },
         { ...missing('quarantined', 'QUARANTINED', 'This describe block'), line: 3 },
@@ -360,7 +375,12 @@ runRule('no-orphaned-marker (node:test)', noOrphanedMarker, {
   valid: withOptions(nodeTest, [
     {
       code: "import { test } from 'node:test';\n// NEW: TRADE-1\ntest('fills a limit order', { tags: ['new'] }, () => {});",
-      settings: settings({ lifecycleTags: true }),
+      settings: settings({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     "import { test } from 'node:test';\n// SKIP: TRADE-1\ntest('fills', { skip: 'flaky' }, () => {});",
     "import { test } from 'node:test';\n// SKIP: TRADE-1\ntest('fills', (t) => {\n  t.skip();\n});",
@@ -400,17 +420,24 @@ runRule('no-orphaned-marker (node:test)', noOrphanedMarker, {
   ]),
 });
 
-runRule('no-conflicting-states (node:test)', noConflictingStates, {
-  valid: withOptions({ ...nodeTest, lifecycleTags: true }, [
-    "import { test } from 'node:test';\ntest('fills a limit order @new', { skip: isWindows }, () => {});",
-    "import { test } from 'node:test';\ntest('settles at T+1 @new', (t) => {\n  t.todo();\n});",
-  ]),
-  invalid: withOptions({ ...nodeTest, lifecycleTags: true }, [
+runRule('consistent-tag-names (node:test)', consistentTagNames, {
+  valid: withOptions(
     {
-      code: "import { test } from 'node:test';\ntest('fills a limit order @new', { skip: 'flaky' }, () => {});",
-      errors: [{ messageId: 'newSkipped' }],
+      ...nodeTest,
+      customStates: {
+        new: { when: '@new', marker: 'NEW' },
+        quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+      },
     },
-  ]),
+    [
+      "import { test } from 'node:test';\ntest('fills a limit order @new', { skip: isWindows }, () => {});",
+      "import { test } from 'node:test';\ntest('settles at T+1 @new', (t) => {\n  t.todo();\n});",
+
+      // Custom tags do not impose lifecycle conflicts.
+      { code: "import { test } from 'node:test';\ntest('fills a limit order @new', { skip: 'flaky' }, () => {});" },
+    ],
+  ),
+  invalid: [],
 });
 
 // Only node:test declares subtests through the context and reads any option value.

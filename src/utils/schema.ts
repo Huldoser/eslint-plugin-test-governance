@@ -1,12 +1,4 @@
-import {
-  BUILTIN_STATE_NAMES,
-  FRAMEWORK_NAMES,
-  HOST_ENTRY_RE,
-  MARKER_RE,
-  TAG_RE,
-  TAG_STATE_NAMES,
-  TICKET_PRESETS,
-} from './constants.ts';
+import { BUILTIN_STATE_NAMES, FRAMEWORK_NAMES, HOST_ENTRY_RE, MARKER_RE, TAG_RE, TICKET_PRESETS } from './constants.ts';
 import type { Schema } from './validate.ts';
 
 const MARKER_HINT = 'an uppercase keyword such as NEEDS-DATA (letters, digits, "-" and "_")';
@@ -62,22 +54,21 @@ const ticketSchema: Schema = {
   anyOf: [ticketSpecSchema, { type: 'array', items: ticketSpecSchema, minItems: 1 }],
 };
 
-/** A setting in `states`. Only a state that a tag puts a test in, such as `new`, can rename its tag. */
-const stateOverrideSchema = (hasTag: boolean): Schema => ({
+/** A setting for a native runner state. */
+const stateOverrideSchema: Schema = {
   anyOf: [
     { type: 'boolean' },
     {
       type: 'object',
       properties: {
         enabled: { type: 'boolean' },
-        ...(hasTag && { tag: { type: 'string', pattern: TAG_RE.source, patternHint: TAG_HINT } }),
         marker: { type: 'string', pattern: MARKER_RE.source, patternHint: MARKER_HINT },
         ticket: ticketSchema,
       },
       additionalProperties: false,
     },
   ],
-});
+};
 
 /** The shape of `settings['test-governance']`, the options of `configure()`. */
 export const optionsSchema: Schema = {
@@ -87,17 +78,15 @@ export const optionsSchema: Schema = {
     testFunctions: { type: 'array', items: { type: 'string' } },
     ticket: ticketSchema,
     placeholders: { type: 'array', items: { type: 'string' } },
-    lifecycleTags: { type: 'boolean' },
     states: {
       type: 'object',
-      properties: Object.fromEntries(
-        BUILTIN_STATE_NAMES.map((name) => [
-          name,
-          stateOverrideSchema((TAG_STATE_NAMES as readonly string[]).includes(name)),
-        ]),
-      ),
+      properties: Object.fromEntries(BUILTIN_STATE_NAMES.map((name) => [name, stateOverrideSchema])),
       additionalProperties: false,
-      renamed: { unstable: 'quarantined' },
+      removed: {
+        new: 'configure customStates.new with when and marker instead',
+        quarantined: 'configure customStates.quarantined with when and marker instead',
+        unstable: 'configure a customStates entry with when and marker instead',
+      },
     },
     customStates: {
       type: 'object',
@@ -145,4 +134,5 @@ export const optionsSchema: Schema = {
   required: ['framework'],
   additionalProperties: false,
   renamed: { reportDynamicTitles: 'reportUnreadableTags' },
+  removed: { lifecycleTags: 'configure tags explicitly with customStates instead; omit it to leave tags unchecked' },
 };

@@ -19,9 +19,9 @@ function problems(options: unknown): string[] {
 
 describe('options validation', () => {
   for (const [options, message] of [
-    [{ lifecycleTag: true }, 'lifecycleTag is not a known option; did you mean "lifecycleTags"?'],
-    [{ LIFECYCLETAGS: true }, 'LIFECYCLETAGS is not a known option; did you mean "lifecycleTags"?'],
-    [{ lifecycleTags: 'yes' }, 'lifecycleTags must be a boolean (got "yes")'],
+    [{ customState: true }, 'customState is not a known option; did you mean "customStates"?'],
+    [{ CUSTOMSTATES: true }, 'CUSTOMSTATES is not a known option; did you mean "customStates"?'],
+    [{ allowNotes: 'yes' }, 'allowNotes must be a boolean (got "yes")'],
     [
       { ticket: { preset: 'jria' } },
       'ticket.preset must be one of "any", "jira", "github", "gitlab", "linear", "azure-devops", "trello", "notion", "asana", "clickup", "redmine", "monday", "youtrack", "basecamp", "shortcut", "openproject", "bugzilla", "phabricator", "rally", "servicenow", "plane", "url", "numeric", "pattern" (got "jria")',
@@ -42,7 +42,7 @@ describe('options validation', () => {
     [{ ticket: { preset: 'numeric', minLength: 0 } }, 'ticket.minLength must be at least 1 (got 0)'],
     [
       { states: { blocked: true } },
-      'states.blocked is not a known option (expected one of: skip, fixme, fail, slow, todo, retry, new, quarantined)',
+      'states.blocked is not a known option (expected one of: skip, fixme, fail, slow, todo, retry)',
     ],
     [{ states: { skip: null } }, 'states.skip must be a boolean or an object (got null)'],
     [{ comments: true }, 'comments must be false (got true)'],
@@ -85,21 +85,45 @@ describe('options validation', () => {
       { customStates: { blocked: { when: '@blocked', marker: '@BLOCKED' } } },
       'customStates.blocked.marker must be an uppercase keyword such as NEEDS-DATA (letters, digits, "-" and "_") (got "@BLOCKED")',
     ],
-    [{ states: { new: { tag: 'candidate' } } }, 'states.new.tag must be a tag such as @needs-data (got "candidate")'],
+    [
+      { customStates: { candidate: { when: 'candidate', marker: 'CANDIDATE' } } },
+      'customStates.candidate.when must be a tag such as @needs-data (got "candidate")',
+    ],
     [{ comments: 'off' }, 'comments must be false or an object (got "off")'],
     [{ comments: { keyword: ['HACK'] } }, 'comments.keyword is not a known option; did you mean "keywords"?'],
     [{ placeholders: [0] }, 'placeholders[0] must be a string (got 0)'],
-    [{ lifecycleTags: () => true }, 'lifecycleTags must be a boolean (got a function)'],
+    [{ allowNotes: () => true }, 'allowNotes must be a boolean (got a function)'],
     [{ requireTicketForConditional: 'always' }, 'requireTicketForConditional must be a boolean (got "always")'],
     [{ allowBlankLine: 1 }, 'allowBlankLine must be a boolean (got 1)'],
     [{ reportUnreadableTags: 'on' }, 'reportUnreadableTags must be a boolean (got "on")'],
     // An option renamed before 1.0 names its new name.
     [{ reportDynamicTitles: true }, 'reportDynamicTitles was renamed to "reportUnreadableTags"'],
-    [{ states: { unstable: { enabled: true } } }, 'states.unstable was renamed to "quarantined"'],
+    [
+      { states: { unstable: { enabled: true } } },
+      'states.unstable was removed; configure a customStates entry with when and marker instead',
+    ],
   ]) {
     it(JSON.stringify(options), () => {
       assert.deepEqual(problems(options), [message]);
     });
+  }
+
+  for (const lifecycleTags of [true, false]) {
+    it(`rejects removed lifecycleTags: ${lifecycleTags} with migration instructions`, () => {
+      assert.deepEqual(problems({ lifecycleTags }), [
+        'lifecycleTags was removed; configure tags explicitly with customStates instead; omit it to leave tags unchecked',
+      ]);
+    });
+  }
+
+  for (const name of ['new', 'quarantined']) {
+    for (const value of [true, false, { tag: '@flaky', marker: 'FLAKY' }]) {
+      it(`rejects removed states.${name}: ${JSON.stringify(value)} with migration instructions`, () => {
+        assert.deepEqual(problems({ states: { [name]: value } }), [
+          `states.${name} was removed; configure customStates.${name} with when and marker instead`,
+        ]);
+      });
+    }
   }
 
   it('names the frameworks when the framework is missing', () => {
@@ -110,7 +134,7 @@ describe('options validation', () => {
 
   it('reports every problem at once', () => {
     assert.deepEqual(problems({ xyzzy: 1, allowNotes: 'no' }), [
-      'xyzzy is not a known option (expected one of: framework, testFunctions, ticket, placeholders, lifecycleTags, states, customStates, knownTags, comments, annotations, requireTicketForConditional, requireReasonForConditional, allowBlankLine, allowNotes, reportUnreadableTags)',
+      'xyzzy is not a known option (expected one of: framework, testFunctions, ticket, placeholders, states, customStates, knownTags, comments, annotations, requireTicketForConditional, requireReasonForConditional, allowBlankLine, allowNotes, reportUnreadableTags)',
       'allowNotes must be a boolean (got "no")',
     ]);
   });
@@ -122,7 +146,7 @@ describe('options validation', () => {
           { preset: 'jira', projects: ['TRADE'] },
           { preset: 'numeric', minLength: 4 },
         ],
-        lifecycleTags: undefined,
+        knownTags: undefined,
         states: { skip: false, fixme: { marker: 'BROKEN', ticket: { preset: 'github' } } },
         customStates: { blocked: { when: '@blocked', marker: 'BLOCKED' } },
         comments: false,

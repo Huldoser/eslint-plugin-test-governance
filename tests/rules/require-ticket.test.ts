@@ -3,9 +3,16 @@ import type { TicketSpec } from '../../src/utils/tickets.ts';
 import { runRule, settings } from '../helpers.ts';
 
 const ANY = 'a ticket key like PROJ-123, an issue like #4821 or owner/repo#4821, or a URL';
-const lifecycle = settings({ lifecycleTags: true });
-const dynamic = settings({ lifecycleTags: true, reportUnreadableTags: true });
-const flaky = settings({ lifecycleTags: true, states: { quarantined: { tag: '@flaky', marker: 'FLAKY' } } });
+const lifecycle = settings({
+  customStates: { new: { when: '@new', marker: 'NEW' }, quarantined: { when: '@quarantined', marker: 'QUARANTINED' } },
+});
+const dynamic = settings({
+  reportUnreadableTags: true,
+  customStates: { new: { when: '@new', marker: 'NEW' }, quarantined: { when: '@quarantined', marker: 'QUARANTINED' } },
+});
+const flaky = settings({
+  customStates: { new: { when: '@new', marker: 'NEW' }, quarantined: { when: '@flaky', marker: 'FLAKY' } },
+});
 
 const missing = (state: string, marker: string, subject = 'This test', example = 'PROJ-123') => ({
   messageId: 'missingMarker' as const,
@@ -151,7 +158,7 @@ runRule('require-ticket', rule, {
     "test('exports the trade history', async ({ page }, info) => {});\nsteps.forEach((info) => info.skip());",
     // Only Playwright's test.info() returns the test info.
     "test('shows prices', async () => { broker.info().skip(); });",
-    // Tags are off unless lifecycleTags is set.
+    // Tags need tickets only when configured in customStates.
     "test('places an order @new', async () => {});",
     "test('places an order', { tag: '@quarantined' }, async () => {});",
     { code: "// NEW: TRADE-1\ntest('places an order @new', async () => {});", settings: lifecycle },
@@ -371,7 +378,16 @@ runRule('require-ticket', rule, {
     ...[
       "test.describe(() => { test('places an order', async () => {}); });",
       "test('shows prices', async ({ browserName }) => { test.skip(browserName === 'webkit'); });",
-    ].map((code) => ({ code, settings: settings({ lifecycleTags: true, reportUnreadableTags: true }) })),
+    ].map((code) => ({
+      code,
+      settings: settings({
+        reportUnreadableTags: true,
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
+    })),
     // Steps: `test.step.skip` and `step.skip()` in a step's body.
     "test('places an order', async () => {\n  // SKIP: TRADE-1\n  await test.step.skip('confirms the fill', async () => {});\n});",
     "// SKIP: TRADE-1\ntest.skip('places an order', async () => {\n  await test.step.skip('confirms the fill', async () => {});\n});",
@@ -947,7 +963,7 @@ runRule('require-ticket', rule, {
       settings: settings({ requireTicketForConditional: true }),
       errors: [missing('skip', 'SKIP', 'This skip call')],
     },
-    // Tags, once lifecycleTags is on.
+    // Explicit custom tags need tickets.
     { code: "test('places an order @new', async () => {});", settings: lifecycle, errors: [missing('new', 'NEW')] },
     {
       code: "test('places an order', { tag: '@quarantined' }, async () => {});",
@@ -1198,7 +1214,13 @@ runRule('require-ticket', rule, {
     },
     {
       code: 'test(title, async () => {});\ntest.describe(symbol, () => {});',
-      settings: settings({ lifecycleTags: true, reportUnreadableTags: true }),
+      settings: settings({
+        reportUnreadableTags: true,
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [
         { messageId: 'dynamicTitle', column: 6 },
         { messageId: 'dynamicTitle', column: 15 },
@@ -1206,7 +1228,13 @@ runRule('require-ticket', rule, {
     },
     {
       code: 'test(title, async () => {});',
-      settings: settings({ lifecycleTags: true, reportUnreadableTags: true }),
+      settings: settings({
+        reportUnreadableTags: true,
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [
         { message: "This title isn't static text, so its tags can't be checked. Use a string or template literal." },
       ],

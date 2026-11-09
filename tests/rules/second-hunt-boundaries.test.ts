@@ -2,7 +2,7 @@ import tsParser from '@typescript-eslint/parser';
 import { RuleTester } from 'eslint';
 import requireTicket from '../../src/rules/require-ticket.ts';
 import orphan from '../../src/rules/no-orphaned-marker.ts';
-import conflicting from '../../src/rules/no-conflicting-states.ts';
+import conflicting from '../../src/rules/consistent-tag-names.ts';
 import { runRule, settings } from '../helpers.ts';
 
 runRule('require-ticket (mutation and early-exit controls)', requireTicket, {
@@ -10,7 +10,13 @@ runRule('require-ticket (mutation and early-exit controls)', requireTicket, {
     "const { unused, ...rest } = helper; rest.skip('fills', () => {});",
     {
       code: "const T = ['@new']; T.map(read);\n// NEW: PROJ-1\ntest('fills', { tag: T[0] }, () => {});",
-      settings: settings({ lifecycleTags: true, reportUnreadableTags: true }),
+      settings: settings({
+        reportUnreadableTags: true,
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     "test('fills', () => { if (a) { if (b) work(); else return; } test.skip(); });",
     "test('fills', () => { if (a) { if (b) work(); } else throw error; test.skip(); });",
@@ -18,12 +24,24 @@ runRule('require-ticket (mutation and early-exit controls)', requireTicket, {
   invalid: [
     {
       code: "const T = { tag: '@new' }; T.tag++; test('fills', { tag: T.tag }, () => {});",
-      settings: settings({ lifecycleTags: true, reportUnreadableTags: true }),
+      settings: settings({
+        reportUnreadableTags: true,
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [{ messageId: 'dynamicTags' }],
     },
     {
       code: "const T = ['@new']; T[method](); test('fills', { tag: T[0] }, () => {});",
-      settings: settings({ lifecycleTags: true, reportUnreadableTags: true }),
+      settings: settings({
+        reportUnreadableTags: true,
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [{ messageId: 'missingMarker' }],
     },
   ],
@@ -91,22 +109,46 @@ runRule('require-ticket (second bug-hunt boundaries)', requireTicket, {
     {
       code: 'test(`${1}@new`, () => {});',
       name: 'A numeric interpolation adjacent to a tag prevents its word boundary',
-      settings: settings({ framework: 'playwright', lifecycleTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: 'test(`${true}@new`, () => {});',
       name: 'A boolean interpolation adjacent to a tag prevents its word boundary',
-      settings: settings({ framework: 'playwright', lifecycleTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: 'test(`${null}@new`, () => {});',
       name: 'A null interpolation adjacent to a tag prevents its word boundary',
-      settings: settings({ framework: 'playwright', lifecycleTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: 'test(`fills @new${1}`, () => {});',
       name: 'A numeric suffix makes a different state tag',
-      settings: settings({ framework: 'playwright', lifecycleTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: "test.skip('fills', { meta: { ['__proto__']: 'PROJ-1' } }, () => {});",
@@ -124,55 +166,115 @@ runRule('require-ticket (second bug-hunt boundaries)', requireTicket, {
       code: "const T = { tag: '@new' }; T.tag = '@smoke'; test('fills', { tag: T.tag }, () => {});",
       errors: [{ messageId: 'dynamicTags' }],
       name: 'A written object member is not its initializer',
-      settings: settings({ framework: 'playwright', lifecycleTags: true, reportUnreadableTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        reportUnreadableTags: true,
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: "const T = ['@new']; T[0] = '@smoke'; test('fills', { tag: T[0] }, () => {});",
       errors: [{ messageId: 'dynamicTags' }],
       name: 'An updated array slot is unread',
-      settings: settings({ framework: 'playwright', lifecycleTags: true, reportUnreadableTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        reportUnreadableTags: true,
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: "const T = { tag: '@new' }; delete T.tag; test('fills', { tag: T.tag }, () => {});",
       errors: [{ messageId: 'dynamicTags' }],
       name: 'Deleting a property invalidates its original text',
-      settings: settings({ framework: 'playwright', lifecycleTags: true, reportUnreadableTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        reportUnreadableTags: true,
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: "const T = { tag: '@new' }; const A = T; A.tag = '@smoke'; test('fills', { tag: T.tag }, () => {});",
       errors: [{ messageId: 'dynamicTags' }],
       name: 'Mutating through a constant alias invalidates shared text',
-      settings: settings({ framework: 'playwright', lifecycleTags: true, reportUnreadableTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        reportUnreadableTags: true,
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: "const T = ['@new', '@smoke']; T.shift(); test('fills', { tag: T[0] }, () => {});",
       errors: [{ messageId: 'dynamicTags' }],
       name: 'An array shift invalidates its first tag',
-      settings: settings({ framework: 'playwright', lifecycleTags: true, reportUnreadableTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        reportUnreadableTags: true,
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: "const T = { tag: '@new' }; log(T.tag); test('fills', { tag: T.tag }, () => {});",
       errors: [{ messageId: 'missingMarker' }],
       name: 'Reading a property has no mutation effect',
-      settings: settings({ framework: 'playwright', lifecycleTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: "const T = { tag: '@new' }; function f(T) { T.tag = '@smoke'; } test('fills', { tag: T.tag }, () => {});",
       errors: [{ messageId: 'missingMarker' }],
       name: 'A shadowed object mutation leaves the outer constant usable',
-      settings: settings({ framework: 'playwright', lifecycleTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: "const T = { tag: '@new', ...other }; test('fills', { tag: T.tag }, () => {});",
       errors: [{ messageId: 'dynamicTags' }],
       name: 'An unknown spread cannot prove an earlier object value',
-      settings: settings({ framework: 'playwright', lifecycleTags: true, reportUnreadableTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        reportUnreadableTags: true,
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: "const T = { ...other, tag: '@new' }; test('fills', { tag: T.tag }, () => {});",
       errors: [{ messageId: 'missingMarker' }],
       name: 'A later explicit property wins over an opaque spread',
-      settings: settings({ framework: 'playwright', lifecycleTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: "const WHY = 'sandbox unavailable'; test('fills', ctx => { ctx.skip(WHY); });",
@@ -282,31 +384,64 @@ runRule('require-ticket (second bug-hunt boundaries)', requireTicket, {
       code: 'test(`fills ${"@new"}.`, () => {});',
       errors: [{ messageId: 'missingMarker' }],
       name: 'A static template tag followed by punctuation retains its boundary',
-      settings: settings({ framework: 'playwright', lifecycleTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: "const T = { __proto__: '@new' }; test('fills', { tag: T.__proto__ }, () => {});",
       errors: [{ messageId: 'dynamicTags' }],
       name: 'An object prototype setter is not an own tag property',
-      settings: settings({ framework: 'playwright', lifecycleTags: true, reportUnreadableTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        reportUnreadableTags: true,
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: "const T = { ['__proto__']: '@new' }; test('fills', { tag: T.__proto__ }, () => {});",
       errors: [{ messageId: 'missingMarker' }],
       name: 'A computed prototype-named property remains an own tag value',
-      settings: settings({ framework: 'playwright', lifecycleTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: "const T = { get tag() { throw Error(); } }; test('fills', { tag: T.tag }, () => {});",
       errors: [{ messageId: 'dynamicTags' }],
       name: 'A getter is unread without executing user code',
-      settings: settings({ framework: 'playwright', lifecycleTags: true, reportUnreadableTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        reportUnreadableTags: true,
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: "const T = ['@new']; test('fills', { tag: T[-1] }, () => {});",
       errors: [{ messageId: 'dynamicTags' }],
       name: 'An array negative index is unread',
-      settings: settings({ framework: 'playwright', lifecycleTags: true, reportUnreadableTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        reportUnreadableTags: true,
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: "test.skip('fills', { meta: { __proto__: 'PROJ-1' } }, () => {});",
@@ -336,27 +471,45 @@ runRule('no-orphaned-marker (second bug-hunt boundaries)', orphan, {
   ],
   invalid: [],
 });
-runRule('no-conflicting-states (second bug-hunt boundaries)', conflicting, {
+runRule('consistent-tag-names (second bug-hunt boundaries)', conflicting, {
   valid: [
     {
       code: "import { test } from 'node:test'; test('outer', t => { t.test('inner @new', inner => { t.skip(); }); });",
       name: 'Skipping the outer context leaves a new child runnable',
-      settings: settings({ framework: 'node-test', lifecycleTags: true }),
+      settings: settings({
+        framework: 'node-test',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       code: "test('fills @new', { todo: true }, () => {});",
       name: 'Node todo runs a new test rather than skipping it',
-      settings: settings({ framework: 'node-test', lifecycleTags: true }),
+      settings: settings({
+        framework: 'node-test',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
-  ],
-  invalid: [
+
+    // Custom tags do not impose lifecycle conflicts.
     {
       code: "import { test } from 'node:test'; test('outer @new', t => { t.test('inner', inner => { inner.skip(); }); });",
-      errors: [{ messageId: 'newSkipped' }],
-      name: 'A child skip conflicts with an inherited new tag',
-      settings: settings({ framework: 'node-test', lifecycleTags: true }),
+      name: 'A custom tag inherited by a child permits its skip',
+      settings: settings({
+        framework: 'node-test',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
   ],
+  invalid: [],
 });
 new RuleTester({ languageOptions: { parser: tsParser }, settings: settings({ framework: 'playwright' }) }).run(
   'require-ticket (additional TypeScript boundaries)',

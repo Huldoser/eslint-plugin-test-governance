@@ -58,7 +58,7 @@ import testGovernance, { type GovernanceOptions } from 'eslint-plugin-test-gover
 
 const options: GovernanceOptions = {
   framework: 'playwright',
-  lifecycleTags: true,
+  customStates: { review: { when: '@needs-review', marker: 'REVIEW' } },
   ticket: { preset: 'jira', projects: ['TRADE'] },
 };
 
@@ -122,9 +122,7 @@ export default [
       framework: 'playwright',
       // Only accept Jira keys from these projects (or Jira URLs).
       ticket: { preset: 'jira', projects: ['TRADE', 'RISK'] },
-      // Turn on the @new and @quarantined states.
-      lifecycleTags: true,
-      // Any tag your team uses, with the same rules as the built-ins.
+      // Require tickets for the tags your team chooses.
       customStates: {
         'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' },
       },
@@ -138,7 +136,7 @@ with a clear message rather than being ignored:
 
 ```text
 eslint-plugin-test-governance: invalid options:
-  - lifecycleTag is not a known option; did you mean "lifecycleTags"?
+  - customState is not a known option; did you mean "customStates"?
   - ticket.preset must be one of "any", "jira", "github", … (got "jria")
 ```
 
@@ -178,23 +176,22 @@ yourself. `framework` is required, and every other option has a default. The rul
 of their own: they all read these shared settings, so they always agree on ticket formats, states
 and markers. To turn a rule off, set it to `'off'` as usual.
 
-| Option                        | Type                                                           | Default                           | Description                                                                                                                                                                                  |
-| ----------------------------- | -------------------------------------------------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `framework`                   | `FrameworkName`                                                | required                          | The test framework of the files the config applies to. Each framework's config, such as `configs.playwright`, sets it, and `configure()` needs it. See [Frameworks](frameworks.md).          |
-| `ticket`                      | `TicketSpec \| TicketSpec[]`                                   | `{ preset: 'any' }`               | Accepted ticket formats. An array accepts a ticket that matches any entry. See [Ticket presets](#ticket-presets).                                                                            |
-| `placeholders`                | `string[]`                                                     | [defaults](../README.md#defaults) | See [placeholders details](#placeholders).                                                                                                                                                   |
-| `lifecycleTags`               | `boolean`                                                      | `false`                           | Turns on the `new` (`@new`) and `quarantined` (`@quarantined`) states.                                                                                                                       |
-| `states`                      | `{ [state]: boolean \| { enabled?, tag?, marker?, ticket? } }` | `skip`, `fixme` and `todo` on     | See [states details](#states).                                                                                                                                                               |
-| `customStates`                | `{ [name]: { when, marker, ticket? } }`                        | `{}`                              | Adds a state for a tag, e.g. `{ 'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' } }`. `when` is a tag and `marker` an uppercase keyword; neither can be shared with another state. |
-| `knownTags`                   | `string[]`                                                     | `[]`                              | See [knownTags details](#knowntags).                                                                                                                                                         |
-| `requireTicketForConditional` | `boolean`                                                      | `false`                           | See [requireTicketForConditional details](#requireticketforconditional).                                                                                                                     |
-| `requireReasonForConditional` | `boolean`                                                      | `false`                           | See [requireReasonForConditional details](#requirereasonforconditional).                                                                                                                     |
-| `allowBlankLine`              | `boolean`                                                      | `false`                           | Let blank lines separate a marker from its test.                                                                                                                                             |
-| `allowNotes`                  | `boolean`                                                      | `false`                           | Allow free text after the tickets, e.g. `// SKIP: TRADE-123 flaky on CI`. Applies to markers and to `FIXME` / `TODO` comments.                                                               |
-| `comments`                    | `false \| { keywords?: string[] }`                             | `{ keywords: ['FIXME', 'TODO'] }` | Comment keywords that must start with a ticket anywhere in a test file, e.g. `// TODO: TRADE-123`. Your keywords replace the default ones. `false` allows free-form comments.                |
-| `annotations`                 | `false \| { type?: string, only?: boolean }`                   | `{ type: 'issue' }`               | See [annotations details](#annotations).                                                                                                                                                     |
-| `testFunctions`               | `string[]`                                                     | `['test']`                        | See [testFunctions details](#testfunctions).                                                                                                                                                 |
-| `reportUnreadableTags`        | `boolean`                                                      | `false`                           | See [reportUnreadableTags details](#reportunreadabletags).                                                                                                                                   |
+| Option                        | Type                                                     | Default                           | Description                                                                                                                                                                                  |
+| ----------------------------- | -------------------------------------------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `framework`                   | `FrameworkName`                                          | required                          | The test framework of the files the config applies to. Each framework's config, such as `configs.playwright`, sets it, and `configure()` needs it. See [Frameworks](frameworks.md).          |
+| `ticket`                      | `TicketSpec \| TicketSpec[]`                             | `{ preset: 'any' }`               | Accepted ticket formats. An array accepts a ticket that matches any entry. See [Ticket presets](#ticket-presets).                                                                            |
+| `placeholders`                | `string[]`                                               | [defaults](../README.md#defaults) | See [placeholders details](#placeholders).                                                                                                                                                   |
+| `states`                      | `{ [state]: boolean \| { enabled?, marker?, ticket? } }` | `skip`, `fixme` and `todo` on     | See [states details](#states).                                                                                                                                                               |
+| `customStates`                | `{ [name]: { when, marker, ticket? } }`                  | `{}`                              | Adds a state for a tag, e.g. `{ 'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' } }`. `when` is a tag and `marker` an uppercase keyword; neither can be shared with another state. |
+| `knownTags`                   | `string[]`                                               | `[]`                              | See [knownTags details](#knowntags).                                                                                                                                                         |
+| `requireTicketForConditional` | `boolean`                                                | `false`                           | See [requireTicketForConditional details](#requireticketforconditional).                                                                                                                     |
+| `requireReasonForConditional` | `boolean`                                                | `false`                           | See [requireReasonForConditional details](#requirereasonforconditional).                                                                                                                     |
+| `allowBlankLine`              | `boolean`                                                | `false`                           | Let blank lines separate a marker from its test.                                                                                                                                             |
+| `allowNotes`                  | `boolean`                                                | `false`                           | Allow free text after the tickets, e.g. `// SKIP: TRADE-123 flaky on CI`. Applies to markers and to `FIXME` / `TODO` comments.                                                               |
+| `comments`                    | `false \| { keywords?: string[] }`                       | `{ keywords: ['FIXME', 'TODO'] }` | Comment keywords that must start with a ticket anywhere in a test file, e.g. `// TODO: TRADE-123`. Your keywords replace the default ones. `false` allows free-form comments.                |
+| `annotations`                 | `false \| { type?: string, only?: boolean }`             | `{ type: 'issue' }`               | See [annotations details](#annotations).                                                                                                                                                     |
+| `testFunctions`               | `string[]`                                               | `['test']`                        | See [testFunctions details](#testfunctions).                                                                                                                                                 |
+| `reportUnreadableTags`        | `boolean`                                                | `false`                           | See [reportUnreadableTags details](#reportunreadabletags).                                                                                                                                   |
 
 ### placeholders
 
@@ -204,15 +201,15 @@ Tickets numbered 0 are always rejected.
 
 ### states
 
-Turns built-in states (`skip`, `fixme`, `fail`, `slow`, `todo`, `retry`, `new`, `quarantined`) on or off, renames their tag or marker, or gives them their own ticket format.
+Turns built-in states (`skip`, `fixme`, `fail`, `slow`, `todo`, `retry`) on or off, renames their marker, or gives them their own ticket format. These states follow native runner behavior.
 
-`fail`, `slow` and `retry` are off by default; a setting for `new` or `quarantined` here wins over `lifecycleTags`. Only `new` and `quarantined` have a tag to rename; see [Tag names](#tag-names).
+`fail`, `slow` and `retry` are off by default. Configure tag policies separately with `customStates`; see [Tag names](#tag-names).
 
 `fixme` and `slow` exist only in Playwright, `todo` in every framework but Playwright, `fail` in Playwright, Jest, Vitest and node:test, and `retry` in every framework but node:test and Jasmine, so turning one on elsewhere has no effect.
 
 ### knownTags
 
-Your team's other tags, such as `['@smoke', '@regression']`, written with the `@`. `no-conflicting-states` reports them in the wrong case or misspelled, as it does state tags, and never reports a listed tag as a typo of a state tag.
+Your team's other tags, such as `['@smoke', '@regression']`, written with the `@`. `consistent-tag-names` reports them in the wrong case or misspelled, as it does state tags, and never reports a listed tag as a typo of a state tag.
 
 ### requireTicketForConditional
 
@@ -236,32 +233,40 @@ When a tag state is on, report titles that aren't static text, and tags or detai
 
 ## Tag names
 
-Teams name the stages of a test differently, so `states` can rename the tag of `new` and
-`quarantined`. The marker keeps its name unless you rename it too:
+Tags are unrestricted by default. Use `customStates` when a tag should require a ticket, and
+`knownTags` when it should get spelling and case checks without a ticket requirement:
 
 ```js
 testGovernance.configure({
   framework: 'playwright',
-  lifecycleTags: true,
-  states: { quarantined: { tag: '@flaky', marker: 'FLAKY' } },
+  customStates: {
+    review: { when: '@needs-review', marker: 'REVIEW' },
+    blocked: { when: '@blocked', marker: 'BLOCKED', ticket: { preset: 'github' } },
+  },
+  knownTags: ['@smoke', '@regression'],
 });
 ```
 
-With `lifecycleTags: true` and `states: { quarantined: { tag: '@flaky', marker: 'FLAKY' } }`:
+The keys `review` and `blocked` name your custom states; `when` is the exact tag, including `@`.
+Each tag and marker must be unique among configured states. Native names such as `skip` are reserved.
+Custom states have no `enabled` property: omit an entry to stop tracking it.
 
-<!-- example: valid settings={"lifecycleTags":true,"states":{"quarantined":{"tag":"@flaky","marker":"FLAKY"}}} -->
+With `customStates: { review: { when: '@needs-review', marker: 'REVIEW' } }`:
+
+<!-- example: valid settings={"customStates":{"review":{"when":"@needs-review","marker":"REVIEW"}}} -->
 
 ```ts
-// FLAKY: TRADE-311
-test('streams level 2 quotes @flaky', async ({ page }) => {
-  // ...
-});
+// REVIEW: TRADE-311
+test('streams level 2 quotes @needs-review', async ({ page }) => {});
 ```
 
-The new tag replaces the default one, so `@quarantined` no longer puts a test in the state, and the
-rules check `@flaky` as they checked `@quarantined`: `@new` together with `@flaky` is reported, and so
-is a near-miss such as `@flakey`. For a tag that isn't one of these stages, such as `@needs-data`, add
-a `customStates` entry.
+`consistent-tag-names` reports `@Needs-review` and near-miss spellings such as `@needs-reveiw`.
+An exact tag in `knownTags` is never a typo. Other unlisted tags stay allowed; `knownTags` is not an
+allowlist. Tags can coexist, including on skipped tests, provided each tracked state has its ticket.
+The plugin does not assign promotion stages or change runner execution.
+
+Migrating from `lifecycleTags` or `states.new` / `states.quarantined`? See the
+[upgrade guide](upgrading.md#next-release-custom-tag-states).
 
 ## Ticket presets
 
@@ -324,8 +329,9 @@ reports in GitHub:
 testGovernance.configure({
   framework: 'playwright',
   ticket: { preset: 'jira', projects: ['TRADE'] },
-  lifecycleTags: true,
-  states: { quarantined: { ticket: { preset: 'github' } } },
+  customStates: {
+    flaky: { when: '@flaky', marker: 'FLAKY', ticket: { preset: 'github' } },
+  },
 });
 ```
 

@@ -1,5 +1,5 @@
 import markerMatchesState from '../../src/rules/marker-matches-state.ts';
-import noConflictingStates from '../../src/rules/no-conflicting-states.ts';
+import consistentTagNames from '../../src/rules/consistent-tag-names.ts';
 import noOrphanedMarker from '../../src/rules/no-orphaned-marker.ts';
 import requireTicket from '../../src/rules/require-ticket.ts';
 import { runRule, settings, withOptions } from '../helpers.ts';
@@ -68,7 +68,15 @@ runRule('require-ticket (Mocha)', requireTicket, {
     'it(order);\ndescribe(order);\nit();',
     "describe('order book');",
     // A describe with only a title isn't one, so its tags put nothing in a state.
-    { code: "describe('order book @new');", settings: settings({ lifecycleTags: true }) },
+    {
+      code: "describe('order book @new');",
+      settings: settings({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
+    },
     // `this` in a describe body is the suite's, also when a condition picks the describe.
     "(isCI ? describe : describe.skip)('order book', function () {\n  this.skip();\n});",
     // `testFunctions` replaces `it`, `specify` and `test`; the other globals stay.
@@ -198,12 +206,22 @@ runRule('require-ticket (Mocha)', requireTicket, {
     },
     {
       code: "it('fills a limit order @new', () => {});\ndescribe('order book @quarantined', () => {});",
-      settings: settings({ lifecycleTags: true }),
+      settings: settings({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [missing('new', 'NEW'), missing('quarantined', 'QUARANTINED', 'This describe block')],
     },
     {
       code: "it.only('fills a limit order @new', () => {});\ndescribe.only('order book @new', () => {});",
-      settings: settings({ lifecycleTags: true }),
+      settings: settings({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [missing('new', 'NEW'), missing('new', 'NEW', 'This describe block')],
     },
   ]),
@@ -214,9 +232,22 @@ runRule('require-ticket (Cypress)', requireTicket, {
     // Tags from @cypress/grep, which are written with their `@`.
     {
       code: "// NEW: TRADE-1\nit('fills a limit order', { tags: '@new' }, () => {});\n// NEW: TRADE-2\ndescribe('order book', { tags: ['@new', '@smoke'] }, () => {});",
-      settings: settings({ lifecycleTags: true }),
+      settings: settings({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
-    { code: "it('fills a limit order', { tags: 'new' }, () => {});", settings: settings({ lifecycleTags: true }) },
+    {
+      code: "it('fills a limit order', { tags: 'new' }, () => {});",
+      settings: settings({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
+    },
     // `browser` runs the test only in some browsers: a conditional skip.
     "it('fills a limit order', { browser: '!webkit' }, () => {});",
     "describe('order book', { browser: ['chrome', 'firefox'] }, () => {});",
@@ -237,7 +268,12 @@ runRule('require-ticket (Cypress)', requireTicket, {
     },
     {
       code: "it('fills a limit order', { tags: ['@smoke', '@quarantined'] }, () => {});",
-      settings: settings({ lifecycleTags: true }),
+      settings: settings({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [missing('quarantined', 'QUARANTINED')],
     },
     {
@@ -309,26 +345,28 @@ runRule('no-orphaned-marker (Mocha)', noOrphanedMarker, {
   ]),
 });
 
-runRule('no-conflicting-states (Mocha)', noConflictingStates, {
-  valid: withOptions({ ...mocha, lifecycleTags: true }, [
-    "it('fills a limit order @new', function () {\n  if (isMobile) this.skip();\n});",
-  ]),
-  invalid: withOptions({ ...mocha, lifecycleTags: true }, [
-    { code: "it.skip('fills a limit order @new', () => {});", errors: [{ messageId: 'newSkipped' }] },
+runRule('consistent-tag-names (Mocha)', consistentTagNames, {
+  valid: withOptions(
     {
-      code: "it('fills a limit order @new', function () {\n  this.skip();\n});",
-      errors: [{ messageId: 'newSkipped' }],
+      ...mocha,
+      customStates: {
+        new: { when: '@new', marker: 'NEW' },
+        quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+      },
     },
-    { code: "it('settles at T+1 @new');", errors: [{ messageId: 'newSkipped' }] },
-    // A skipped test in a `@new` describe is a new test too.
-    {
-      code: "describe('order book @new', () => {\n  xit('fills a limit order', () => {});\n  xspecify('cancels an order');\n});",
-      errors: [
-        { messageId: 'newSkipped', line: 2 },
-        { messageId: 'newSkipped', line: 3 },
-      ],
-    },
-  ]),
+    [
+      "it('fills a limit order @new', function () {\n  if (isMobile) this.skip();\n});",
+
+      // Custom tags do not impose lifecycle conflicts.
+      { code: "it.skip('fills a limit order @new', () => {});" },
+      { code: "it('fills a limit order @new', function () {\n  this.skip();\n});" },
+      { code: "it('settles at T+1 @new');" },
+      {
+        code: "describe('order book @new', () => {\n  xit('fills a limit order', () => {});\n  xspecify('cancels an order');\n});",
+      },
+    ],
+  ),
+  invalid: [],
 });
 
 // Only Mocha gives a test's `function` a `this` that can skip it.

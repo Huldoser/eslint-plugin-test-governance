@@ -47,7 +47,12 @@ runRule('require-ticket (alias, flow and annotation boundaries)', requireTicket,
     {
       name: 'rendered template boundaries distinguish an email from a state tag',
       code: 'test(`fills ${"desk"}@new`, () => {}); test(`fills ${"@new"}er`, () => {});',
-      settings: settings({ lifecycleTags: true }),
+      settings: settings({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       name: 'Reassigning an alias to a helper stops it being a test',
@@ -72,7 +77,13 @@ runRule('require-ticket (alias, flow and annotation boundaries)', requireTicket,
     {
       name: 'An unread computed member can override an earlier tag constant',
       code: "const TAGS = { NEW: '@new', [key]: '@smoke' }; test('fills', { tag: TAGS.NEW }, () => {});",
-      settings: settings({ framework: 'playwright', lifecycleTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
     },
     {
       name: 'An alias of an annotation object keeps its ticket',
@@ -100,31 +111,59 @@ runRule('require-ticket (alias, flow and annotation boundaries)', requireTicket,
     {
       name: 'a split template state tag is recognized from rendered text',
       code: 'test(`fills @${"new"}`, () => {});',
-      settings: settings({ lifecycleTags: true }),
+      settings: settings({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [{ messageId: 'missingMarker' }],
     },
     {
       name: 'a plain template tag is one value even with interpolations',
       code: 'test("fills", { tags: [`${"new"}`] }, () => {});',
-      settings: settings({ framework: 'vitest', lifecycleTags: true }),
+      settings: settings({
+        framework: 'vitest',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [{ messageId: 'missingMarker' }],
     },
     {
       name: 'inline object and array constants retain their state tags',
       code: "test('one', { tag: ({ NEW: '@new' }).NEW }, () => {}); test('two', { tag: ['@new'][0] }, () => {});",
-      settings: settings({ lifecycleTags: true }),
+      settings: settings({
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [{ messageId: 'missingMarker' }, { messageId: 'missingMarker' }],
     },
     {
       name: 'cyclic template definitions remain unread instead of overflowing',
       code: 'const TAG = `${TAG}`; test("fills", { tag: TAG }, () => {});',
-      settings: settings({ lifecycleTags: true, reportUnreadableTags: true }),
+      settings: settings({
+        reportUnreadableTags: true,
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [{ messageId: 'dynamicTags' }],
     },
     {
       name: 'cyclic interpolated title definitions are reported as unread',
       code: 'const TAG = `${TAG}`; test(`fills ${TAG}`, () => {});',
-      settings: settings({ lifecycleTags: true, reportUnreadableTags: true }),
+      settings: settings({
+        reportUnreadableTags: true,
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [{ messageId: 'dynamicTitle' }],
     },
     {
@@ -208,25 +247,49 @@ runRule('require-ticket (alias, flow and annotation boundaries)', requireTicket,
     {
       name: 'Object aliases retain constant tag members',
       code: "const BASE = { NEW: '@new' }; const TAGS = BASE; test('fills', { tag: TAGS.NEW }, () => {});",
-      settings: settings({ framework: 'playwright', lifecycleTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [{ messageId: 'missingMarker' }],
     },
     {
       name: 'Literal text interpolated into a title contributes its tag',
       code: 'test(`fills ${"@new"}`, () => {});',
-      settings: settings({ framework: 'playwright', lifecycleTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [{ messageId: 'missingMarker' }],
     },
     {
       name: 'Nested template text contributes its tag',
       code: 'const TAG = "@new"; test(`fills ${`${TAG}`}`, () => {});',
-      settings: settings({ framework: 'playwright', lifecycleTags: true }),
+      settings: settings({
+        framework: 'playwright',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [{ messageId: 'missingMarker' }],
     },
     {
       name: 'A plain Vitest tag written as a static template is recognized',
       code: 'test("fills", { tags: [`new`] }, () => {});',
-      settings: settings({ framework: 'vitest', lifecycleTags: true }),
+      settings: settings({
+        framework: 'vitest',
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
+      }),
       errors: [{ messageId: 'missingMarker' }],
     },
     {
@@ -292,8 +355,10 @@ runRule('marker-matches-state (alias, flow and annotation boundaries)', matching
       code: "// SKIP: PROJ-1\ntest.skip('fills @new', () => {});",
       settings: settings({
         framework: 'playwright',
-        lifecycleTags: true,
-        states: { new: { ticket: { preset: 'github' } } },
+        customStates: {
+          new: { when: '@new', marker: 'NEW', ticket: { preset: 'github' } },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+        },
       }),
       errors: [{ messageId: 'sharedMarker', suggestions: [] }],
     },

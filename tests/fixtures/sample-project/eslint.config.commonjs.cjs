@@ -13,8 +13,11 @@ module.exports = defineConfig([
       testGovernance.configure({
         framework: 'playwright',
         ticket: { preset: 'jira', projects: ['TRADE', 'RISK'] },
-        lifecycleTags: true,
-        customStates: { 'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' } },
+        customStates: {
+          new: { when: '@new', marker: 'NEW' },
+          quarantined: { when: '@quarantined', marker: 'QUARANTINED' },
+          'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' },
+        },
       }),
     ],
   },
