@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.13.3] - 2026-11-09
+
 ### Fixed
 
 - Vitest conditional factories can clear an earlier skip in a modifier chain. Runtime context methods
@@ -642,7 +644,8 @@ First release.
 - Support for ESLint 9 and 10 flat config, JavaScript and TypeScript test files, `.extend()`
   fixtures, describe blocks, runtime skips and tags in titles or the `tag` option.
 
-[Unreleased]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.13.2...HEAD
+[Unreleased]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.13.3...HEAD
+[0.13.3]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.13.2...v0.13.3
 [0.13.2]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.13.1...v0.13.2
 [0.13.1]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.12.1...v0.13.0
