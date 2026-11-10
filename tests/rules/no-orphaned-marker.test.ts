@@ -375,6 +375,21 @@ runRule('no-orphaned-marker', rule, {
       ],
     },
     {
+      name: 'removes trailing spaces with a marker in the middle of a block comment',
+      code: "/**\n * SKIP: TRADE-1   \n * Checks the cancel flow.\n */\ntest('cancels an order', async () => {});",
+      errors: [
+        {
+          messageId: 'orphaned',
+          suggestions: [
+            {
+              messageId: 'removeMarker',
+              output: "/**\n * Checks the cancel flow.\n */\ntest('cancels an order', async () => {});",
+            },
+          ],
+        },
+      ],
+    },
+    {
       code: "/**\n * Checks the cancel flow.\n * SKIP: TRADE-1\n */\ntest('cancels an order', async () => {});",
       errors: [
         {

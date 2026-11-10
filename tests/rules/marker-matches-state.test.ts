@@ -121,6 +121,18 @@ runRule('marker-matches-state', rule, {
     },
     // One marker for a test in two states.
     {
+      name: 'does not copy tickets that the missing state cannot all accept',
+      code: "// SKIP: TRADE-1, #4821\ntest.skip('fills an order @new', () => {});",
+      settings: settings({ customStates: { new: { when: '@new', marker: 'NEW', ticket: { preset: 'jira' } } } }),
+      errors: [{ messageId: 'sharedMarker', suggestions: [] }],
+    },
+    {
+      name: 'does not add a marker beside an eslint-disable-line directive',
+      code: "test.skip('fills an order @new', () => {}); // eslint-disable-line no-console -- SKIP: TRADE-1",
+      settings: lifecycle,
+      errors: [{ messageId: 'sharedMarker', suggestions: [] }],
+    },
+    {
       code: "// SKIP: TRADE-1, TRADE-2\ntest.skip('triggers a stop-loss @quarantined', async () => {});",
       settings: lifecycle,
       errors: [
