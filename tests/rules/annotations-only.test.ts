@@ -88,6 +88,16 @@ runRule('require-ticket (annotations.only, Playwright)', rule, {
       errors: [useAnnotation()],
     },
     { code: '// SKIP: TRADE-1\ntest.describe.skip(() => {});', errors: [useAnnotation()] },
+    {
+      name: 'does not suggest moving a marker without tickets',
+      code: "// SKIP:\ntest.skip('places an order', async () => {});",
+      errors: [useAnnotation()],
+    },
+    {
+      name: 'keeps block ticket comments out of annotation suggestions',
+      code: "/* SKIP: TRADE-1 */\ntest.skip('places an order', async () => {});",
+      errors: [useAnnotation()],
+    },
     // A region's marker covers several tests, so it is reported once and has no single place to move to.
     {
       code: "/* eslint-disable no-console -- SKIP: TRADE-1 */\n\ntest.skip('places an order', async () => {});\ntest.skip('cancels an order', async () => {});",
@@ -108,6 +118,23 @@ runRule('require-ticket (annotations.only, Playwright)', rule, {
       errors: [missingAnnotation('This describe block')],
     },
     // The annotation type comes from the option.
+    {
+      name: 'escapes quotes, backslashes and carriage returns when moving annotation types',
+      code: "// SKIP: TRADE-1\ntest.skip('places an order', async () => {});",
+      settings: { 'test-governance': { annotations: { type: "issue's\\tracker\rname", only: true } } },
+      errors: [
+        {
+          messageId: 'useAnnotation',
+          suggestions: [
+            {
+              messageId: 'moveToAnnotation',
+              output:
+                "test.skip('places an order', { annotation: { type: 'issue\\'s\\\\tracker\\rname', description: 'TRADE-1' } }, async () => {});",
+            },
+          ],
+        },
+      ],
+    },
     {
       code: "// SKIP: TRADE-1\ntest.skip('places an order', async () => {});",
       settings: { 'test-governance': { annotations: { type: 'jira', only: true } } },

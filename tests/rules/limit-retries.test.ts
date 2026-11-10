@@ -166,6 +166,7 @@ it('keeps limit-retries off in every preset and independent of retry tickets', (
   const reports = linter.verify('jest.retryTimes(3);', config);
   assert.equal(reports.length, 1);
   assert.equal(reports[0].messageId, 'excessiveRetries');
+  assert.equal(reports[0].message, 'This retry count of 3 exceeds the configured maximum of 1.');
   const tracked = plugin.configure({ framework: 'jest', maxRetries: 1, states: { retry: true } });
   tracked.rules['test-governance/limit-retries'] = 'error';
   const both = linter.verify('// RETRY: EXAMPLE-123\njest.retryTimes(3);', tracked);

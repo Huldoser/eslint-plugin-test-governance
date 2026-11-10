@@ -68,6 +68,10 @@ runRule('require-ticket-for-commented-out-tests', rule, {
       code: `// SKIP: TBD\n// test('places an order', async () => {});${TEST}`,
       errors: [{ messageId: 'placeholderTicket', data: { ticket: 'TBD' }, line: 1 }],
     },
+    {
+      code: `// SKIP: TRADE-1, TBD\n// test('places an order', async () => {});${TEST}`,
+      errors: [{ messageId: 'placeholderTicket', data: { ticket: 'TBD' }, line: 1 }],
+    },
     // Only tickets follow the marker unless notes are allowed, as in any marker.
     {
       code: `// SKIP: TRADE-1 flaky on CI\n// test('places an order', async () => {});${TEST}`,

@@ -43,6 +43,12 @@ describe('configs', () => {
     assert.equal(configure({ framework: 'jest' }).name, 'test-governance/jest');
   });
 
+  it('preserves explicit undefined and boolean native state overrides', () => {
+    const states = { skip: undefined, fixme: false, slow: true };
+    const config = configure({ framework: 'playwright', states });
+    assert.deepEqual(config.settings?.['test-governance'], { framework: 'playwright', states });
+  });
+
   it('needs a framework in configure() when the config file loads', () => {
     assert.throws(
       () =>
@@ -84,8 +90,8 @@ describe('configs', () => {
       configure({
         framework: 'playwright',
         ticket: { preset: 'jira', projects: ['TRADE'] },
-        states: { skip: { ticket: { preset: 'jira', host: 'jira.acme.io' } } },
-        customStates: { flaky: { when: '@flaky', marker: 'FLAKY', ticket: { preset: 'jira' } } },
+        states: { skip: { ticket: { preset: 'jira', projects: ['TRADE'], host: 'jira.acme.io' } } },
+        customStates: { flaky: { when: '@flaky', marker: 'FLAKY', ticket: { preset: 'jira', projects: ['TRADE'] } } },
       }),
       {
         files: ['legacy/**'],
@@ -97,7 +103,7 @@ describe('configs', () => {
         }),
       },
     ];
-    // ESLint merges settings objects key by key, which would give github a `projects` or `host` it doesn't take.
+    // Earlier Jira project constraints must not reach the later GitHub ticket formats.
     assert.deepEqual(linter.verify(code, config, 'legacy/orders.spec.js'), []);
     assert.equal(linter.verify(code, config, 'e2e/orders.spec.js').length, 1);
   });
