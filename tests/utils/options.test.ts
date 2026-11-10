@@ -41,6 +41,13 @@ describe('compileOptions', () => {
     assert.deepEqual(compile({ annotations: { only: true } }).annotations, { type: 'issue', only: true });
   });
 
+  it('allows shared annotation settings without only on frameworks without annotations', () => {
+    for (const framework of ['jest', 'mocha', 'cypress', 'webdriverio', 'node-test', 'jasmine'] as const) {
+      assert.doesNotThrow(() => compile({ framework, annotations: { type: 'issue' } }));
+      assert.doesNotThrow(() => compile({ framework, annotations: { only: false } }));
+    }
+  });
+
   it('accepts formerly built-in lifecycle names as explicit custom states', () => {
     assert.deepEqual(
       stateNames({
@@ -396,6 +403,8 @@ describe('compileOptions', () => {
   it('does not read a ticket spec the schema already rejects as a preset', () => {
     for (const ticket of [
       { preset: 'bogus' },
+      { preset: 'bogus', host: 'tracker.example.com' },
+      { host: 'tracker.example.com' },
       'trello',
       null,
       [null],
