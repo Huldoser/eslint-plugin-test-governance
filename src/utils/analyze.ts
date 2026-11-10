@@ -1316,7 +1316,7 @@ function leavesOutTitle(
   args: TSESTree.CallExpressionArgument[],
 ): boolean {
   const [first] = args;
-  return isFunction(first) || (framework.optionalTitle && isObject(sourceCode, first));
+  return (!framework.functionTitle && isFunction(first)) || (framework.optionalTitle && isObject(sourceCode, first));
 }
 
 /** Whether a title is text, written out or held in a constant declared in this file. */
@@ -1343,7 +1343,7 @@ function isDeclaration(
   members: string[],
 ): boolean {
   const first = args.at(0);
-  if (isFunction(first)) return kind === 'describe' || framework.optionalTitle;
+  if (isFunction(first) && !framework.functionTitle) return kind === 'describe' || framework.optionalTitle;
   if (first === undefined) return false;
   // node:test's `test({ skip: true }, fn)`, or `test({ name, fn })` with everything in the options.
   if (framework.optionalTitle && isObject(sourceCode, first)) return true;
@@ -1909,8 +1909,8 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
    * What a body can change the test's state with: Playwright's `testInfo`, Vitest's test context, or
    * Jasmine's `pending()`.
    */
-  const bodyInfos = (args: TSESTree.CallExpressionArgument[], path: string[]): InfoName[] => {
-    const body = args.findLast(isFunction);
+  const bodyInfos = (args: TSESTree.CallExpressionArgument[], path: string[], declaration = false): InfoName[] => {
+    const body = args.slice(framework.functionTitle && declaration ? 1 : 0).findLast(isFunction);
     if (!body) return [];
     const functions = [
       ...[...framework.runtimeFunctions].map(([name, modifier]): InfoName => ({
@@ -1993,7 +1993,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
         branches.every((branch) => branch.get(modifier) === true),
       );
     }
-    const infos = first.kind === 'test' ? bodyInfos(args, first.members) : [];
+    const infos = first.kind === 'test' ? bodyInfos(args, first.members, true) : [];
     return { subject: makeSubject(first.kind, call, modifiers, tagInfo), infos };
   };
 
@@ -2187,8 +2187,9 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     }
     const { kind, members } = declaration;
     // A describe's body gets no test context: node:test passes one that can't skip.
-    const bodyInfo = kind === 'describe' ? [] : bodyInfos(args, path);
-    if (declares(declaration, args)) return declare(call, declaration, bodyInfo);
+    const declared = declares(declaration, args);
+    const bodyInfo = kind === 'describe' ? [] : bodyInfos(args, path, declared);
+    if (declared) return declare(call, declaration, bodyInfo);
     // test.skip(), test.fixme(), test.fail() and test.slow() in a test, a describe or a hook.
     if (framework.playwright && members.length === 1 && RUNTIME_MODIFIERS.has(members[0])) {
       return { subject: runtimeSubject(call, members[0]), infos: bodyInfo };
@@ -2312,7 +2313,9 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     return subject;
   };
 
+  const functionTitles = new Set<Node>();
   const walk = (node: Node): void => {
+    if (functionTitles.has(node)) return;
     let pushedSubject = false;
     let pushedInfos = 0;
     if (node.type === 'CallExpression') {
@@ -2320,6 +2323,8 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       if (visit.subject && visit.subject.kind !== 'runtime') {
         stack.push(visit.subject);
         pushedSubject = true;
+        const title = visit.subject.node.arguments[0];
+        if (framework.functionTitle && isFunction(title)) functionTitles.add(title);
       }
       for (const info of visit.infos ?? []) {
         if (!info.runtimeFunction && info.step === undefined && visit.subject?.kind === 'test')

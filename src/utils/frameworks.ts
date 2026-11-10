@@ -69,6 +69,8 @@ export interface Framework {
    * options object then comes first.
    */
   optionalTitle: boolean;
+  /** Whether a function in the title position supplies its name instead of a test body, as in Vitest. */
+  functionTitle?: true;
   /** The key of the details or options object that holds tags. */
   tagKey?: string;
   /** Whether that key holds names without their `@`, as Vitest's `tags: ['flaky']`, which stand for `@flaky`. */
@@ -269,6 +271,7 @@ const vitest: Framework = {
   anyOptionValue: false,
   exclusiveStates: [],
   optionalTitle: false,
+  functionTitle: true,
   tagKey: 'tags',
   plainTags: true,
   annotations: { key: 'meta', shape: 'meta' },
