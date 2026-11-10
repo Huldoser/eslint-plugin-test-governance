@@ -53,6 +53,15 @@ runRule('require-ticket (Jasmine)', requireTicket, {
     "const { xdescribe } = require('mocha');\nxdescribe('order book', () => {});",
   ]),
   invalid: withOptions(jasmine, [
+    {
+      name: 'replaces the default it function while keeping skipped Jasmine globals',
+      code: "it('ordinary helper');\nspec('needs implementation');\nxit('disabled test', () => {});",
+      settings: settings({ testFunctions: ['spec'] }),
+      errors: [
+        { ...missing('todo', 'TODO'), line: 2 },
+        { ...missing('skip', 'SKIP'), line: 3 },
+      ],
+    },
     // `pending()` takes only a message, so a message in a name always applies.
     {
       code: "it('fills a limit order', () => {\n  pending(reason);\n});",

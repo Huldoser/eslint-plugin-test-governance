@@ -354,6 +354,7 @@ interface RuntimeFunction {
 }
 
 interface TestNames {
+  usesModule: boolean;
   /** Names that refer to the framework's test functions, with what each one is. */
   roots: Map<string, Root>;
   /** Names bound to a whole framework module, as in `import * as pw`, whose `test` is `pw.test`. */
@@ -363,13 +364,15 @@ interface TestNames {
 }
 
 /** Collects the top-level names that refer to the framework's test functions or to its module. */
-function collectTestNames(program: TSESTree.Program, framework: Framework, configured: Set<string>): TestNames {
+function collectTestNames(sourceCode: SourceCode, framework: Framework, configured: Set<string>): TestNames {
+  const program = sourceCode.ast;
   /** The framework's `test` function, which is also its module when `moduleIsDefault`. */
   const testRoot = framework.defaultExport ?? TEST;
   const roots = new Map(framework.globals);
   for (const name of configured) roots.set(name, testRoot);
   const runtime = new Map<string, RuntimeFunction>();
   const modules = new Set<string>();
+  let usesModule = false;
   const mergeTests = new Set<string>();
   /** Names bound to another test runner, such as `ava` in `import ava from 'ava'`. */
   const others = new Set<string>();
@@ -435,6 +438,7 @@ function collectTestNames(program: TSESTree.Program, framework: Framework, confi
       if (isOtherRunner(framework, source)) {
         for (const spec of statement.specifiers) setOther(spec.local.name);
       } else if (framework.ownsModule(source)) {
+        usesModule = true;
         for (const spec of statement.specifiers) {
           const local = spec.local.name;
           if (spec.type === 'ImportNamespaceSpecifier') modules.add(local);
@@ -469,8 +473,11 @@ function collectTestNames(program: TSESTree.Program, framework: Framework, confi
           // which is `test` itself, as `require('node:test')` is.
           const source = requireSource(init);
           if (source !== undefined && framework.ownsModule(source)) {
+            usesModule = true;
             modules.add(name);
             if (framework.moduleIsDefault && framework.defaultExport) roots.set(name, framework.defaultExport);
+          } else if (init.type === 'Identifier' && modules.has(init.name) && !isReassigned(sourceCode, init)) {
+            modules.add(name);
           }
         }
       } else if (declarator.id.type === 'ObjectPattern') {
@@ -487,11 +494,15 @@ function collectTestNames(program: TSESTree.Program, framework: Framework, confi
           continue;
         }
         const source = requireSource(init);
-        if (source === undefined) continue;
+        const ownModule =
+          (source !== undefined && framework.ownsModule(source)) ||
+          (init.type === 'Identifier' && modules.has(init.name) && !isReassigned(sourceCode, init));
+        if (source === undefined && !ownModule) continue;
+        if (ownModule) usesModule = true;
         for (const prop of declarator.id.properties) {
           if (prop.type !== 'Property' || prop.value.type !== 'Identifier') continue;
-          if (isOtherRunner(framework, source)) setOther(prop.value.name);
-          else if (framework.ownsModule(source)) {
+          if (source !== undefined && isOtherRunner(framework, source)) setOther(prop.value.name);
+          else if (ownModule) {
             const root = framework.exports.get(propertyName(prop) ?? '');
             bindRuntime(prop.value.name, propertyName(prop));
             if (root) roots.set(prop.value.name, root);
@@ -500,7 +511,7 @@ function collectTestNames(program: TSESTree.Program, framework: Framework, confi
       }
     }
   }
-  return { roots, modules, runtime };
+  return { roots, modules, runtime, usesModule };
 }
 
 /** The name a property key spells out: `test` in `{ test }`, `{ 'test': t }` or `{ ['test']: t }`. */
@@ -1316,7 +1327,7 @@ function leavesOutTitle(
   args: TSESTree.CallExpressionArgument[],
 ): boolean {
   const [first] = args;
-  return isFunction(first) || (framework.optionalTitle && isObject(sourceCode, first));
+  return (!framework.functionTitle && isFunction(first)) || (framework.optionalTitle && isObject(sourceCode, first));
 }
 
 /** Whether a title is text, written out or held in a constant declared in this file. */
@@ -1343,7 +1354,7 @@ function isDeclaration(
   members: string[],
 ): boolean {
   const first = args.at(0);
-  if (isFunction(first)) return kind === 'describe' || framework.optionalTitle;
+  if (isFunction(first) && !framework.functionTitle) return kind === 'describe' || framework.optionalTitle;
   if (first === undefined) return false;
   // node:test's `test({ skip: true }, fn)`, or `test({ name, fn })` with everything in the options.
   if (framework.optionalTitle && isObject(sourceCode, first)) return true;
@@ -1431,7 +1442,8 @@ function isUnconditional(sourceCode: SourceCode, call: TSESTree.CallExpression, 
   const always =
     first === undefined ||
     booleanOf(first) === true ||
-    // node:test's `t.skip(message)` and Jasmine's `pending(message)` take no condition, so any argument is a note.
+    // Mocha ignores arguments; Node and Jasmine take a reason rather than a condition.
+    framework.reasonArgument === undefined ||
     framework.reasonArgument === 'only' ||
     (framework.skipNotes && (isStaticText(unwrap(first)) || staticText(sourceCode, first) !== undefined));
   return always && !isGuarded(call);
@@ -1585,7 +1597,7 @@ export function analyze(sourceCode: SourceCode, options: ResolvedOptions): Analy
 
 function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis {
   const { states, framework } = options;
-  const testNames = collectTestNames(sourceCode.ast, framework, options.testFunctions);
+  const testNames = collectTestNames(sourceCode, framework, options.testFunctions);
   /** Whole-module imports or requires, including constant aliases of them. */
   const moduleOf = (node: Node, seen: readonly Node[] = []): boolean => {
     const value = unwrap(node);
@@ -1656,9 +1668,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const alias = target(chainOf(unwrap(value), framework.factories), [...seen, value]);
     return alias && { root: alias.root, path: [...alias.path, ...path], args: new Map([...alias.args, ...args]) };
   };
-  let usesTest = sourceCode.ast.body.some(
-    (statement) => statement.type === 'ImportDeclaration' && framework.ownsModule(statement.source.value),
-  );
+  let usesTest = testNames.usesModule;
   const subjects: Subject[] = [];
   const retryCounts: Analysis['retryCounts'] = [];
   /** Follows local constants and conditional branches without executing a runtime expression. */
@@ -1908,8 +1918,8 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
    * What a body can change the test's state with: Playwright's `testInfo`, Vitest's test context, or
    * Jasmine's `pending()`.
    */
-  const bodyInfos = (args: TSESTree.CallExpressionArgument[], path: string[]): InfoName[] => {
-    const body = args.findLast(isFunction);
+  const bodyInfos = (args: TSESTree.CallExpressionArgument[], path: string[], declaration = false): InfoName[] => {
+    const body = args.slice(framework.functionTitle && declaration ? 1 : 0).findLast(isFunction);
     if (!body) return [];
     const functions = [
       ...[...framework.runtimeFunctions].map(([name, modifier]): InfoName => ({
@@ -1992,7 +2002,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
         branches.every((branch) => branch.get(modifier) === true),
       );
     }
-    const infos = first.kind === 'test' ? bodyInfos(args, first.members) : [];
+    const infos = first.kind === 'test' ? bodyInfos(args, first.members, true) : [];
     return { subject: makeSubject(first.kind, call, modifiers, tagInfo), infos };
   };
 
@@ -2186,8 +2196,9 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     }
     const { kind, members } = declaration;
     // A describe's body gets no test context: node:test passes one that can't skip.
-    const bodyInfo = kind === 'describe' ? [] : bodyInfos(args, path);
-    if (declares(declaration, args)) return declare(call, declaration, bodyInfo);
+    const declared = declares(declaration, args);
+    const bodyInfo = kind === 'describe' ? [] : bodyInfos(args, path, declared);
+    if (declared) return declare(call, declaration, bodyInfo);
     // test.skip(), test.fixme(), test.fail() and test.slow() in a test, a describe or a hook.
     if (framework.playwright && members.length === 1 && RUNTIME_MODIFIERS.has(members[0])) {
       return { subject: runtimeSubject(call, members[0]), infos: bodyInfo };
@@ -2291,7 +2302,12 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     always = isUnconditional(sourceCode, call, framework),
   ): Subject | undefined => {
     if (!states.some((s) => s.modifier === modifier)) return undefined;
-    if (framework.reasonArgument !== 'only' && booleanOf(call.arguments.at(0)) === false) return undefined;
+    if (
+      framework.reasonArgument !== undefined &&
+      framework.reasonArgument !== 'only' &&
+      booleanOf(call.arguments.at(0)) === false
+    )
+      return undefined;
     const subject = makeSubject(
       'runtime',
       call,
@@ -2306,7 +2322,9 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     return subject;
   };
 
+  const functionTitles = new Set<Node>();
   const walk = (node: Node): void => {
+    if (functionTitles.has(node)) return;
     let pushedSubject = false;
     let pushedInfos = 0;
     if (node.type === 'CallExpression') {
@@ -2314,6 +2332,8 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       if (visit.subject && visit.subject.kind !== 'runtime') {
         stack.push(visit.subject);
         pushedSubject = true;
+        const title = visit.subject.node.arguments[0];
+        if (framework.functionTitle && isFunction(title)) functionTitles.add(title);
       }
       for (const info of visit.infos ?? []) {
         if (!info.runtimeFunction && info.step === undefined && visit.subject?.kind === 'test')

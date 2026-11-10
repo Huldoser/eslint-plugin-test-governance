@@ -41,6 +41,13 @@ describe('compileOptions', () => {
     assert.deepEqual(compile({ annotations: { only: true } }).annotations, { type: 'issue', only: true });
   });
 
+  it('allows shared annotation settings without only on frameworks without annotations', () => {
+    for (const framework of ['jest', 'mocha', 'cypress', 'webdriverio', 'node-test', 'jasmine'] as const) {
+      assert.doesNotThrow(() => compile({ framework, annotations: { type: 'issue' } }));
+      assert.doesNotThrow(() => compile({ framework, annotations: { only: false } }));
+    }
+  });
+
   it('accepts formerly built-in lifecycle names as explicit custom states', () => {
     assert.deepEqual(
       stateNames({
@@ -168,6 +175,10 @@ describe('compileOptions', () => {
     [{ states: { skip: { marker: 'Skip' } } }, /states\.skip\.marker must be an uppercase keyword/],
     [{ customState: true }, /customState is not a known option; did you mean "customStates"\?/],
     [{ annotations: 'yes' }, /annotations/],
+    [{ annotations: { type: 42 } }, /annotations\.type must be a string/],
+    [{ annotations: { only: 'yes' } }, /annotations\.only must be a boolean/],
+    [{ annotations: { typo: true } }, /annotations\.typo is not a known option/],
+    [{ requireReasonForConditional: 'yes' }, /requireReasonForConditional must be a boolean/],
     [{ ticket: { preset: 'numeric', minLength: 5, maxLength: 3 } }, /minLength \(5\) is greater than maxLength \(3\)/],
     [{ ticket: { preset: 'pattern' } }, /"pattern" ticket preset needs a `pattern` regex string/],
     [{ customStates: { x: { when: '@x', marker: 'SKIP' } } }, /two states use the marker "SKIP"/],
@@ -383,6 +394,7 @@ describe('compileOptions', () => {
       [{ preset: 'numeric', minLength: '25' }, 'ticket.minLength must be an integer (got "25")'],
       [{ preset: 'numeric', minLength: 5, maxLength: '3' }, 'ticket.maxLength must be an integer (got "3")'],
       [{ preset: 'pattern', pattern: 5 }, 'ticket.pattern must be a string (got 5)'],
+      [{ preset: 'pattern', pattern: ['('] }, 'ticket.pattern must be a string (got ["("])'],
       [{ preset: 'pattern', pattern: 'x', flags: 5 }, 'ticket.flags must be a string (got 5)'],
     ] as const) {
       assert.throws(() => compile({ ticket: ticket as never }), new ConfigError(`invalid options:\n  - ${problem}`));
@@ -392,14 +404,19 @@ describe('compileOptions', () => {
   it('does not read a ticket spec the schema already rejects as a preset', () => {
     for (const ticket of [
       { preset: 'bogus' },
+      { preset: 'bogus', host: 'tracker.example.com' },
+      { host: 'tracker.example.com' },
       'trello',
       null,
       [null],
       [[]],
       { preset: 5 },
+      { preset: { toString: null } },
       { preset: 'jira', projects: 'TRADE' },
       { preset: 'jira', projects: [123] },
+      { preset: 'jira', projects: [{ toString: null }] },
       { preset: 'redmine', host: 123 },
+      { preset: 'redmine', host: { toString: null } },
     ]) {
       assert.throws(() => compile({ ticket: ticket as never }), ConfigError);
     }
@@ -419,6 +436,10 @@ describe('compileOptions', () => {
       () => compile({ customStates: { constructor: { when: 'not a tag', marker: 'lower case' } } }),
       /customStates\.constructor\.marker/,
     );
+  });
+
+  it('reports a ConfigError for a malformed framework instead of coercing it', () => {
+    assert.throws(() => compile({ framework: { toString: null } } as never), ConfigError);
   });
 
   it('does not read malformed states as states', () => {

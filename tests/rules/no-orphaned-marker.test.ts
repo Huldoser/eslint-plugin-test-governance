@@ -64,8 +64,29 @@ runRule('no-orphaned-marker', rule, {
     "/* eslint-disable no-console -- SKIP: TRADE-1 */\ntest.skip('places an order', async () => {});\ntest('cancels an order', async () => {});",
     "/* eslint-disable no-console -- SKIP: TRADE-1 */\ntest('places an order', async () => {});\ntest.skip('cancels an order', async () => {});",
     "/* eslint-disable no-console -- TODO: TRADE-1 */\ntest('places an order', async () => {});",
+    {
+      name: 'a TODO region remains a work note when native todo tests are enabled',
+      code: "import { test } from 'node:test';\n/* eslint-disable no-console -- TODO: EXAMPLE-123 */\ntest('fills an order', () => {});",
+      settings: settings({ framework: 'node-test', states: { todo: true } }),
+    },
   ],
   invalid: [
+    {
+      name: 'explains why an unused region marker is left over',
+      code: "/* eslint-disable no-console -- SKIP: EXAMPLE-123 */\ntest('fills an order', () => {});\n/* eslint-enable no-console */",
+      errors: [
+        {
+          message: "`SKIP:` is left over: no test up to the `eslint-enable` of this comment is in the 'skip' state.",
+          suggestions: [
+            {
+              messageId: 'removeMarker',
+              output:
+                "/* eslint-disable no-console */\ntest('fills an order', () => {});\n/* eslint-enable no-console */",
+            },
+          ],
+        },
+      ],
+    },
     // A region's marker that no test up to its `eslint-enable` uses is left over.
     {
       code: "/* eslint-disable no-console -- SKIP: TRADE-1 */\ntest('places an order', async () => {});\n/* eslint-enable no-console */\ntest.skip('cancels an order', async () => {});",
@@ -348,6 +369,21 @@ runRule('no-orphaned-marker', rule, {
             {
               messageId: 'removeMarker',
               output: "/* FIXME: TRADE-2 */\ntest.fixme('cancels an order', async () => {});",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      name: 'removes trailing spaces with a marker in the middle of a block comment',
+      code: "/**\n * SKIP: TRADE-1   \n * Checks the cancel flow.\n */\ntest('cancels an order', async () => {});",
+      errors: [
+        {
+          messageId: 'orphaned',
+          suggestions: [
+            {
+              messageId: 'removeMarker',
+              output: "/**\n * Checks the cancel flow.\n */\ntest('cancels an order', async () => {});",
             },
           ],
         },

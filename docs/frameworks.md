@@ -92,6 +92,8 @@ Vitest writes tag names without the `@`: `{ tags: ['flaky'] }` matches the gover
 Define those tags in your [Vitest config](https://vitest.dev/guide/test-tags#defining-tags) too; this plugin's
 `knownTags` does not register runner tags. A plain title containing `@flaky` is a separate convention.
 Vitest's `.for` and `.each` table-driven forms count too.
+Vitest also accepts a function as the name, as in `test.skip(function namedTest() {}, fn)`.
+The name function is not executed; the separate body supplies the test context.
 
 ## Mocha
 
@@ -115,6 +117,8 @@ also count for retry ticketing and [retry limits](rules/limit-retries.md).
 
 `this.skip()` and `this.retries()` count in tests or hooks written as `function`; an arrow function
 has no Mocha context. `this.slow(ms)` only sets the speed threshold and is not the `slow` state.
+Mocha ignores arguments passed to `this.skip()`: `this.skip(false)` still skips, and an argument
+does not supply a reason for a condition around the call.
 A skipped test or describe with no body still counts as skipped.
 
 ## Cypress

@@ -6,8 +6,7 @@ import { runRule, settings, withOptions } from '../helpers.ts';
 const TEST = "\ntest('cancels an order', async () => {});";
 
 const missing = (marker = 'SKIP', example = 'PROJ-123') => ({
-  messageId: 'missingMarker' as const,
-  data: { marker, example },
+  message: `This commented-out test has no \`// ${marker}: <ticket>\` comment, e.g. \`// ${marker}: ${example}\`. Track it like a skipped test, or delete it.`,
 });
 
 runRule('require-ticket-for-commented-out-tests', rule, {
@@ -44,6 +43,11 @@ runRule('require-ticket-for-commented-out-tests', rule, {
   ],
   invalid: [
     { code: `// test('places an order', async () => {});${TEST}`, errors: [{ ...missing(), line: 1, column: 4 }] },
+    {
+      name: 'a fixme marker does not track a commented-out test',
+      code: `// FIXME: TRADE-1\n// test('places an order', async () => {});${TEST}`,
+      errors: [missing()],
+    },
     { code: `// test.describe.serial.only('orders', () => {});${TEST}`, errors: [missing()] },
     {
       code: "test('places an order', async () => {\n  // await test.step('fills the order', async () => {});\n});",
@@ -61,20 +65,42 @@ runRule('require-ticket-for-commented-out-tests', rule, {
       errors: [{ ...missing(), line: 4 }],
     },
     {
+      name: 'renders the invalid ticket diagnostic for a commented-out test',
       code: `// SKIP: nope\n// test('places an order', async () => {});${TEST}`,
-      errors: [{ messageId: 'invalidTicket', line: 1 }],
+      errors: [
+        {
+          message:
+            "'nope' is not a valid ticket for the 'skip' state. Expected a ticket key like PROJ-123, an issue like #4821 or owner/repo#4821, or a URL.",
+          line: 1,
+        },
+      ],
     },
     {
+      name: 'renders the placeholder diagnostic for a commented-out test',
       code: `// SKIP: TBD\n// test('places an order', async () => {});${TEST}`,
+      errors: [
+        {
+          message: "'TBD' is a placeholder, not a real ticket. Link the ticket that tracks this test.",
+          line: 1,
+        },
+      ],
+    },
+    {
+      code: `// SKIP: TRADE-1, TBD\n// test('places an order', async () => {});${TEST}`,
       errors: [{ messageId: 'placeholderTicket', data: { ticket: 'TBD' }, line: 1 }],
     },
     // Only tickets follow the marker unless notes are allowed, as in any marker.
     {
+      name: 'locates and explains extra text on a commented-out test marker',
       code: `// SKIP: TRADE-1 flaky on CI\n// test('places an order', async () => {});${TEST}`,
       errors: [
         {
-          messageId: 'extraText',
-          data: { marker: 'SKIP', text: 'flaky on CI' },
+          message:
+            'Only ticket IDs are allowed after `SKIP:`, separated by commas. Put details in the ticket instead of `flaky on CI`.',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 29,
           suggestions: [
             {
               messageId: 'removeExtraText',
@@ -85,8 +111,9 @@ runRule('require-ticket-for-commented-out-tests', rule, {
       ],
     },
     {
+      name: 'renders the missing ticket diagnostic for a commented-out test',
       code: `// SKIP:\n// test('places an order', async () => {});${TEST}`,
-      errors: [{ messageId: 'missingTicket', line: 1 }],
+      errors: [{ message: '`SKIP:` needs a ticket right after the colon, e.g. `// SKIP: PROJ-123`.', line: 1 }],
     },
     ...withOptions({ framework: 'jest' }, [
       { code: "// xit('places an order', () => {});\ntest('cancels an order', () => {});", errors: [missing()] },

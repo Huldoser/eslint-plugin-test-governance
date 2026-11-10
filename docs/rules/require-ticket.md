@@ -414,6 +414,45 @@ describe('order entry', () => {
 });
 ```
 
+Mocha ignores a false argument to `this.skip()`, so this still needs a ticket:
+
+<!-- example: invalid settings={"framework":"mocha"} -->
+
+```js
+it('fills an order', function () {
+  this.skip(false);
+});
+```
+
+Vitest accepts a function as the name. A separate body does not make the skipped test exempt:
+
+<!-- example: invalid settings={"framework":"vitest"} -->
+
+```js
+test.skip(
+  function fillsAnOrder() {},
+  () => {},
+);
+```
+
+OpenProject links may include an installation base path and a semantic work-package ID:
+
+<!-- example: valid settings={"ticket":{"preset":"openproject","host":"tracker.example.com"}} -->
+
+```js
+// SKIP: https://tracker.example.com/openproject/wp/TRADE-512
+test.skip('fills an order', () => {});
+```
+
+A matching custom pattern still rejects a URL whose ticket ID is zero:
+
+<!-- example: invalid settings={"ticket":{"preset":"pattern","pattern":"\\S+"}} -->
+
+```js
+// SKIP: https://tracker.example.com/issues?id=0
+test.skip('fills an order', () => {});
+```
+
 ## Options
 
 This rule has no options of its own. It reads the shared options described in the

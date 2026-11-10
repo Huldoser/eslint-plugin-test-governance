@@ -90,7 +90,7 @@ export function moveToAnnotation(
   const [title] = call.arguments;
   // Vitest's `test.skip('title')` has no second argument.
   const details = call.arguments.at(1);
-  if (isFunction(title)) return undefined;
+  if (source.shape !== 'meta' && isFunction(title)) return undefined;
   const remove = removeMarkerComment(sourceCode, marker);
   if (isFunction(details)) {
     // Vitest reads a timeout or options after the function only as the third argument.

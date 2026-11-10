@@ -81,9 +81,9 @@ const BASECAMP_PATH_RE = /^\/\d+\/buckets\/\d+\/(?:todos|card_tables\/cards)\/(\
 const SHORTCUT_REF_RE = /^(?:sc-(\d+)|\[sc-(\d+)\])$/i;
 const SHORTCUT_PATH_RE = /^\/[^/]+\/story\/(\d+)(?:\/[^/]+)?\/?$/;
 // OpenProject work packages: the canonical `/projects/<identifier>/work_packages/<id or AGILE-1>` with any
-// tab path after it, and the `/wp/<id>` short form its changelog links use.
-const OPENPROJECT_PATH_RE = /\/projects\/[^/]+\/work_packages\/([A-Z][A-Z0-9_]+-\d+|\d+)(?:\/.*)?\/?$/;
-const OPENPROJECT_SHORT_RE = /^\/(?:work_packages|wp)\/(\d+)(?:\/.*)?\/?$/;
+// tab path after it, and the `/wp/<id>` short form its changelog links use. Both may follow a base path.
+const OPENPROJECT_PATH_RE = /\/projects\/[^/]+\/work_packages\/(?:[A-Z][A-Z0-9_]+-)?(\d+)(?:\/.*)?\/?$/;
+const OPENPROJECT_SHORT_RE = /\/(?:work_packages|wp)\/(?:[A-Z][A-Z0-9_]+-)?(\d+)(?:\/.*)?\/?$/;
 // Bugzilla runs under any path, as `/bugzilla/show_bug.cgi`; the bug is in the `id` query value.
 const BUGZILLA_CGI_RE = /\/show_bug\.cgi\/?$/;
 // Phabricator tasks: the `T4821` monogram, and the `/T4821` path its instances use.
@@ -553,9 +553,13 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
       } catch (error) {
         throw new ConfigError(`invalid ticket pattern "${spec.pattern}": ${(error as Error).message}`);
       }
-      // The regex is the user's, so the ID is the whole ticket; one that ends in a zero ID is a placeholder.
+      // Reuse URL ID parsing so zero query IDs and title slugs behave like the other generic presets.
       return {
-        find: (t) => (re.test(t) ? (ZERO_ID_RE.test(t) ? '0' : t) : undefined),
+        find: (t) => {
+          if (!re.test(t)) return undefined;
+          const url = parseUrl(t);
+          return url ? linkId(url) : ZERO_ID_RE.test(t) ? '0' : t;
+        },
         expected: `a ticket matching /${spec.pattern}/`,
         example: 'TICKET',
         generic: true,

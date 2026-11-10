@@ -27,7 +27,8 @@ How comments are read:
 - A JSDoc comment, `/** ... */`, is documentation, so a test in its example is left alone.
 - A block's comments belong to it: a `SKIP:` marker in it is not taken as the marker of the test below the
   block, which still needs its own.
-- Only test files (a test framework import or a call to a test function) are checked.
+- Only test files (a test framework import or require, or a call to a test function) are checked.
+  Names destructured from a namespace import or its stable aliases count too.
 
 The rule reads comment text rather than code, so a sentence that starts like a call, `// test(...)
 covers this`, is reported too. That is why the configs set it to warn.
@@ -56,7 +57,27 @@ test('places a limit order', async ({ page }) => {});
 test('places a limit order', async ({ page }) => {});
 ```
 
+A namespace alias still identifies a test, even when all its calls are commented out:
+
+<!-- example: invalid -->
+
+```js
+import * as runner from '@playwright/test';
+const { test: spec } = runner;
+// spec('cancels an order', () => {});
+```
+
 Correct:
+
+A required framework also identifies a test file. Its commented-out calls need their marker:
+
+<!-- example: valid -->
+
+```js
+const { test: spec } = require('@playwright/test');
+// SKIP: TRADE-512
+// spec('cancels an order', () => {});
+```
 
 <!-- example: valid -->
 

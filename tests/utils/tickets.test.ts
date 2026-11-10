@@ -454,12 +454,17 @@ const tables: Record<string, Table> = {
       'https://community.openproject.org/projects/AGILE/work_packages/24971/',
       'https://community.openproject.org/work_packages/24971',
       'https://community.openproject.org/wp/80962',
+      'https://community.openproject.org/work_packages/AGILE-1',
+      'https://community.openproject.org/wp/AGILE-1',
+      'https://community.openproject.org/openproject/work_packages/24971',
+      'https://community.openproject.org/tools/openproject/wp/80962',
+      'https://community.openproject.org/openproject/work_packages/24971/activity',
     ],
     rejects: [
       'https://community.openproject.org/projects/AGILE',
       'https://community.openproject.org/projects/AGILE/work_packages',
-      'https://community.openproject.org/work_packages/AGILE-1',
-      'https://community.openproject.org/wp/AGILE-1',
+      'https://community.openproject.org/work_packages/AGILE-1x',
+      'https://community.openproject.org/wp/agile-1',
       'https://community.openproject.org/news',
       'https://tracker.example.org/projects/AGILE/work_packages/AGILE-1',
     ],
@@ -854,6 +859,14 @@ describe('placeholders', () => {
     { spec: { preset: 'linear' }, ticket: 'https://linear.app/acme/issue/ENG-0/fix-rounding' },
     { spec: { preset: 'github' }, ticket: 'https://github.com/acme/trading-engine/pull/0/' },
     { spec: { preset: 'basecamp' }, ticket: 'https://3.basecamp.com/4821/buckets/4822/todos/0' },
+    {
+      spec: { preset: 'openproject', host: 'tracker.example.com' },
+      ticket: 'https://tracker.example.com/projects/AGILE/work_packages/AGILE-0/activity',
+    },
+    {
+      spec: { preset: 'openproject', host: 'tracker.example.com' },
+      ticket: 'https://tracker.example.com/openproject/work_packages/AGILE-000/activity',
+    },
     { spec: { preset: 'pattern', pattern: 'BUG-\\d+' }, ticket: 'BUG-0' },
   ] satisfies { spec: TicketSpec; ticket: string }[]) {
     it(`rejects ${ticket} with the ${spec.preset} preset, since its ID is 0`, () => {

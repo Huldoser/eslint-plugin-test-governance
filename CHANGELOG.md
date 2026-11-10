@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Treat arguments passed to Mocha, Cypress and WebdriverIO `this.skip()` as ignored, so a false
+  argument cannot hide an unconditional skip or explain a conditional one.
+- Accept OpenProject short links under installation base paths and semantic work-package IDs,
+  while rejecting their zero-number placeholders.
+- Read ticket IDs from URLs matched by custom patterns, rejecting zero IDs without mistaking
+  unrelated title suffixes or query values for placeholders.
+- Recognize Vitest function titles without analyzing the name function as an executed body,
+  and preserve options, runtime contexts and ticket-to-metadata suggestions.
+- Find commented-out tests through namespace aliases and recognize CommonJS-only test files,
+  while retaining protection against reassigned helpers and suite-hook aliases.
+
 ### Added
 
 - Add the opt-in `limit-retries` rule for Playwright, Jest, Vitest, Mocha, Cypress and WebdriverIO.
