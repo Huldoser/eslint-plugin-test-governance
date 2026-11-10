@@ -1431,7 +1431,8 @@ function isUnconditional(sourceCode: SourceCode, call: TSESTree.CallExpression, 
   const always =
     first === undefined ||
     booleanOf(first) === true ||
-    // node:test's `t.skip(message)` and Jasmine's `pending(message)` take no condition, so any argument is a note.
+    // Mocha ignores arguments; Node and Jasmine take a reason rather than a condition.
+    framework.reasonArgument === undefined ||
     framework.reasonArgument === 'only' ||
     (framework.skipNotes && (isStaticText(unwrap(first)) || staticText(sourceCode, first) !== undefined));
   return always && !isGuarded(call);
@@ -2291,7 +2292,12 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     always = isUnconditional(sourceCode, call, framework),
   ): Subject | undefined => {
     if (!states.some((s) => s.modifier === modifier)) return undefined;
-    if (framework.reasonArgument !== 'only' && booleanOf(call.arguments.at(0)) === false) return undefined;
+    if (
+      framework.reasonArgument !== undefined &&
+      framework.reasonArgument !== 'only' &&
+      booleanOf(call.arguments.at(0)) === false
+    )
+      return undefined;
     const subject = makeSubject(
       'runtime',
       call,
