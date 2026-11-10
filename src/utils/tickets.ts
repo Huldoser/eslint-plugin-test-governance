@@ -553,9 +553,13 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
       } catch (error) {
         throw new ConfigError(`invalid ticket pattern "${spec.pattern}": ${(error as Error).message}`);
       }
-      // The regex is the user's, so the ID is the whole ticket; one that ends in a zero ID is a placeholder.
+      // Reuse URL ID parsing so zero query IDs and title slugs behave like the other generic presets.
       return {
-        find: (t) => (re.test(t) ? (ZERO_ID_RE.test(t) ? '0' : t) : undefined),
+        find: (t) => {
+          if (!re.test(t)) return undefined;
+          const url = parseUrl(t);
+          return url ? linkId(url) : ZERO_ID_RE.test(t) ? '0' : t;
+        },
         expected: `a ticket matching /${spec.pattern}/`,
         example: 'TICKET',
         generic: true,
