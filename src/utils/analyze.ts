@@ -354,6 +354,7 @@ interface RuntimeFunction {
 }
 
 interface TestNames {
+  usesModule: boolean;
   /** Names that refer to the framework's test functions, with what each one is. */
   roots: Map<string, Root>;
   /** Names bound to a whole framework module, as in `import * as pw`, whose `test` is `pw.test`. */
@@ -363,13 +364,15 @@ interface TestNames {
 }
 
 /** Collects the top-level names that refer to the framework's test functions or to its module. */
-function collectTestNames(program: TSESTree.Program, framework: Framework, configured: Set<string>): TestNames {
+function collectTestNames(sourceCode: SourceCode, framework: Framework, configured: Set<string>): TestNames {
+  const program = sourceCode.ast;
   /** The framework's `test` function, which is also its module when `moduleIsDefault`. */
   const testRoot = framework.defaultExport ?? TEST;
   const roots = new Map(framework.globals);
   for (const name of configured) roots.set(name, testRoot);
   const runtime = new Map<string, RuntimeFunction>();
   const modules = new Set<string>();
+  let usesModule = false;
   const mergeTests = new Set<string>();
   /** Names bound to another test runner, such as `ava` in `import ava from 'ava'`. */
   const others = new Set<string>();
@@ -435,6 +438,7 @@ function collectTestNames(program: TSESTree.Program, framework: Framework, confi
       if (isOtherRunner(framework, source)) {
         for (const spec of statement.specifiers) setOther(spec.local.name);
       } else if (framework.ownsModule(source)) {
+        usesModule = true;
         for (const spec of statement.specifiers) {
           const local = spec.local.name;
           if (spec.type === 'ImportNamespaceSpecifier') modules.add(local);
@@ -469,8 +473,11 @@ function collectTestNames(program: TSESTree.Program, framework: Framework, confi
           // which is `test` itself, as `require('node:test')` is.
           const source = requireSource(init);
           if (source !== undefined && framework.ownsModule(source)) {
+            usesModule = true;
             modules.add(name);
             if (framework.moduleIsDefault && framework.defaultExport) roots.set(name, framework.defaultExport);
+          } else if (init.type === 'Identifier' && modules.has(init.name) && !isReassigned(sourceCode, init)) {
+            modules.add(name);
           }
         }
       } else if (declarator.id.type === 'ObjectPattern') {
@@ -487,11 +494,15 @@ function collectTestNames(program: TSESTree.Program, framework: Framework, confi
           continue;
         }
         const source = requireSource(init);
-        if (source === undefined) continue;
+        const ownModule =
+          (source !== undefined && framework.ownsModule(source)) ||
+          (init.type === 'Identifier' && modules.has(init.name) && !isReassigned(sourceCode, init));
+        if (source === undefined && !ownModule) continue;
+        if (ownModule) usesModule = true;
         for (const prop of declarator.id.properties) {
           if (prop.type !== 'Property' || prop.value.type !== 'Identifier') continue;
-          if (isOtherRunner(framework, source)) setOther(prop.value.name);
-          else if (framework.ownsModule(source)) {
+          if (source !== undefined && isOtherRunner(framework, source)) setOther(prop.value.name);
+          else if (ownModule) {
             const root = framework.exports.get(propertyName(prop) ?? '');
             bindRuntime(prop.value.name, propertyName(prop));
             if (root) roots.set(prop.value.name, root);
@@ -500,7 +511,7 @@ function collectTestNames(program: TSESTree.Program, framework: Framework, confi
       }
     }
   }
-  return { roots, modules, runtime };
+  return { roots, modules, runtime, usesModule };
 }
 
 /** The name a property key spells out: `test` in `{ test }`, `{ 'test': t }` or `{ ['test']: t }`. */
@@ -1586,7 +1597,7 @@ export function analyze(sourceCode: SourceCode, options: ResolvedOptions): Analy
 
 function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis {
   const { states, framework } = options;
-  const testNames = collectTestNames(sourceCode.ast, framework, options.testFunctions);
+  const testNames = collectTestNames(sourceCode, framework, options.testFunctions);
   /** Whole-module imports or requires, including constant aliases of them. */
   const moduleOf = (node: Node, seen: readonly Node[] = []): boolean => {
     const value = unwrap(node);
@@ -1657,9 +1668,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const alias = target(chainOf(unwrap(value), framework.factories), [...seen, value]);
     return alias && { root: alias.root, path: [...alias.path, ...path], args: new Map([...alias.args, ...args]) };
   };
-  let usesTest = sourceCode.ast.body.some(
-    (statement) => statement.type === 'ImportDeclaration' && framework.ownsModule(statement.source.value),
-  );
+  let usesTest = testNames.usesModule;
   const subjects: Subject[] = [];
   const retryCounts: Analysis['retryCounts'] = [];
   /** Follows local constants and conditional branches without executing a runtime expression. */
