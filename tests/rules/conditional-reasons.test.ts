@@ -145,6 +145,16 @@ runRule('require-ticket (conditional reasons, Vitest)', requireTicket, {
       errors: [missingReason('This skip call', call("context.skip('why')"))],
     },
     {
+      name: 'suggests a reason-only argument for an empty template reason',
+      code: "test('hovers', (context) => {\n  if (isMobile) context.skip(``);\n});",
+      errors: [
+        {
+          message:
+            "This skip call is in the 'skip' state only under a condition and doesn't say why. Write the reason in a comment above it, or pass it to the call: `context.skip('why')`.",
+        },
+      ],
+    },
+    {
       code: "test('hovers', (context) => {\n  context.skip(isMobile);\n});",
       errors: [missingReason('This skip call', call("context.skip(condition, 'why')"))],
     },
