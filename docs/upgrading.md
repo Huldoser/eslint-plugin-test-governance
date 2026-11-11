@@ -3,9 +3,11 @@
 Run ESLint on your tests before and after updating. An upgrade may recognize syntax that an older
 version missed, producing new reports. Check the [changelog](../CHANGELOG.md) for fixes and additions.
 
-## Next release: custom tag states
+<a id="next-release-custom-tag-states"></a>
 
-This change is unreleased. Tag policies are now fully custom; the plugin no longer assigns lifecycle
+## Upgrading to 0.14: custom tag states
+
+In 0.14, tag policies are fully custom; the plugin no longer assigns lifecycle
 stages. Projects using only native runner states such as `skip` need no settings changes. Framework
 configs enable the renamed spelling rule automatically.
 

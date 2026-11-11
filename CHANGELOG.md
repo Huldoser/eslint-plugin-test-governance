@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-10
+
 ### Fixed
 
 - Treat arguments passed to Mocha, Cypress and WebdriverIO `this.skip()` as ignored, so a false
@@ -39,7 +41,7 @@ All notable changes to this project are documented here. The format follows
 
 - **Breaking:** rename `no-conflicting-states` to `consistent-tag-names`. It retains case fixes and
   spelling checks for `customStates` and `knownTags`; the old rule name fails with migration guidance.
-  See the [upgrade guide](docs/upgrading.md#next-release-custom-tag-states).
+  See the [upgrade guide](docs/upgrading.md#upgrading-to-014-custom-tag-states).
 
 - Reorganize documentation around a complete first lint run, with separate configuration, framework
   and troubleshooting references. Clarify supported version combinations, optional states, example
@@ -683,7 +685,8 @@ First release.
 - Support for ESLint 9 and 10 flat config, JavaScript and TypeScript test files, `.extend()`
   fixtures, describe blocks, runtime skips and tags in titles or the `tag` option.
 
-[Unreleased]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.13.3...HEAD
+[Unreleased]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.13.3...v0.14.0
 [0.13.3]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.13.2...v0.13.3
 [0.13.2]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.13.1...v0.13.2
 [0.13.1]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.13.0...v0.13.1
