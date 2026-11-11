@@ -41,7 +41,7 @@ All notable changes to this project are documented here. The format follows
 
 - **Breaking:** rename `no-conflicting-states` to `consistent-tag-names`. It retains case fixes and
   spelling checks for `customStates` and `knownTags`; the old rule name fails with migration guidance.
-  See the [upgrade guide](docs/upgrading.md#next-release-custom-tag-states).
+  See the [upgrade guide](docs/upgrading.md#upgrading-to-014-custom-tag-states).
 
 - Reorganize documentation around a complete first lint run, with separate configuration, framework
   and troubleshooting references. Clarify supported version combinations, optional states, example

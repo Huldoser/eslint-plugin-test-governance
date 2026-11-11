@@ -273,7 +273,7 @@ allowlist. Tags can coexist, including on skipped tests, provided each tracked s
 The plugin does not assign promotion stages or change runner execution.
 
 Migrating from `lifecycleTags` or `states.new` / `states.quarantined`? See the
-[upgrade guide](upgrading.md#next-release-custom-tag-states).
+[upgrade guide](upgrading.md#upgrading-to-014-custom-tag-states).
 
 ## Ticket presets
 

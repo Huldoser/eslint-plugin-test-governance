@@ -76,4 +76,4 @@ This rule has no options of its own. It reads the shared options described in th
 - `framework` and `testFunctions`: which functions count as the framework's `test`.
 
 For the old `no-conflicting-states` name and removed lifecycle checks, see the
-[upgrade guide](../upgrading.md#next-release-custom-tag-states).
+[upgrade guide](../upgrading.md#upgrading-to-014-custom-tag-states).
