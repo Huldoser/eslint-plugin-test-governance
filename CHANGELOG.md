@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Recognize imported Vitest tests with only a title as todos, including namespace imports and stable
+  aliases, while leaving ambiguous global helpers unchanged.
+- Track Node `getTestContext().skip()` and `.todo()` inside test and per-test hook bodies, including
+  stable aliases and contexts retained across nested subtests.
+
 ## [0.14.0] - 2026-11-10
 
 ### Fixed

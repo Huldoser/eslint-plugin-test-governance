@@ -95,6 +95,10 @@ Vitest's `.for` and `.each` table-driven forms count too.
 Vitest also accepts a function as the name, as in `test.skip(function namedTest() {}, fn)`.
 The name function is not executed; the separate body supplies the test context.
 
+A title-only test imported from `vitest`, such as `import { test } from 'vitest'; test('title')`,
+is a todo and needs a TODO ticket. This also covers namespace imports and stable aliases. A global
+title-only `test('title')` remains ambiguous and is not checked.
+
 ## Mocha
 
 - The globals `it`, `specify`, `describe` and `context`, their `x` forms, the TDD names `suite` and
@@ -161,6 +165,10 @@ Use the [Mocha syntax and imports](#mocha), plus the forms below.
 `{ skip: 'broker sandbox is down' }` always skips. `t.skip()` and `t.todo()` take a message, not a
 condition; `this.skip()` and `this.todo()` do the same in a test or hook written as `function`.
 
+An imported `getTestContext()` also supplies the current test context inside a recognized test,
+`beforeEach` or `afterEach` body. Its `skip()` and `todo()` calls are checked, including stable aliases
+of the getter, context and methods. A saved context retains its original test owner inside subtests.
+
 Subtests declared with `t.test('title', options, fn)` are checked like tests. A test or describe can
 omit its title, as in `test({ skip: true }, fn)`. A test without a body, `test('title')`, passes in
 Node and is not a todo. A describe's body and its `before`/`after` hooks get the suite context, which
@@ -217,9 +225,9 @@ tag content when a tag state is enabled. String and template titles, including t
 These forms are not covered:
 
 - Fixtures imported under a name absent from `testFunctions`.
-- A Vitest test with only a title, which is a todo at runtime but resembles a helper named `test`.
+- A global Vitest test with only a title, which resembles a helper named `test`.
 - Cypress's @cypress/skip-test `skipOn()` and `onlyOn()`.
-- `node:test`'s `getTestContext()`.
+- `node:test`'s `getTestContext()` inside arbitrary helper functions outside recognized test/hook bodies.
 - Jasmine's `pending()` in a helper called by tests, or Jasmine 5/6's `jasmine-core.noGlobals()`.
 - Other runners, such as Bun.
 

@@ -10,6 +10,8 @@ export type Modifier = 'skip' | 'fixme' | 'fail' | 'slow' | 'todo' | 'retry';
 export interface Root {
   kind: 'test' | 'describe' | 'hook';
   modifiers: readonly string[];
+  /** An imported test function whose title-only calls are todos, even when globals are ambiguous. */
+  todoWithoutBody?: true;
   /** Set for a hook whose body gets no test context, as node:test's `before` in a describe. */
   noContext?: true;
 }
@@ -240,8 +242,8 @@ const vitest: Framework = {
   name: 'vitest',
   ownsModule: (source) => source === 'vitest',
   exports: new Map([
-    ['test', TEST],
-    ['it', TEST],
+    ['test', { ...TEST, todoWithoutBody: true }],
+    ['it', { ...TEST, todoWithoutBody: true }],
     ['describe', DESCRIBE],
     ['suite', DESCRIBE],
     ['beforeEach', HOOK],

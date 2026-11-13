@@ -392,7 +392,7 @@ function collectTestNames(sourceCode: SourceCode, framework: Framework, configur
     }
     const effect = framework.effects.get(name);
     if (effect !== undefined && effect.when === undefined) {
-      return { kind: object.kind, modifiers: [...object.modifiers, effect.modifier] };
+      return { ...object, modifiers: [...object.modifiers, effect.modifier] };
     }
     return undefined;
   };
@@ -1352,6 +1352,7 @@ function isDeclaration(
   kind: Root['kind'],
   args: TSESTree.CallExpressionArgument[],
   members: string[],
+  todoWithoutBody = framework.todoWithoutBody,
 ): boolean {
   const first = args.at(0);
   if (isFunction(first) && !framework.functionTitle) return kind === 'describe' || framework.optionalTitle;
@@ -1360,7 +1361,11 @@ function isDeclaration(
   if (framework.optionalTitle && isObject(sourceCode, first)) return true;
   if (args.length === 1) {
     if (members.includes('todo') || (framework.skipWithoutBody && members.includes('skip'))) return true;
-    return framework.todoWithoutBody && kind === 'test' && isTextTitle(sourceCode, first);
+    return (
+      todoWithoutBody &&
+      kind === 'test' &&
+      (isTextTitle(sourceCode, first) || (framework.functionTitle === true && isFunction(first)))
+    );
   }
   if (!framework.playwright) return true;
   return isTextTitle(sourceCode, first) || args.slice(1).some(isFunction);
@@ -1737,6 +1742,8 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   const thisBodies = new Set<Node>();
   /** Describe bodies written as a `function`, whose `this` is Mocha's suite, which `this.retries()` acts on. */
   const suiteBodies = new Set<Node>();
+  /** Node context getters belong to the test or hook in which they are evaluated. */
+  const contextBodies = new Map<Node, Subject | undefined>();
 
   /**
    * Whether `anchor` or a statement around it has a comment that says something above it or at the end of its
@@ -1901,8 +1908,11 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     kind: Root['kind'],
     args: TSESTree.CallExpressionArgument[],
     modifiers: Map<string, boolean>,
+    todoWithoutBody = framework.todoWithoutBody,
   ): Map<string, boolean> => {
-    if (framework.todoWithoutBody && kind === 'test' && args.length === 1 && !modifiers.has('skip')) {
+    const withoutBody =
+      args.length === 1 || (framework.name === 'vitest' && args.length === 2 && isObject(sourceCode, args[1]));
+    if (todoWithoutBody && kind === 'test' && withoutBody && !modifiers.has('skip')) {
       modifiers.set('todo', true);
     }
     return modifiers;
@@ -1921,6 +1931,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   const bodyInfos = (args: TSESTree.CallExpressionArgument[], path: string[], declaration = false): InfoName[] => {
     const body = args.slice(framework.functionTitle && declaration ? 1 : 0).findLast(isFunction);
     if (!body) return [];
+    if (framework.name === 'node-test') contextBodies.set(body, stack.at(-1));
     const functions = [
       ...[...framework.runtimeFunctions].map(([name, modifier]): InfoName => ({
         name,
@@ -1948,7 +1959,13 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const playwrightDescribe = framework.playwright && path[0] === 'describe';
     const kind = playwrightDescribe ? 'describe' : root.kind;
     const written = playwrightDescribe ? path.slice(1) : path;
-    return { kind, members: [...root.modifiers, ...written], written, args };
+    return {
+      kind,
+      members: [...root.modifiers, ...written],
+      written,
+      args,
+      todoWithoutBody: root.todoWithoutBody ?? framework.todoWithoutBody,
+    };
   };
   type Declaration = NonNullable<ReturnType<typeof declarationOf>>;
 
@@ -1956,9 +1973,14 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
    * Whether a call with these members and arguments declares a test or describe of this kind. Only the
    * members written after the name must exist: Jasmine's `xit` skips, but it has no `it.skip`.
    */
-  const declares = ({ kind, members, written }: Declaration, args: TSESTree.CallExpressionArgument[]): boolean => {
+  const declares = (
+    { kind, members, written, todoWithoutBody }: Declaration,
+    args: TSESTree.CallExpressionArgument[],
+  ): boolean => {
     const allowed = kind === 'test' ? framework.testMembers : framework.describeMembers;
-    return written.every((m) => allowed.has(m)) && isDeclaration(sourceCode, framework, kind, args, members);
+    return (
+      written.every((m) => allowed.has(m)) && isDeclaration(sourceCode, framework, kind, args, members, todoWithoutBody)
+    );
   };
 
   /**
@@ -1989,8 +2011,8 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     if (!alternatives.every((choice) => choice.kind === first.kind && declares(choice, args))) return undefined;
     usesTest = true;
     const { details, tagInfo } = headOf(call);
-    const branches = alternatives.map(({ members, args: conditions }) =>
-      declarationModifiers(first.kind, args, modifiersOf(members, details.entries, conditions)),
+    const branches = alternatives.map(({ members, args: conditions, todoWithoutBody }) =>
+      declarationModifiers(first.kind, args, modifiersOf(members, details.entries, conditions), todoWithoutBody),
     );
     if (first.kind === 'test') addThisBody(args);
     const body = args.findLast(isFunction);
@@ -2034,16 +2056,52 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
 
   const declare = (
     call: TSESTree.CallExpression,
-    { kind, members, args: conditions }: Declaration,
+    { kind, members, args: conditions, todoWithoutBody }: Declaration,
     infos: InfoName[],
   ): { subject: Subject; infos: InfoName[] } => {
     const args = call.arguments;
     const { details, tagInfo } = headOf(call);
-    const modifiers = declarationModifiers(kind, args, modifiersOf(members, details.entries, conditions));
+    const modifiers = declarationModifiers(
+      kind,
+      args,
+      modifiersOf(members, details.entries, conditions),
+      todoWithoutBody,
+    );
     if (kind === 'test') addThisBody(args);
     const body = args.findLast(isFunction);
     if (kind === 'describe' && body?.type === 'FunctionExpression') suiteBodies.add(body);
     return { subject: makeSubject(kind, call, modifiers, tagInfo), infos };
+  };
+
+  /** Whether a stable binding is node:test's getTestContext export. */
+  const isContextGetter = (node: Node, seen: readonly Node[] = []): boolean => {
+    const value = unwrap(node);
+    if (seen.includes(value)) return false;
+    if (value.type === 'MemberExpression') return memberName(value) === 'getTestContext' && moduleOf(value.object);
+    if (value.type !== 'Identifier' || isReassigned(sourceCode, value)) return false;
+    const definition = declaredVariable(sourceCode, value)?.defs[0];
+    if (definition?.type === 'ImportBinding') {
+      return (
+        definition.node.type === 'ImportSpecifier' &&
+        importedName(definition.node) === 'getTestContext' &&
+        definition.parent.type === 'ImportDeclaration' &&
+        framework.ownsModule(definition.parent.source.value)
+      );
+    }
+    if (definition?.type !== 'Variable' || definition.node.init === null) return false;
+    const { id, init } = definition.node;
+    if (id.type === 'Identifier') return isContextGetter(init, [...seen, value]);
+    return (
+      id.type === 'ObjectPattern' &&
+      moduleOf(init) &&
+      id.properties.some(
+        (prop) =>
+          prop.type === 'Property' &&
+          propertyName(prop) === 'getTestContext' &&
+          prop.value.type === 'Identifier' &&
+          prop.value.name === value.name,
+      )
+    );
   };
 
   /** A context or runtime method, following stable local aliases and bound methods. */
@@ -2052,6 +2110,15 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     if (seen.includes(value)) return undefined;
     const path = [...seen, value];
     if (value.type === 'CallExpression') {
+      if (framework.name === 'node-test' && isContextGetter(value.callee)) {
+        for (let parent: Node | undefined = value.parent; parent; parent = parent.parent) {
+          if (!FUNCTIONS.has(parent.type)) continue;
+          return contextBodies.has(parent)
+            ? { name: 'getTestContext', methods: framework.thisMethods, owner: contextBodies.get(parent) }
+            : undefined;
+        }
+        return undefined;
+      }
       const bind = unwrap(value.callee);
       if (bind.type !== 'MemberExpression' || memberName(bind) !== 'bind') return undefined;
       const source = resolveInfo(bind.object, path);
@@ -2099,7 +2166,13 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     if (!framework.subtests || callee.type !== 'MemberExpression' || memberName(callee) !== 'test') return undefined;
     const { object } = callee;
     if (object.type !== 'Identifier' || !resolveInfo(object)?.methods) return undefined;
-    const declaration: Declaration = { kind: 'test', members: [], written: [], args: new Map() };
+    const declaration: Declaration = {
+      kind: 'test',
+      members: [],
+      written: [],
+      args: new Map(),
+      todoWithoutBody: false,
+    };
     return declares(declaration, call.arguments)
       ? declare(call, declaration, bodyInfos(call.arguments, []))
       : undefined;
@@ -2334,6 +2407,11 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
         pushedSubject = true;
         const title = visit.subject.node.arguments[0];
         if (framework.functionTitle && isFunction(title)) functionTitles.add(title);
+        if (visit.subject.kind === 'test') {
+          for (const argument of node.arguments) {
+            if (contextBodies.has(argument)) contextBodies.set(argument, visit.subject);
+          }
+        }
       }
       for (const info of visit.infos ?? []) {
         if (!info.runtimeFunction && info.step === undefined && visit.subject?.kind === 'test')
