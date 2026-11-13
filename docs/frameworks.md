@@ -99,6 +99,10 @@ A title-only test imported from `vitest`, such as `import { test } from 'vitest'
 is a todo and needs a TODO ticket. This also covers namespace imports and stable aliases. A global
 title-only `test('title')` remains ambiguous and is not checked.
 
+Implicit todo detection follows the [current Vitest API](https://vitest.dev/api/test.html).
+The plugin does not inspect installed runner versions. Older Vitest releases can run missing-body
+tests as no-ops instead of marking them todo; for example, [Vitest 1.2.2 supplies an empty body](https://github.com/vitest-dev/vitest/blob/v1.2.2/packages/runner/src/suite.ts).
+
 ## Mocha
 
 - The globals `it`, `specify`, `describe` and `context`, their `x` forms, the TDD names `suite` and
