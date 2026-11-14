@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Opt-in `require-ticket-for-error-suppression` to track direct blanket Cypress uncaught-error
+  handlers in specs and support files, without reserving a custom test-state name.
+
 - Opt-in `comments.ticketedDisables` to require tracking tickets in descriptions when selected
   lint rules are disabled in test files, using the existing comment and state-marker checks.
 

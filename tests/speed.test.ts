@@ -17,6 +17,18 @@ interface Spec {
 }
 
 const specs: Record<string, Spec> = {
+  Cypress: {
+    options: { framework: 'cypress' },
+    header: '',
+    block: (i) => `
+describe('group ${i}', () => {
+  // SUPPRESS: EXAMPLE-${i}
+  Cypress.on('uncaught:exception', () => false);
+  Cypress.on('uncaught:exception', (error) => { if (error.expected) return false; });
+  it('example ${i}', () => { cy.get('button').click(); });
+});
+`,
+  },
   Playwright: {
     options: {
       framework: 'playwright',
@@ -176,6 +188,7 @@ function spec({ header, block }: Spec, lines: number): string {
 async function ruleTime(options: GovernanceOptions, code: string, runs: number): Promise<number> {
   const config = configure(options);
   config.rules['test-governance/limit-retries'] = 'error';
+  config.rules['test-governance/require-ticket-for-error-suppression'] = 'error';
   const eslint = new ESLint({ overrideConfigFile: true, overrideConfig: config as Linter.Config, stats: true });
   let fastest = Infinity;
   for (let run = 0; run < runs; run++) {

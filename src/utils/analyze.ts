@@ -222,6 +222,8 @@ export interface CommentedOutTest {
 
 export interface Analysis {
   subjects: Subject[];
+  /** Direct Cypress handlers that unconditionally suppress uncaught application errors. */
+  errorSuppressions: { node: TSESTree.CallExpression; comments: Comment[] }[];
   /** Statically readable native retry counts, collected even when retry ticketing is off. */
   retryCounts: { node: Node; count: number }[];
   /** Markers that are not in the comment block of any test, describe or runtime call. */
@@ -1676,6 +1678,12 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   let usesTest = testNames.usesModule;
   const subjects: Subject[] = [];
   const retryCounts: Analysis['retryCounts'] = [];
+  const errorSuppressions: Analysis['errorSuppressions'] = [];
+  const cypressReassigned =
+    framework.name === 'cypress' &&
+    sourceCode
+      .getScope(sourceCode.ast)
+      .through.some((reference) => reference.identifier.name === 'Cypress' && reference.isWrite());
   /** Follows local constants and conditional branches without executing a runtime expression. */
   const recordRetryCounts = (node: Node | undefined, keys?: ReadonlySet<string>, seen: readonly Node[] = []): void => {
     if (node === undefined) return;
@@ -2210,6 +2218,38 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   };
 
   const visitCall = (original: TSESTree.CallExpression): { subject?: Subject; infos?: InfoName[] } => {
+    if (framework.name === 'cypress') {
+      const callee = original.callee;
+      const callback = original.arguments.at(1);
+      if (
+        callee.type === 'MemberExpression' &&
+        memberName(callee) === 'on' &&
+        callee.object.type === 'Identifier' &&
+        callee.object.name === 'Cypress' &&
+        !declaredVariable(sourceCode, callee.object)?.defs.length &&
+        !isReassigned(sourceCode, callee.object) &&
+        !cypressReassigned &&
+        original.arguments[0]?.type === 'Literal' &&
+        original.arguments[0].value === 'uncaught:exception' &&
+        (callback?.type === 'ArrowFunctionExpression' || callback?.type === 'FunctionExpression') &&
+        !callback.async &&
+        !callback.generator
+      ) {
+        const body = callback.body;
+        const value =
+          body.type === 'BlockStatement'
+            ? body.body.length === 1 && body.body[0].type === 'ReturnStatement'
+              ? body.body[0].argument
+              : undefined
+            : body;
+        if (value?.type === 'Literal' && value.value === false) {
+          errorSuppressions.push({
+            node: original,
+            comments: commentBlock(sourceCode, anchorOf(original), options.allowBlankLine),
+          });
+        }
+      }
+    }
     const alias = aliasValue(throughFunctionMethods(original).callee);
     const visited = visitDeclaredCall(original, alias);
     if (alias && visited.subject && aliasCommented(alias)) {
@@ -2461,6 +2501,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   return {
     subjects,
     retryCounts,
+    errorSuppressions,
     detachedMarkers,
     idleRegionMarkers,
     commentedOutTests: commentedOut.found,
