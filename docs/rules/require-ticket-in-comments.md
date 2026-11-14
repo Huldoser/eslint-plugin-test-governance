@@ -118,9 +118,8 @@ This rule has no options of its own. It reads the shared options described in th
 - `comments`: the keywords to check, `{ keywords: ['FIXME', 'TODO'] }` by default. Your list
   replaces the default one: `{ keywords: ['FIXME'] }` allows free-form `TODO`s, and
   `{ keywords: ['FIXME', 'TODO', 'HACK'] }` checks `HACK` too. `comments: false` turns the check
-  off, and so does turning the rule off in your config.
-- `comments.ticketedDisables`: exact lint rule IDs whose suppressions need a ticketed description,
-  `[]` by default.
+  off, and so does turning the rule off in your config. Its `ticketedDisables` field lists the exact
+  lint rule IDs whose suppressions need a ticketed description, `[]` by default.
 - `ticket`, `placeholders` and `allowNotes` work as they do for markers.
 - `framework` and `testFunctions`: which functions count as the framework's `test`, and so which
   files are test files.
