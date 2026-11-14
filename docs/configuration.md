@@ -194,6 +194,11 @@ and markers. To turn a rule off, set it to `'off'` as usual.
 | `testFunctions`               | `string[]`                                               | `['test']`                        | See [testFunctions details](#testfunctions).                                                                                                                                                 |
 | `reportUnreadableTags`        | `boolean`                                                | `false`                           | See [reportUnreadableTags details](#reportunreadabletags).                                                                                                                                   |
 
+To require tickets when selected lint rules are disabled, set
+`comments: { ticketedDisables: ['cypress/no-force'] }`. These are exact IDs, including your plugin
+alias. See [ticketed lint suppressions](rules/require-ticket-in-comments.md#tickets-for-selected-lint-suppressions)
+for syntax, scope and how ESLint suppression affects the checker.
+
 ### placeholders
 
 Tickets rejected as placeholders. `*` matches any characters. Case-insensitive, and a leading `#` on the ticket or the placeholder is ignored. Your list replaces the default one, so repeat the defaults you want to keep.

@@ -81,6 +81,37 @@ test('places a limit order', async ({ page }) => {});
 
 ## Options
 
+### Tickets for selected lint suppressions
+
+Set `comments.ticketedDisables` to exact rule IDs to require a ticketed description when those
+rules are disabled in a test file. The default is an empty list. For example:
+
+```js
+testGovernance.configure({
+  framework: 'cypress',
+  comments: { ticketedDisables: ['cypress/no-unnecessary-waiting', 'cypress/no-force'] },
+  allowNotes: true,
+});
+```
+
+Use a configured comment keyword in the description, such as
+`// eslint-disable-next-line cypress/no-force -- TODO: EXAMPLE-123 remove the workaround`.
+The ticket follows the same format and placeholder checks as other work comments. Notes require
+`allowNotes: true`. Plugin aliases must match the IDs written in the directives; wildcards are not
+accepted. The list does not enable the selected rules.
+
+The check covers `eslint-disable-next-line`, `eslint-disable-line`, and block `eslint-disable`
+directives, including multiple rule IDs. `eslint-enable` needs no ticket. A missing description or
+plain prose reports once per directive. An applicable state marker such as `SKIP: EXAMPLE-123`
+continues to be validated by `require-ticket`; keep that rule enabled to check state markers.
+
+This option does not make the checker immune to ESLint suppression: a blanket disable or a disable
+of this rule can suppress its diagnostic. Use existing ESLint policy to restrict those directives.
+`comments: false`, an empty `comments.keywords` list, or disabling this rule turns these checks off.
+Files without a recognized test import or call remain outside this rule's scope.
+
+### Shared settings
+
 This rule has no options of its own. It reads the shared options described in the
 [configuration reference](../configuration.md#options):
 
@@ -88,6 +119,8 @@ This rule has no options of its own. It reads the shared options described in th
   replaces the default one: `{ keywords: ['FIXME'] }` allows free-form `TODO`s, and
   `{ keywords: ['FIXME', 'TODO', 'HACK'] }` checks `HACK` too. `comments: false` turns the check
   off, and so does turning the rule off in your config.
+- `comments.ticketedDisables`: exact lint rule IDs whose suppressions need a ticketed description,
+  `[]` by default.
 - `ticket`, `placeholders` and `allowNotes` work as they do for markers.
 - `framework` and `testFunctions`: which functions count as the framework's `test`, and so which
   files are test files.

@@ -87,7 +87,13 @@ export interface GovernanceOptions {
    * Defaults to `{ keywords: ['FIXME', 'TODO'] }`, and your keywords replace those; `false` allows free-form
    * comments.
    */
-  comments?: false | { keywords?: string[] };
+  comments?:
+    | false
+    | {
+        keywords?: string[];
+        /** Exact rule IDs whose ESLint disable descriptions must contain a ticketed comment or applicable state marker. */
+        ticketedDisables?: string[];
+      };
   /**
    * Accept the ticket from a test annotation as well: Playwright's `annotation` of the given type or
    * Vitest's `meta` key of that name, as in
@@ -141,6 +147,7 @@ export interface ResolvedOptions {
   annotations?: { type: string; only: boolean };
   /** Keywords checked by `require-ticket-in-comments`; empty when `comments: false`. */
   commentKeywords: string[];
+  ticketedDisables: Set<string>;
   /**
    * Keywords that are ordinary work comments as well as markers (`FIXME`, `TODO` and any configured
    * comment keywords). A `// FIXME: refactor` with no ticket is a work comment, never a stray marker.
@@ -418,6 +425,7 @@ export function compileOptions(options: GovernanceOptions): ResolvedOptions {
         ? undefined
         : { type: options.annotations?.type ?? 'issue', only: options.annotations?.only ?? false },
     commentKeywords,
+    ticketedDisables: new Set(options.comments === false ? [] : options.comments?.ticketedDisables),
     workCommentKeywords: new Set([...DEFAULT_COMMENT_KEYWORDS, ...commentKeywords]),
     commentTicket: defaultMatcher,
   };
