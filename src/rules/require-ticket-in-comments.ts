@@ -1,4 +1,4 @@
-import { appliesTo, commentLines, parseTickets } from '../utils/analyze.ts';
+import { appliesTo, commentLines, directiveOf, parseTickets } from '../utils/analyze.ts';
 import { createRule } from '../utils/create-rule.ts';
 import { compileTicketSpec } from '../utils/tickets.ts';
 
@@ -20,6 +20,7 @@ export default createRule({
     hasSuggestions: true,
     schema: [],
     messages: {
+      missingDirectiveTicket: 'This suppression needs a ticket in its description, e.g. `-- {{keyword}}: {{example}}`.',
       missingTicket:
         '`{{keyword}}` comments must start with a ticket, e.g. `// {{upper}}: {{example}}`. Put the details in the ticket.',
       invalidTicket: "'{{ticket}}' is not a valid ticket. Expected {{expected}}.",
@@ -38,10 +39,14 @@ export default createRule({
     // A marker directly above a test in that state belongs to require-ticket, which also reports one
     // in the wrong case.
     const owned = new Set<number>();
+    const ownedComments = new Set<number>();
     for (const subject of analysis.subjects) {
       for (const marker of [...subject.markers, ...subject.regionMarkers]) {
         const state = marker.state ?? marker.caseOf;
-        if (state && appliesTo(subject, state.name)) owned.add(marker.keywordStart);
+        if (state && appliesTo(subject, state.name)) {
+          owned.add(marker.keywordStart);
+          ownedComments.add(marker.comment.range[0]);
+        }
       }
     }
 
@@ -73,6 +78,7 @@ export default createRule({
     }
 
     for (const comment of sourceCode.getAllComments()) {
+      let handled = ownedComments.has(comment.range[0]);
       for (const { text: line, start } of commentLines(comment)) {
         const match = keywordRe.exec(line);
         if (!match) continue;
@@ -82,6 +88,7 @@ export default createRule({
         const inParens = match[3] as string | undefined;
         const upper = keyword.toUpperCase();
         if (keyword !== upper && !whole.endsWith(':')) continue;
+        handled = true;
 
         const { tickets, extra } =
           inParens === undefined
@@ -117,6 +124,20 @@ export default createRule({
             ],
           });
         }
+      }
+      const directive = directiveOf(comment);
+      if (
+        !handled &&
+        options.ticketedDisables.size > 0 &&
+        directive &&
+        directive.kind !== 'eslint-enable' &&
+        (directive.rules.length === 0 || directive.rules.some((name) => options.ticketedDisables.has(name)))
+      ) {
+        context.report({
+          loc: comment.loc,
+          messageId: 'missingDirectiveTicket',
+          data: { keyword: keywords[0], example: matcher.example },
+        });
       }
     }
   },

@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Opt-in `comments.ticketedDisables` to require tracking tickets in descriptions when selected
+  lint rules are disabled in test files, using the existing comment and state-marker checks.
+
 ## [0.14.1] - 2026-11-13
 
 ### Fixed

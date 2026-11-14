@@ -110,6 +110,14 @@ export const optionsSchema: Schema = {
           type: 'object',
           properties: {
             keywords: { type: 'array', items: { type: 'string', pattern: MARKER_RE.source, patternHint: MARKER_HINT } },
+            ticketedDisables: {
+              type: 'array',
+              items: {
+                type: 'string',
+                pattern: '^[^\\s,*]+$',
+                patternHint: 'an exact rule ID without spaces, commas or wildcards',
+              },
+            },
           },
           additionalProperties: false,
         },
