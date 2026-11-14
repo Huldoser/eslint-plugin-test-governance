@@ -6,6 +6,7 @@ import {
   evaluate,
   hasAnnotationTicket,
   headLoc,
+  parseTickets,
   unreadAnnotationsOf,
   type Subject,
 } from '../utils/analyze.ts';
@@ -23,6 +24,9 @@ export default createRule({
     hasSuggestions: true,
     schema: [],
     messages: {
+      missingReasonTicket: 'Start the skip reason with a tracking ticket, e.g. `{{example}}`.',
+      invalidReasonTicket: "'{{ticket}}' is not a valid ticket prefix in this reason. Expected {{expected}}.",
+      reasonNotes: 'Only tickets are allowed in the skip reason unless allowNotes is enabled.',
       missingMarker:
         "{{subject}} is in the '{{state}}' state but has no `// {{marker}}: <ticket>` comment directly above it, e.g. `// {{marker}}: {{example}}`.",
       missingReason:
@@ -125,7 +129,7 @@ export default createRule({
         }
       }
       const annotationOnly = only && (subject.kind === 'test' || subject.kind === 'describe') ? only : undefined;
-      for (const { state, required, reasoned } of subject.states) {
+      for (const { state, required, reasoned, reasonTicket } of subject.states) {
         if (!required) {
           if (options.requireReasonForConditional && reasoned === false) reportReason(subject, state);
           continue;
@@ -146,6 +150,23 @@ export default createRule({
         }
         const result = evaluate(subject, state);
         if (result.kind === 'missing' && hasAnnotationTicket(subject, state, options)) continue;
+        if (result.kind === 'missing' && reasonTicket) {
+          const { node, text } = reasonTicket;
+          const { tickets, extra } = parseTickets(text, node.range[0], state.ticket);
+          const bad = tickets.find((ticket) => ticket.result !== 'ok');
+          if (tickets.length === 0) {
+            context.report({ node, messageId: 'missingReasonTicket', data: { example: state.ticket.example } });
+          } else if (bad) {
+            context.report({
+              node,
+              messageId: bad.result === 'placeholder' ? 'placeholderTicket' : 'invalidReasonTicket',
+              data: { ticket: bad.text, expected: state.ticket.expected },
+            });
+          } else if (extra && !options.allowNotes) {
+            context.report({ node, messageId: 'reasonNotes' });
+          }
+          continue;
+        }
         if (
           result.kind !== 'ok' &&
           result.kind !== 'missing' &&

@@ -455,6 +455,36 @@ test.skip('fills an order', () => {});
 
 ## Options
 
+### Tickets from native reasons
+
+Set `ticketsFromReasons: true` to accept a ticket prefix in a readable runtime reason as a fallback
+when no comment marker or annotation supplies the ticket. Supported calls are Playwright runtime
+`skip` and `fixme` (including recognized test-info methods), and `node:test` runtime `skip` and
+`todo`. This does not change which states need tickets; conditional skips still use
+`requireTicketForConditional`.
+
+<!-- example: valid settings={"ticketsFromReasons":true} -->
+
+```js
+test('example', () => {
+  test.skip(true, 'EXAMPLE-123');
+});
+```
+
+The reason must start with a ticket in that state's configured format. Placeholders are rejected,
+and comma-separated tickets work. Text after the tickets requires `allowNotes: true`. With a valid
+comment or annotation, ordinary reason text remains allowed. A valid reason never hides an invalid
+explicit marker. Annotation-only requirements for declarations remain unchanged.
+
+Dynamic reasons cannot supply a verified ticket; use a marker or annotation instead. Readable local
+constants work. This option does not search test titles, Node declaration options such as
+`{ skip: 'reason' }`, or messages from other runners. Issue references buried in prose are not
+extracted. The runner receives the original message unchanged.
+
+### Shared settings
+
+- `ticketsFromReasons`: opt-in native-reason fallback described above, false by default.
+
 This rule has no options of its own. It reads the shared options described in the
 [configuration reference](../configuration.md#options), usually set once with `testGovernance.configure({...})`. These
 change what it reports:

@@ -75,6 +75,8 @@ export interface GovernanceOptions {
   maxRetries?: number;
   /** Require a ticket for conditional skips such as `test.skip(browserName === 'webkit')`. */
   requireTicketForConditional?: boolean;
+  /** Accept a ticket prefix in readable Playwright or node:test runtime skip reasons when no marker or annotation supplies one. */
+  ticketsFromReasons?: boolean;
   /**
    * Require a reason for conditional skips, without a ticket: a comment above the skip, or the reason the
    * call takes, as `test.skip(browserName === 'webkit', 'No clipboard API')`.
@@ -136,6 +138,7 @@ export interface ResolvedOptions {
   knownTags: string[];
   maxRetries: number;
   requireTicketForConditional: boolean;
+  ticketsFromReasons: boolean;
   requireReasonForConditional: boolean;
   allowBlankLine: boolean;
   allowNotes: boolean;
@@ -416,6 +419,7 @@ export function compileOptions(options: GovernanceOptions): ResolvedOptions {
     knownTags: options.knownTags ?? [],
     maxRetries: options.maxRetries ?? 2,
     requireTicketForConditional: options.requireTicketForConditional ?? false,
+    ticketsFromReasons: options.ticketsFromReasons ?? false,
     requireReasonForConditional: options.requireReasonForConditional ?? false,
     allowBlankLine: options.allowBlankLine ?? false,
     allowNotes: options.allowNotes ?? false,
