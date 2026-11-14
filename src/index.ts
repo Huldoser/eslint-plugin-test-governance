@@ -7,6 +7,7 @@ import requireTicketForCommentedOutTests from './rules/require-ticket-for-commen
 import requireTicketInComments from './rules/require-ticket-in-comments.ts';
 import requireTicket from './rules/require-ticket.ts';
 import limitRetries from './rules/limit-retries.ts';
+import requireTicketForErrorSuppression from './rules/require-ticket-for-error-suppression.ts';
 import { FRAMEWORK_NAMES, type FrameworkName } from './utils/constants.ts';
 import { ConfigError } from './utils/errors.ts';
 import { compileOptions, SETTINGS_KEY, type GovernanceOptions } from './utils/options.ts';
@@ -26,7 +27,8 @@ export type RuleName =
   | 'consistent-tag-names'
   | 'require-ticket-in-comments'
   | 'require-ticket-for-commented-out-tests'
-  | 'limit-retries';
+  | 'limit-retries'
+  | 'require-ticket-for-error-suppression';
 
 const ruleModules: Record<RuleName, { meta: { docs: { recommended: 'error' | 'warn' | 'off' } } }> = {
   'require-ticket': requireTicket,
@@ -36,6 +38,7 @@ const ruleModules: Record<RuleName, { meta: { docs: { recommended: 'error' | 'wa
   'require-ticket-in-comments': requireTicketInComments,
   'require-ticket-for-commented-out-tests': requireTicketForCommentedOutTests,
   'limit-retries': limitRetries,
+  'require-ticket-for-error-suppression': requireTicketForErrorSuppression,
 };
 
 // Public types come from `eslint` itself, so users don't need typescript-eslint installed.

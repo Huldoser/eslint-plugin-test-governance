@@ -128,26 +128,28 @@ All framework configs use the severities in [Defaults](#defaults).
 | [no-orphaned-marker](docs/rules/no-orphaned-marker.md)                                         | Disallow marker comments that no longer match a test state           |
 | [require-ticket](docs/rules/require-ticket.md)                                                 | Require a ticket for skipped, fixme, todo, retried and tagged tests  |
 | [require-ticket-for-commented-out-tests](docs/rules/require-ticket-for-commented-out-tests.md) | Require a ticket marker on commented-out tests                       |
+| [require-ticket-for-error-suppression](docs/rules/require-ticket-for-error-suppression.md)     | Require a ticket for blanket Cypress error suppression               |
 | [require-ticket-in-comments](docs/rules/require-ticket-in-comments.md)                         | Require FIXME and TODO comments in test files to start with a ticket |
 
 <!-- end auto-generated rules list -->
 
 ## Defaults
 
-| Setting                   | Default                                                                                                                          |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| States that need a ticket | `skip`, `fixme`; in the other frameworks `skip`, `todo`                                                                          |
-| Tag ticket requirements   | none by default; configure your own with `customStates`                                                                          |
-| Conditional skips         | no ticket or reason required; opt in with `requireTicketForConditional` or `requireReasonForConditional`                         |
-| `fail`, `slow`, `retry`   | off; enable the states your framework supports with `states`                                                                     |
-| Marker format             | uppercase keyword and colon, then comma-separated tickets: `// SKIP: TRADE-123, TRADE-124`                                       |
-| Notes after the ticket    | not allowed; `allowNotes: true` allows them                                                                                      |
-| `FIXME` / `TODO` comments | require tickets in test files; `comments: false` turns this check off                                                            |
-| Placement                 | comment block directly above the test or skip call; a blank line breaks it                                                       |
-| Placeholder tickets       | rejected: `TODO`, `TBD`, `XXX-*`, and any ticket numbered 0                                                                      |
-| Describe blocks           | a marker on a skipped or tagged describe covers its tests                                                                        |
-| Severity                  | `consistent-tag-names` and `require-ticket-for-commented-out-tests`: warn; every other rule except the opt-in retry limit: error |
-| Retry limit               | `limit-retries`: off; enable the rule explicitly, then set `maxRetries` (default `2`)                                            |
+| Setting                   | Default                                                                                                                    |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| States that need a ticket | `skip`, `fixme`; in the other frameworks `skip`, `todo`                                                                    |
+| Tag ticket requirements   | none by default; configure your own with `customStates`                                                                    |
+| Conditional skips         | no ticket or reason required; opt in with `requireTicketForConditional` or `requireReasonForConditional`                   |
+| `fail`, `slow`, `retry`   | off; enable the states your framework supports with `states`                                                               |
+| Marker format             | uppercase keyword and colon, then comma-separated tickets: `// SKIP: TRADE-123, TRADE-124`                                 |
+| Notes after the ticket    | not allowed; `allowNotes: true` allows them                                                                                |
+| `FIXME` / `TODO` comments | require tickets in test files; `comments: false` turns this check off                                                      |
+| Placement                 | comment block directly above the test or skip call; a blank line breaks it                                                 |
+| Placeholder tickets       | rejected: `TODO`, `TBD`, `XXX-*`, and any ticket numbered 0                                                                |
+| Describe blocks           | a marker on a skipped or tagged describe covers its tests                                                                  |
+| Severity                  | `consistent-tag-names` and `require-ticket-for-commented-out-tests`: warn; every other rule except the opt-in rules: error |
+| Retry limit               | `limit-retries`: off; enable the rule explicitly, then set `maxRetries` (default `2`)                                      |
+| Error suppression         | `require-ticket-for-error-suppression`: off; enable it explicitly in Cypress specs and support files                       |
 
 Tags have no built-in meaning. Configure `customStates` for tags that need ticket markers, or
 `knownTags` for spelling checks alone. Other tags remain allowed. See [custom tag policies](docs/configuration.md#tag-names).

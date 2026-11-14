@@ -14,6 +14,7 @@ body:
         - require-ticket-in-comments
         - require-ticket-for-commented-out-tests
         - limit-retries
+        - require-ticket-for-error-suppression
     validations:
       required: true
   - type: dropdown
