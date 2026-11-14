@@ -170,6 +170,8 @@ interface StateSource {
    * call takes, or one its option gives.
    */
   reasoned?: boolean;
+  /** A readable native reason in a supported runtime call, available as an opt-in ticket fallback. */
+  reasonTicket?: { node: Node; text: string };
 }
 
 export interface Subject {
@@ -1828,6 +1830,16 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       const always = modifiers.get(state.modifier);
       if (always === undefined) continue;
       const source: StateSource = { state, required: always || options.requireTicketForConditional };
+      if (
+        options.ticketsFromReasons &&
+        kind === 'runtime' &&
+        ((framework.playwright && (state.modifier === 'skip' || state.modifier === 'fixme')) ||
+          (framework.name === 'node-test' && (state.modifier === 'skip' || state.modifier === 'todo')))
+      ) {
+        const argument = call.arguments.at(framework.playwright ? 1 : 0);
+        const text = argument && staticText(sourceCode, argument);
+        if (argument && text !== undefined) source.reasonTicket = { node: argument, text };
+      }
       if (!always) source.reasoned = commented || tagInfo.reasonedOptions.has(state.modifier) || reasonedCall();
       sources.push(source);
     }

@@ -134,6 +134,7 @@ export const optionsSchema: Schema = {
       ],
     },
     requireTicketForConditional: { type: 'boolean' },
+    ticketsFromReasons: { type: 'boolean' },
     requireReasonForConditional: { type: 'boolean' },
     allowBlankLine: { type: 'boolean' },
     allowNotes: { type: 'boolean' },

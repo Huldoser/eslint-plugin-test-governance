@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Opt-in `ticketsFromReasons` to accept ticket prefixes from Playwright and Node runtime skip
+  reasons when no comment or annotation supplies the ticket.
+
 - Opt-in `require-ticket-for-error-suppression` to track direct blanket Cypress uncaught-error
   handlers in specs and support files, without reserving a custom test-state name.
 
