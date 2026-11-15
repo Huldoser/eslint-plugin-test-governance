@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Read immutable object and array destructuring when resolving local tags, annotations, runtime
+  reasons and retry counts. Defaults, rest bindings and getters remain unread.
+- Check blanket Cypress error suppression and Jest/Mocha retry calls through TypeScript assertions,
+  non-null assertions and `satisfies`, including assertions around the callback's returned `false`.
+- Select the correct retry branch for negated boolean literals instead of reporting an unreachable
+  excessive count.
+- Keep a local Cypress `SUPPRESS` marker attached to its handler when a custom test state uses the
+  same marker, without hiding unrelated detached markers.
+
 ### Added
 
 - Opt-in `ticketsFromReasons` to accept ticket prefixes from Playwright and Node runtime skip

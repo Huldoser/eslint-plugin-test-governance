@@ -886,7 +886,7 @@ function isStaticText(node: Node): node is Text {
  * The value a `const` or enum declared in this file gives a name: the `'@new'` of `const NEW = '@new'`,
  * or the enum itself. Undefined for any other name, such as an import, a parameter or a `let`.
  */
-function declaredValue(sourceCode: SourceCode, id: TSESTree.Identifier): Node | undefined {
+function declaredValue(sourceCode: SourceCode, id: TSESTree.Identifier, seen: readonly Node[] = []): Node | undefined {
   if (isMutated(sourceCode, id)) return undefined;
   for (let scope: TSESLint.Scope.Scope | null = sourceCode.getScope(id); scope; scope = scope.upper) {
     const variable = scope.set.get(id.name);
@@ -896,7 +896,41 @@ function declaredValue(sourceCode: SourceCode, id: TSESTree.Identifier): Node | 
     const [def] = variable.defs;
     if (def.type === 'TSEnumName') return def.node;
     const declarator = def.type === 'Variable' && def.parent.kind === 'const' ? def.node : undefined;
-    return declarator?.id.type === 'Identifier' ? (declarator.init ?? undefined) : undefined;
+    if (declarator?.init === null || declarator === undefined) return undefined;
+    return destructuredValue(sourceCode, declarator.id, declarator.init, id.name, seen);
+  }
+  return undefined;
+}
+
+/** The initializer selected by a const binding, without evaluating defaults, rest bindings or getters. */
+function destructuredValue(
+  sourceCode: SourceCode,
+  pattern: Node,
+  value: Node,
+  name: string,
+  seen: readonly Node[],
+): Node | undefined {
+  if (pattern.type === 'Identifier') return pattern.name === name ? value : undefined;
+  const target = unwrap(value);
+  const owner = constantValue(sourceCode, target, seen) ?? target;
+  if (pattern.type === 'ObjectPattern' && owner.type === 'ObjectExpression') {
+    for (const property of pattern.properties) {
+      if (property.type !== 'Property') continue;
+      const key = propertyName(property);
+      const selected = key === undefined ? undefined : propertyValue(owner, key);
+      if (selected === undefined) continue;
+      const found = destructuredValue(sourceCode, property.value, selected, name, seen);
+      if (found !== undefined) return found;
+    }
+  }
+  if (pattern.type === 'ArrayPattern' && owner.type === 'ArrayExpression') {
+    for (const [index, binding] of pattern.elements.entries()) {
+      const selected = owner.elements.at(index);
+      if (selected?.type === 'SpreadElement') break;
+      if (binding === null || selected === undefined || selected === null) continue;
+      const found = destructuredValue(sourceCode, binding, selected, name, seen);
+      if (found !== undefined) return found;
+    }
   }
   return undefined;
 }
@@ -932,7 +966,7 @@ function constantValue(sourceCode: SourceCode, node: Node, seen: readonly Node[]
       ? constantValue(sourceCode, target, path)
       : target;
   };
-  if (node.type === 'Identifier') return follow(declaredValue(sourceCode, node));
+  if (node.type === 'Identifier') return follow(declaredValue(sourceCode, node, path));
   if (node.type !== 'MemberExpression') return undefined;
   const key = memberKey(node);
   const object = unwrap(node.object);
@@ -1384,9 +1418,13 @@ function thisFunction(node: Node): Node | undefined {
   return current;
 }
 
-/** The value of a `true` or `false` literal; undefined for anything else. */
+/** A boolean literal or its negation; undefined when the value depends on runtime data. */
 function booleanOf(node: Node | undefined): boolean | undefined {
   const value = node === undefined ? undefined : unwrap(node);
+  if (value?.type === 'UnaryExpression' && value.operator === '!') {
+    const argument = booleanOf(value.argument);
+    return argument === undefined ? undefined : !argument;
+  }
   return value?.type === 'Literal' && typeof value.value === 'boolean' ? value.value : undefined;
 }
 
@@ -2231,15 +2269,17 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
 
   const visitCall = (original: TSESTree.CallExpression): { subject?: Subject; infos?: InfoName[] } => {
     if (framework.name === 'cypress') {
-      const callee = original.callee;
-      const callback = original.arguments.at(1);
+      const callee = unwrap(original.callee);
+      const object = callee.type === 'MemberExpression' ? unwrap(callee.object) : undefined;
+      const argument = original.arguments.at(1);
+      const callback = argument && unwrap(argument);
       if (
         callee.type === 'MemberExpression' &&
         memberName(callee) === 'on' &&
-        callee.object.type === 'Identifier' &&
-        callee.object.name === 'Cypress' &&
-        !declaredVariable(sourceCode, callee.object)?.defs.length &&
-        !isReassigned(sourceCode, callee.object) &&
+        object?.type === 'Identifier' &&
+        object.name === 'Cypress' &&
+        !declaredVariable(sourceCode, object)?.defs.length &&
+        !isReassigned(sourceCode, object) &&
         !cypressReassigned &&
         original.arguments[0]?.type === 'Literal' &&
         original.arguments[0].value === 'uncaught:exception' &&
@@ -2254,7 +2294,8 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
               ? body.body[0].argument
               : undefined
             : body;
-        if (value?.type === 'Literal' && value.value === false) {
+        const returned = value && unwrap(value);
+        if (returned?.type === 'Literal' && returned.value === false) {
           errorSuppressions.push({
             node: original,
             comments: commentBlock(sourceCode, anchorOf(original), options.allowBlankLine),
@@ -2362,10 +2403,10 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
    * `jest.retryTimes(3)` with Jest's own `jest`.
    */
   const retryCall = (call: TSESTree.CallExpression): Subject | undefined => {
-    const { callee } = call;
+    const callee = unwrap(call.callee);
     if (callee.type !== 'MemberExpression') return undefined;
     const name = memberName(callee);
-    const { object } = callee;
+    const object = unwrap(callee.object);
     if (framework.retryCall === 'this.retries' && name === 'retries') {
       if (object.type === 'ThisExpression') {
         const owner = thisFunction(call);
@@ -2484,7 +2525,12 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   const detachedMarkers = comments
     .filter((comment) => !claimed.has(comment))
     .flatMap((comment) => parseMarkers(comment, states))
-    .filter(isStateMarker);
+    .filter(isStateMarker)
+    .filter(
+      (marker) =>
+        marker.keyword !== 'SUPPRESS' ||
+        !errorSuppressions.some((suppression) => suppression.comments.includes(marker.comment)),
+    );
 
   const byAnchor = new Map<Node, Subject[]>();
   for (const subject of subjects) byAnchor.set(subject.anchor, [...(byAnchor.get(subject.anchor) ?? []), subject]);

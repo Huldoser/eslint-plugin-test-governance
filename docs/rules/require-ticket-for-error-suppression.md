@@ -57,6 +57,9 @@ async/generator functions, `cy.on`, other events, aliases, and imported callback
 rule. A shadowed or reassigned Cypress binding is left alone. Changes to Cypress properties through
 other code are not resolved.
 
+TypeScript assertions, non-null assertions and `satisfies` around the registration, Cypress object,
+callback or returned `false` do not change detection.
+
 This checks the presence of tracking information, not whether the suppression is safe. It neither
 analyzes listener cleanup nor verifies issue existence. The SUPPRESS comment is local to this rule;
 it is not an inherited test-state marker, and `no-orphaned-marker` does not remove it later.
