@@ -601,8 +601,17 @@ function isMutated(
       value = parent;
       parent = value.parent;
     }
-    if (parent.type === 'VariableDeclarator' && parent.init === value && parent.id.type === 'Identifier') {
-      return isMutated(sourceCode, parent.id, [...seen, variable]);
+    while (
+      (parent.type === 'Property' && parent.value === value && parent.parent.type === 'ObjectExpression') ||
+      parent.type === 'ArrayExpression'
+    ) {
+      value = parent.type === 'Property' ? parent.parent : parent;
+      parent = value.parent;
+    }
+    if (parent.type === 'VariableDeclarator' && parent.init === value) {
+      return sourceCode
+        .getDeclaredVariables(parent)
+        .some((alias) => alias.identifiers.some((binding) => isMutated(sourceCode, binding, [...seen, variable])));
     }
     if (parent.type === 'CallExpression' && parent.arguments[0] === value) {
       const callee = unwrap(parent.callee);
@@ -1106,13 +1115,22 @@ function objectDetails(
   for (const prop of object.properties) {
     if (prop.type === 'SpreadElement') {
       const argument = unwrap(prop.argument);
-      const value =
-        argument.type === 'ObjectExpression' ? argument : constantValue(sourceCode, argument, [...path, object]);
-      const spread = value && unwrap(value);
+      const value = constantValue(sourceCode, argument, [...path, object]) ?? argument;
+      const spread = unwrap(value);
+      if (
+        (spread.type === 'Identifier' &&
+          spread.name === 'undefined' &&
+          declaredWhere(sourceCode, spread) === 'global') ||
+        (spread.type === 'Literal' &&
+          (spread.value === null ||
+            spread.value === '' ||
+            ['boolean', 'number', 'bigint'].includes(typeof spread.value)))
+      )
+        continue;
       const before = unread.length;
       const values =
-        spread?.type === 'ObjectExpression' ? objectDetails(sourceCode, spread, unread, [...path, object]) : [];
-      if (spread?.type !== 'ObjectExpression') unread.push(prop.argument);
+        spread.type === 'ObjectExpression' ? objectDetails(sourceCode, spread, unread, [...path, object]) : [];
+      if (spread.type !== 'ObjectExpression') unread.push(prop.argument);
       // An unread spread may replace any earlier property; later known properties still win.
       if (unread.length > before) entries.clear();
       for (const [key, value] of values) entries.set(key, value);
@@ -2093,6 +2111,8 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const choices = (node: Node): Declaration[] | undefined => {
       const value = unwrap(node);
       if (value.type === 'ConditionalExpression') {
+        const condition = booleanOf(sourceCode, value.test);
+        if (condition !== undefined) return choices(condition ? value.consequent : value.alternate);
         const yes = choices(value.consequent);
         const no = choices(value.alternate);
         return yes === undefined || no === undefined ? undefined : [...yes, ...no];
