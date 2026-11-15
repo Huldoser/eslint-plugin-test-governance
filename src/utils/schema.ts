@@ -103,6 +103,7 @@ export const optionsSchema: Schema = {
     },
     knownTags: { type: 'array', items: { type: 'string', pattern: TAG_RE.source, patternHint: TAG_HINT } },
     maxRetries: { type: 'integer', minimum: 0 },
+    checkConfigRetries: { type: 'boolean' },
     comments: {
       anyOf: [
         { type: 'boolean', enum: [false] },

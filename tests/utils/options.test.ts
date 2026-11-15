@@ -7,6 +7,14 @@ const compile = (options: Partial<GovernanceOptions>) => compileOptions({ framew
 const stateNames = (options: Partial<GovernanceOptions>) => compile(options).states.map((s) => s.name);
 
 describe('compileOptions', () => {
+  it('checks config retries only when explicitly requested and rejects non-boolean settings', () => {
+    assert.equal(compile({}).checkConfigRetries, false);
+    assert.equal(compile({ checkConfigRetries: true }).checkConfigRetries, true);
+    for (const checkConfigRetries of ['true', 1, null]) {
+      assert.throws(() => compile({ checkConfigRetries } as never), /checkConfigRetries must be/);
+    }
+  });
+
   it('defaults the retry ceiling to two and accepts zero to forbid retries', () => {
     assert.equal(compile({}).maxRetries, 2);
     assert.equal(compile({ maxRetries: 0 }).maxRetries, 0);

@@ -1545,6 +1545,76 @@ function optionApplies(sourceCode: SourceCode, node: Node): boolean | undefined 
 /** Keys of a retry options object that hold a count: Vitest's `count`, Cypress's `runMode` and `openMode`. */
 const RETRY_COUNT_KEYS = new Set(['count', 'runMode', 'openMode']);
 const VITEST_RETRY_COUNT_KEYS = new Set(['count']);
+
+/** Unshadowed CommonJS globals must not have been assigned elsewhere in the file. */
+function configGlobal(sourceCode: SourceCode, id: TSESTree.Identifier): boolean {
+  return (
+    declaredWhere(sourceCode, id) === 'global' &&
+    !isReassigned(sourceCode, id) &&
+    !sourceCode.getScope(sourceCode.ast).through.some((ref) => ref.identifier.name === id.name && ref.isWrite())
+  );
+}
+
+/** Resolves config factories by their imports, keeping unrelated helpers and shadowed require calls out. */
+function configBinding(
+  sourceCode: SourceCode,
+  node: Node,
+  framework: Framework,
+  seen: readonly Node[] = [],
+): 'module' | 'factory' | undefined {
+  const own = unwrap(node);
+  if (seen.includes(own)) return undefined;
+  const path = [...seen, own];
+  const modules =
+    framework.name === 'vitest'
+      ? ['vitest/config', 'vite']
+      : framework.name === 'playwright'
+        ? ['@playwright/test', 'playwright/test']
+        : ['cypress'];
+  const factory = (name: string | undefined): boolean =>
+    name === 'defineConfig' || (framework.name === 'vitest' && name === 'defineProject');
+  if (own.type === 'CallExpression') {
+    const source = requireSource(own);
+    return source !== undefined &&
+      modules.includes(source) &&
+      own.callee.type === 'Identifier' &&
+      configGlobal(sourceCode, own.callee)
+      ? 'module'
+      : undefined;
+  }
+  if (own.type === 'MemberExpression') {
+    return factory(memberName(own)) && configBinding(sourceCode, own.object, framework, path) === 'module'
+      ? 'factory'
+      : undefined;
+  }
+  if (own.type !== 'Identifier' || isReassigned(sourceCode, own) || isMutated(sourceCode, own)) return undefined;
+  const variable = declaredVariable(sourceCode, own);
+  if (variable?.defs.length !== 1) return undefined;
+  const [def] = variable.defs;
+  if (
+    def.type === 'ImportBinding' &&
+    def.parent.type === 'ImportDeclaration' &&
+    modules.includes(def.parent.source.value)
+  ) {
+    if (def.node.type === 'ImportNamespaceSpecifier') return 'module';
+    return def.node.type === 'ImportSpecifier' && factory(importedName(def.node)) ? 'factory' : undefined;
+  }
+  if (def.type === 'Variable' && def.parent.kind === 'const' && def.node.init !== null) {
+    if (def.node.id.type === 'ObjectPattern') {
+      const prop = def.node.id.properties.find(
+        (p) => p.type === 'Property' && p.value.type === 'Identifier' && p.value.name === own.name,
+      );
+      return prop?.type === 'Property' &&
+        factory(propertyName(prop)) &&
+        configBinding(sourceCode, def.node.init, framework, path) === 'module'
+        ? 'factory'
+        : undefined;
+    }
+    const value = declaredValue(sourceCode, own);
+    if (value !== undefined) return configBinding(sourceCode, value, framework, path);
+  }
+  return undefined;
+}
 const CYPRESS_RETRY_COUNT_KEYS = new Set(['runMode', 'openMode']);
 
 /**
@@ -1863,6 +1933,75 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       }
     }
   };
+  if (options.checkConfigRetries && ['playwright', 'vitest', 'cypress'].includes(framework.name)) {
+    /** Reads only config schema paths, never arbitrary nested application options or config callbacks. */
+    const readConfig = (node: Node, stage: 'root' | 'options' | 'projects', seen: readonly Node[] = []): void => {
+      const own = unwrap(node);
+      const value = constantValue(sourceCode, own) ?? own;
+      if (seen.includes(value)) return;
+      const path = [...seen, value];
+      if (value.type === 'ConditionalExpression') {
+        const condition = booleanOf(sourceCode, value.test);
+        if (condition !== false) readConfig(value.consequent, stage, path);
+        if (condition !== true) readConfig(value.alternate, stage, path);
+      } else if (stage === 'root' && value.type === 'CallExpression') {
+        const argument = value.arguments.at(0);
+        if (
+          argument !== undefined &&
+          value.arguments.length === 1 &&
+          configBinding(sourceCode, value.callee, framework) === 'factory'
+        )
+          readConfig(argument, stage, path);
+      } else if (
+        stage === 'root' &&
+        framework.name === 'vitest' &&
+        isFunction(value) &&
+        !value.async &&
+        !value.generator
+      ) {
+        const body = value.body;
+        if (body.type !== 'BlockStatement') readConfig(body, stage, path);
+        else if (body.body.length === 1 && body.body[0].type === 'ReturnStatement' && body.body[0].argument)
+          readConfig(body.body[0].argument, stage, path);
+      } else if (stage === 'projects' && value.type === 'ArrayExpression') {
+        for (const element of value.elements) if (element !== null) readConfig(element, 'root', path);
+      } else if (stage !== 'projects' && value.type === 'ObjectExpression') {
+        for (const [key, property] of objectDetails(sourceCode, value, [])) {
+          if (stage === 'root' && framework.name === 'vitest') {
+            if (key === 'test') readConfig(property, 'options', path);
+          } else if (key === (framework.name === 'vitest' ? 'retry' : 'retries')) {
+            recordRetryCounts(
+              property,
+              framework.name === 'vitest'
+                ? VITEST_RETRY_COUNT_KEYS
+                : framework.name === 'cypress'
+                  ? CYPRESS_RETRY_COUNT_KEYS
+                  : undefined,
+            );
+          } else if (key === 'projects' && framework.name !== 'cypress') {
+            readConfig(property, 'projects', path);
+          } else if (framework.name === 'cypress' && stage === 'root' && ['e2e', 'component'].includes(key)) {
+            readConfig(property, 'options', path);
+          }
+        }
+      }
+    };
+    for (const statement of sourceCode.ast.body) {
+      if (statement.type === 'ExportDefaultDeclaration') readConfig(statement.declaration, 'root');
+      else if (statement.type === 'ExpressionStatement' && statement.expression.type === 'AssignmentExpression') {
+        const { left, right, operator } = statement.expression;
+        if (
+          operator === '=' &&
+          left.type === 'MemberExpression' &&
+          memberName(left) === 'exports' &&
+          left.object.type === 'Identifier' &&
+          left.object.name === 'module' &&
+          configGlobal(sourceCode, left.object)
+        )
+          readConfig(right, 'root');
+      }
+    }
+  }
   const claimed = new Set<Comment>();
   const allComments = sourceCode.getAllComments();
   const commentedOut = findCommentedOutTests(

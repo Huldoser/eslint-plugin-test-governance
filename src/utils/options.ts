@@ -73,6 +73,8 @@ export interface GovernanceOptions {
   knownTags?: string[];
   /** Maximum retry count checked by the opt-in `limit-retries` rule. Defaults to `2`; `0` forbids retries. */
   maxRetries?: number;
+  /** Include supported runner config exports in `limit-retries`. Defaults to `false`. */
+  checkConfigRetries?: boolean;
   /** Require a ticket for conditional skips such as `test.skip(browserName === 'webkit')`. */
   requireTicketForConditional?: boolean;
   /** Accept a ticket prefix in readable Playwright or node:test runtime skip reasons when no marker or annotation supplies one. */
@@ -137,6 +139,7 @@ export interface ResolvedOptions {
   /** Tags besides the state tags whose case and spelling `consistent-tag-names` checks. */
   knownTags: string[];
   maxRetries: number;
+  checkConfigRetries: boolean;
   requireTicketForConditional: boolean;
   ticketsFromReasons: boolean;
   requireReasonForConditional: boolean;
@@ -418,6 +421,7 @@ export function compileOptions(options: GovernanceOptions): ResolvedOptions {
     states,
     knownTags: options.knownTags ?? [],
     maxRetries: options.maxRetries ?? 2,
+    checkConfigRetries: options.checkConfigRetries ?? false,
     requireTicketForConditional: options.requireTicketForConditional ?? false,
     ticketsFromReasons: options.ticketsFromReasons ?? false,
     requireReasonForConditional: options.requireReasonForConditional ?? false,
