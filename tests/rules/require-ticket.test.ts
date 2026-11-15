@@ -40,7 +40,7 @@ runRule('require-ticket', rule, {
     "test.skip(isMobile, 'Not on mobile');",
     // A title held in a constant, and a constant condition, which is not a title.
     "const title = 'buys shares';\n// SKIP: TRADE-123\ntest.skip(title, placeLimitOrder);",
-    'const onMobile = true;\ntest.skip(onMobile, reason);',
+    "const onMobile = process.env.PLATFORM === 'mobile';\ntest.skip(onMobile, reason);",
     // `describe` taken out of `test`.
     "const { beforeEach, describe } = test;\n// SKIP: TRADE-123\ndescribe.skip('order entry', () => {});",
     // Shapes the analyzer reads without acting on them: a rest element and a computed key when test

@@ -142,7 +142,11 @@ function disableRegions(comments: Comment[], states: StateDef[]): Region[] {
     if (open.kind !== 'eslint-disable' || open.description === undefined) return [];
     const close = directives
       .slice(i + 1)
-      .find((d) => d.kind === 'eslint-enable' && (d.rules.length === 0 || d.rules.some((r) => open.rules.includes(r))));
+      .find(
+        (d) =>
+          d.kind === 'eslint-enable' &&
+          (d.rules.length === 0 || open.rules.length === 0 || d.rules.some((r) => open.rules.includes(r))),
+      );
     const markers = parseMarkers(open.comment, states);
     return [{ start: open.comment.range[1], end: close?.comment.range[0] ?? Infinity, comment: open.comment, markers }];
   });
@@ -640,7 +644,9 @@ function isLocalVariable(sourceCode: SourceCode, id: TSESTree.Identifier): boole
     // A top-level scope: the global scope, a module's scope, or in CommonJS the function scope that
     // wraps the module.
     if (scope.block.type === 'Program') return false;
-    return variable.defs.some((def) => def.type === 'Variable' || def.type === 'FunctionName');
+    return variable.defs.some(
+      (def) => def.type === 'Variable' || def.type === 'FunctionName' || def.type === 'CatchClause',
+    );
   }
   return false;
 }
@@ -917,7 +923,7 @@ function destructuredValue(
     for (const property of pattern.properties) {
       if (property.type !== 'Property') continue;
       const key = propertyName(property);
-      const selected = key === undefined ? undefined : propertyValue(owner, key);
+      const selected = key === undefined ? undefined : propertyValue(sourceCode, owner, key, seen);
       if (selected === undefined) continue;
       const found = destructuredValue(sourceCode, property.value, selected, name, seen);
       if (found !== undefined) return found;
@@ -942,13 +948,13 @@ function isPrototypeSetter(prop: TSESTree.Property): boolean {
 }
 
 /** The value of the last property called `key`, or undefined when a spread written after it may replace it. */
-function propertyValue(object: TSESTree.ObjectExpression, key: string): Node | undefined {
-  for (let i = object.properties.length - 1; i >= 0; i--) {
-    const prop = object.properties[i];
-    if (prop.type === 'SpreadElement' || (prop.computed && propertyName(prop) === undefined)) return undefined;
-    if (!isPrototypeSetter(prop) && propertyName(prop) === key) return prop.value;
-  }
-  return undefined;
+function propertyValue(
+  sourceCode: SourceCode,
+  object: TSESTree.ObjectExpression,
+  key: string,
+  seen: readonly Node[],
+): Node | undefined {
+  return objectDetails(sourceCode, object, [], seen).find(([name]) => name === key)?.[1];
 }
 
 /**
@@ -966,7 +972,10 @@ function constantValue(sourceCode: SourceCode, node: Node, seen: readonly Node[]
       ? constantValue(sourceCode, target, path)
       : target;
   };
-  if (node.type === 'Identifier') return follow(declaredValue(sourceCode, node, path));
+  if (node.type === 'Identifier') {
+    if (node.name === 'undefined' && declaredWhere(sourceCode, node) === 'global') return node;
+    return follow(declaredValue(sourceCode, node, path));
+  }
   if (node.type !== 'MemberExpression') return undefined;
   const key = memberKey(node);
   const object = unwrap(node.object);
@@ -976,7 +985,7 @@ function constantValue(sourceCode: SourceCode, node: Node, seen: readonly Node[]
       : constantValue(sourceCode, object, path);
   const owner = value && unwrap(value);
   if (key === undefined || owner === undefined) return undefined;
-  if (owner.type === 'ObjectExpression') return follow(propertyValue(owner, key));
+  if (owner.type === 'ObjectExpression') return follow(propertyValue(sourceCode, owner, key, path));
   if (owner.type === 'ArrayExpression') {
     const index = Number(key);
     if (!Number.isInteger(index) || index < 0 || String(index) !== key) return undefined;
@@ -1063,18 +1072,18 @@ interface Details {
  * The key of a details property, following a computed string key declared in this file. A computed key that
  * can't be read, as in `{ [key]: '@new' }`, goes in `unread`, since it may be the tag or an option.
  */
-function detailKey(sourceCode: SourceCode, prop: TSESTree.Property, unread: Node[]): string | undefined {
+function detailKey(
+  sourceCode: SourceCode,
+  prop: TSESTree.Property,
+  unread: Node[],
+  seen: readonly Node[],
+): string | undefined {
   const key = unwrap(prop.key);
   if (!prop.computed) {
     return key.type === 'Identifier' ? key.name : String((key as TSESTree.Literal).value);
   }
-  if (key.type === 'Literal' && typeof key.value === 'string') return key.value;
-  // `cooked` is only null in tagged templates, which a computed key isn't.
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
-  if (key.type === 'TemplateLiteral' && key.expressions.length === 0) return key.quasis[0].value.cooked!;
-  const value = constantValue(sourceCode, key);
-  const resolved = value && unwrap(value);
-  if (resolved?.type === 'Literal' && typeof resolved.value === 'string') return resolved.value;
+  const value = staticText(sourceCode, key, seen);
+  if (value !== undefined) return value;
   unread.push(prop.key);
   return undefined;
 }
@@ -1097,7 +1106,8 @@ function objectDetails(
   for (const prop of object.properties) {
     if (prop.type === 'SpreadElement') {
       const argument = unwrap(prop.argument);
-      const value = argument.type === 'ObjectExpression' ? argument : constantValue(sourceCode, argument);
+      const value =
+        argument.type === 'ObjectExpression' ? argument : constantValue(sourceCode, argument, [...path, object]);
       const spread = value && unwrap(value);
       const before = unread.length;
       const values =
@@ -1109,7 +1119,7 @@ function objectDetails(
       continue;
     }
     if (isPrototypeSetter(prop)) continue;
-    const key = detailKey(sourceCode, prop, unread);
+    const key = detailKey(sourceCode, prop, unread, [...path, object]);
     if (key === undefined) entries.clear();
     else entries.set(key, prop.value);
   }
@@ -1418,14 +1428,25 @@ function thisFunction(node: Node): Node | undefined {
   return current;
 }
 
-/** A boolean literal or its negation; undefined when the value depends on runtime data. */
-function booleanOf(node: Node | undefined): boolean | undefined {
-  const value = node === undefined ? undefined : unwrap(node);
-  if (value?.type === 'UnaryExpression' && value.operator === '!') {
-    const argument = booleanOf(value.argument);
+/** A readable local boolean, negation or selected branch; undefined when runtime data decides it. */
+function booleanOf(sourceCode: SourceCode, node: Node | undefined, seen: readonly Node[] = []): boolean | undefined {
+  if (node === undefined) return undefined;
+  const own = unwrap(node);
+  const value = constantValue(sourceCode, own, seen) ?? own;
+  if (seen.includes(value)) return undefined;
+  const path = [...seen, value];
+  if (value.type === 'UnaryExpression' && value.operator === '!') {
+    const argument = booleanOf(sourceCode, value.argument, path);
     return argument === undefined ? undefined : !argument;
   }
-  return value?.type === 'Literal' && typeof value.value === 'boolean' ? value.value : undefined;
+  if (value.type === 'ConditionalExpression') {
+    const test = booleanOf(sourceCode, value.test, path);
+    if (test !== undefined) return booleanOf(sourceCode, test ? value.consequent : value.alternate, path);
+    const consequent = booleanOf(sourceCode, value.consequent, path);
+    const alternate = booleanOf(sourceCode, value.alternate, path);
+    return consequent === alternate ? consequent : undefined;
+  }
+  return value.type === 'Literal' && typeof value.value === 'boolean' ? value.value : undefined;
 }
 
 /**
@@ -1433,10 +1454,15 @@ function booleanOf(node: Node | undefined): boolean | undefined {
  * as `{ skip: 'flaky' }`, `''`, `0`, `null`, and an `expectFailure` pattern or matcher always do. Undefined
  * for a value only known when the test runs, such as `{ skip: isWindows }`.
  */
-function optionApplies(node: Node): boolean | undefined {
-  const value = unwrap(node);
-  if (value.type === 'Identifier' && value.name === 'undefined') return false;
+function optionApplies(sourceCode: SourceCode, node: Node): boolean | undefined {
+  const own = unwrap(node);
+  const value = constantValue(sourceCode, own) ?? own;
+  if (value.type === 'Identifier' && value.name === 'undefined' && declaredWhere(sourceCode, value) === 'global')
+    return false;
   if (value.type === 'Literal') return value.value !== false;
+  const boolean = booleanOf(sourceCode, value);
+  if (boolean !== undefined) return boolean;
+  if (value.type === 'UnaryExpression' && value.operator === 'void') return false;
   return OPTION_VALUES.has(value.type) ? true : undefined;
 }
 
@@ -1461,7 +1487,20 @@ function retries(
   const own = unwrap(node);
   const value = constantValue(sourceCode, own) ?? own;
   if (value.type === 'Literal') return value.value !== 0 && value.value !== false && value.value !== null;
-  if (value.type === 'Identifier') return value.name !== 'undefined';
+  if (value.type === 'Identifier') return value.name !== 'undefined' || declaredWhere(sourceCode, value) !== 'global';
+  if (value.type === 'UnaryExpression' && (value.operator === '+' || value.operator === '-')) {
+    const argument = constantValue(sourceCode, unwrap(value.argument)) ?? unwrap(value.argument);
+    return argument.type !== 'Literal' || typeof argument.value !== 'number' || argument.value !== 0;
+  }
+  if (value.type === 'ConditionalExpression') {
+    const condition = booleanOf(sourceCode, value.test);
+    if (condition !== undefined)
+      return retries(sourceCode, condition ? value.consequent : value.alternate, keys, [...seen, node]);
+    return (
+      retries(sourceCode, value.consequent, keys, [...seen, node]) ||
+      retries(sourceCode, value.alternate, keys, [...seen, node])
+    );
+  }
   if (value.type !== 'ObjectExpression') return true;
   const unread: Node[] = [];
   const counts = objectDetails(sourceCode, value, unread).filter(([key]) => keys.has(key));
@@ -1488,12 +1527,12 @@ function isUnconditional(sourceCode: SourceCode, call: TSESTree.CallExpression, 
   const first = call.arguments.at(0);
   const always =
     first === undefined ||
-    booleanOf(first) === true ||
+    booleanOf(sourceCode, first) === true ||
     // Mocha ignores arguments; Node and Jasmine take a reason rather than a condition.
     framework.reasonArgument === undefined ||
     framework.reasonArgument === 'only' ||
     (framework.skipNotes && (isStaticText(unwrap(first)) || staticText(sourceCode, first) !== undefined));
-  return always && !isGuarded(call);
+  return always && !isGuarded(sourceCode, call);
 }
 
 /**
@@ -1584,7 +1623,7 @@ function isEarlyExit(statement: TSESTree.Statement): boolean {
  * `catch`, or after an early exit such as `if (ready) return;`. `if (!enabled) test.skip()` is the same as `test.skip(!enabled)`, and
  * `catch { test.skip(true, 'service is down') }` only skips when the service is down.
  */
-function isGuarded(call: TSESTree.CallExpression): boolean {
+function isGuarded(sourceCode: SourceCode, call: TSESTree.CallExpression): boolean {
   let child: Node = call;
   for (let node: Node | undefined = call.parent; node && !FUNCTIONS.has(node.type); child = node, node = node.parent) {
     const same = (other: Node): boolean => child.range[0] === other.range[0] && child.range[1] === other.range[1];
@@ -1594,7 +1633,7 @@ function isGuarded(call: TSESTree.CallExpression): boolean {
     if (
       ((node.type === 'WhileStatement' || node.type === 'ForStatement') &&
         node.test !== null &&
-        booleanOf(node.test) !== true &&
+        booleanOf(sourceCode, node.test) !== true &&
         child === node.body) ||
       ((node.type === 'ForInStatement' || node.type === 'ForOfStatement') && child === node.body)
     )
@@ -1739,7 +1778,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
         retryCounts.push({ node: own, count: value.operator === '-' ? -argument.value : argument.value });
       }
     } else if (value.type === 'ConditionalExpression') {
-      const condition = booleanOf(constantValue(sourceCode, unwrap(value.test)) ?? value.test);
+      const condition = booleanOf(sourceCode, value.test);
       if (condition !== false) recordRetryCounts(value.consequent, keys, path);
       if (condition !== true) recordRetryCounts(value.alternate, keys, path);
     } else if (value.type === 'ObjectExpression' && keys !== undefined) {
@@ -1935,7 +1974,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
         continue;
       }
       // `skipIf(true)` always skips and `skipIf(false)` never does, like `{ skip: true }` and `{ skip: false }`.
-      const condition = booleanOf(args.get(member));
+      const condition = booleanOf(sourceCode, args.get(member));
       if (condition === undefined) modifiers.set(effect.modifier, false);
       else if (condition === effect.when) modifiers.set(effect.modifier, true);
       else modifiers.delete(effect.modifier);
@@ -1950,7 +1989,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
         continue;
       }
       const modifier = framework.optionEffects.get(key);
-      const always = framework.anyOptionValue ? optionApplies(value) : booleanOf(value);
+      const always = framework.anyOptionValue ? optionApplies(sourceCode, value) : booleanOf(sourceCode, value);
       if (modifier && always !== false) add(modifier, always === true);
     }
     const first = framework.exclusiveStates.findIndex((state) => modifiers.get(state) === true);
@@ -2209,9 +2248,11 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     if (source === undefined) return undefined;
     if (declarator.id.type === 'Identifier') return { ...source, name: value.name, runtimeFunction: undefined };
     if (declarator.id.type !== 'ObjectPattern' || source.methods === undefined) return undefined;
-    const property = declarator.id.properties.find(
-      (prop) => prop.type === 'Property' && prop.value.type === 'Identifier' && prop.value.name === value.name,
-    );
+    const property = declarator.id.properties.find((prop) => {
+      if (prop.type !== 'Property') return false;
+      const binding = prop.value.type === 'AssignmentPattern' ? prop.value.left : prop.value;
+      return binding.type === 'Identifier' && binding.name === value.name;
+    });
     const name = property?.type === 'Property' ? propertyName(property) : undefined;
     return name !== undefined && source.methods.has(name)
       ? { name: value.name, method: name, step: source.step, owner: source.owner }
@@ -2471,7 +2512,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     if (
       framework.reasonArgument !== undefined &&
       framework.reasonArgument !== 'only' &&
-      booleanOf(call.arguments.at(0)) === false
+      booleanOf(sourceCode, call.arguments.at(0)) === false
     )
       return undefined;
     const subject = makeSubject(
@@ -2645,9 +2686,24 @@ export function missingStates(subject: Subject, options: ResolvedOptions): State
   return subject.states
     .filter(
       (s) =>
-        s.required && evaluate(subject, s.state).kind === 'missing' && !hasAnnotationTicket(subject, s.state, options),
+        s.required &&
+        evaluate(subject, s.state).kind === 'missing' &&
+        !hasAnnotationTicket(subject, s.state, options) &&
+        !hasReasonTicket(s, options),
     )
     .map((s) => s.state);
+}
+
+/** Whether the opt-in native reason supplies a complete valid ticket list for this state. */
+function hasReasonTicket(source: StateSource, options: ResolvedOptions): boolean {
+  if (source.reasonTicket === undefined) return false;
+  const { node, text } = source.reasonTicket;
+  const { tickets, extra } = parseTickets(text, node.range[0], source.state.ticket);
+  return (
+    tickets.length > 0 &&
+    tickets.every((ticket) => ticket.result === 'ok') &&
+    (extra === undefined || options.allowNotes)
+  );
 }
 
 /**
