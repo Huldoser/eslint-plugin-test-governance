@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-15
+
 ### Fixed
 
 - Resolve readable constant conditions and Node option values instead of treating known true/false
@@ -724,7 +726,8 @@ First release.
 - Support for ESLint 9 and 10 flat config, JavaScript and TypeScript test files, `.extend()`
   fixtures, describe blocks, runtime skips and tags in titles or the `tag` option.
 
-[Unreleased]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.14.1...HEAD
+[Unreleased]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.13.3...v0.14.0
 [0.13.3]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.13.2...v0.13.3
