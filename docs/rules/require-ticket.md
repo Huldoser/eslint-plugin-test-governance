@@ -89,6 +89,8 @@ lines. Extra text is reported only once the tickets on that line are valid.
 
 Conditional skips such as `test.skip(browserName === 'webkit', 'Not supported')` usually describe a
 permanent platform limit, so they need no ticket unless you set `requireTicketForConditional: true`.
+Readable local boolean constants, negations and selected conditional-expression branches are resolved:
+a known `true` condition always applies and needs a ticket; a known `false` condition does not apply.
 A runtime skip under an `if`, a `switch` case, a ternary or `&&` counts as conditional too, since
 `if (!enabled) test.skip()` does the same as `test.skip(!enabled)`. So does a skip in a `catch` block,
 such as `catch { test.skip(true, 'Market data feed is down') }`, a skip after other code in a `try`
@@ -475,12 +477,17 @@ The reason must start with a ticket in that state's configured format. Placehold
 and comma-separated tickets work. Text after the tickets requires `allowNotes: true`. With a valid
 comment or annotation, ordinary reason text remains allowed. A valid reason never hides an invalid
 explicit marker. Annotation-only requirements for declarations remain unchanged.
+Marker matching and orphan detection also recognize a valid reason ticket, so they do not suggest
+renaming another marker to supply a ticket the reason already provides.
 
 Dynamic reasons cannot supply a verified ticket; use a marker or annotation instead. Readable local
 constants work, including immutable object and array destructuring. Destructuring defaults, rest
 bindings and getters are not evaluated. This option does not search test titles, Node declaration options such as
 `{ skip: 'reason' }`, or messages from other runners. Issue references buried in prose are not
 extracted. The runner receives the original message unchanged.
+
+Static object spreads and computed string keys are resolved through these local bindings. Unknown
+spreads and keys remain unread; a later explicit property still overrides an earlier unknown spread.
 
 ### Shared settings
 

@@ -8,6 +8,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Resolve readable constant conditions and Node option values instead of treating known true/false
+  values as dynamic; preserve global `undefined` through local aliases and leave unknown predicates conditional.
+- Read static object spreads and computed string keys consistently through local members and destructuring.
+- Do not require retry tickets for signed zero or conditional counts whose selected branches all disable retries.
+- Respect valid native-reason tickets in marker matching and orphan detection, recognize defaulted context-method
+  aliases, and exclude helpers bound by catch clauses.
+- End blanket-disable ticket regions at a named enable directive as well as an enable-all directive.
+
 - Read immutable object and array destructuring when resolving local tags, annotations, runtime
   reasons and retry counts. Defaults, rest bindings and getters remain unread.
 - Check blanket Cypress error suppression and Jest/Mocha retry calls through TypeScript assertions,
