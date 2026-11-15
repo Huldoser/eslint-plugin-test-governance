@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Invalidate static values after writes through destructured aliases or object and array wrappers.
+- Preserve known object properties when later spreads contain null, undefined, booleans, numbers or empty strings.
+- Resolve constant conditions when selecting test functions, so only the reachable runner's states apply.
+
 ## [0.15.0] - 2026-11-15
 
 ### Fixed

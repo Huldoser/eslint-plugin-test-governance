@@ -100,7 +100,8 @@ earlier in the same function.
 
 A test or describe whose function a condition picks is a conditional skip too, in every framework. Its
 title and tags count as usual, and a marker goes above it, or in code without semicolons above the
-`;` that starts the line.
+`;` that starts the line. A readable constant condition selects only its reachable branch: choosing
+the skipped runner always needs a ticket, and choosing the normal runner needs none.
 
 <!-- example: valid -->
 
@@ -488,6 +489,8 @@ extracted. The runner receives the original message unchanged.
 
 Static object spreads and computed string keys are resolved through these local bindings. Unknown
 spreads and keys remain unread; a later explicit property still overrides an earlier unknown spread.
+Spreading `null`, `undefined`, booleans, numbers or an empty string leaves earlier properties intact.
+Writes through destructured aliases or objects and arrays holding a value make that value unreadable.
 
 ### Shared settings
 
