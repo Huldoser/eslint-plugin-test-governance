@@ -477,7 +477,8 @@ comment or annotation, ordinary reason text remains allowed. A valid reason neve
 explicit marker. Annotation-only requirements for declarations remain unchanged.
 
 Dynamic reasons cannot supply a verified ticket; use a marker or annotation instead. Readable local
-constants work. This option does not search test titles, Node declaration options such as
+constants work, including immutable object and array destructuring. Destructuring defaults, rest
+bindings and getters are not evaluated. This option does not search test titles, Node declaration options such as
 `{ skip: 'reason' }`, or messages from other runners. Issue references buried in prose are not
 extracted. The runner receives the original message unchanged.
 

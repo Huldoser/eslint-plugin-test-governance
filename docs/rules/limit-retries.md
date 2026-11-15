@@ -79,6 +79,10 @@ a conditional expression such as `process.env.CI ? 3 : 0`, reporting each readab
 If the condition is a boolean literal or a readable local boolean constant, only its selected branch
 is checked.
 
+Negated boolean literals select their branch too. Immutable object and array destructuring can
+supply local counts; destructuring defaults, rest bindings and getters are not evaluated.
+TypeScript assertions, non-null assertions and `satisfies` around native retry calls preserve detection.
+
 Imported values, mutable variables, arithmetic expressions and function results are not evaluated.
 An unknown count is left alone; a clean lint run does not prove it meets the maximum. The rule
 does not resolve inherited settings across files, runner configuration files, command-line flags,
