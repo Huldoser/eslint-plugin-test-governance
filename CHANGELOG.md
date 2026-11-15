@@ -8,6 +8,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Distinguish primitive snapshots and shallow copies from shared object aliases when tracking mutations,
+  and follow aliases selected through inline object/array wrappers and TypeScript assertions.
+- Report unreadable annotation keys without redundant diagnostics for spreads overridden by explicit keys.
+- Resolve immutable global `NaN` and `Infinity` values through local aliases in template literals.
+
 - Invalidate static values after writes through destructured aliases or object and array wrappers.
 - Preserve known object properties when later spreads contain null, undefined, booleans, numbers or empty strings.
 - Resolve constant conditions when selecting test functions, so only the reachable runner's states apply.
