@@ -149,6 +149,7 @@ All framework configs use the severities in [Defaults](#defaults).
 | Describe blocks           | a marker on a skipped or tagged describe covers its tests                                                                  |
 | Severity                  | `consistent-tag-names` and `require-ticket-for-commented-out-tests`: warn; every other rule except the opt-in rules: error |
 | Retry limit               | `limit-retries`: off; enable the rule explicitly, then set `maxRetries` (default `2`)                                      |
+| Runner config retries     | unchecked; opt in with `checkConfigRetries: true` on selected runner config files                                          |
 | Error suppression         | `require-ticket-for-error-suppression`: off; enable it explicitly in Cypress specs and support files                       |
 
 Tags have no built-in meaning. Configure `customStates` for tags that need ticket markers, or

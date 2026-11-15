@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Opt into retry ceilings for Playwright, Vitest and Cypress config exports with `checkConfigRetries`.
+- Add checked recipes for directory-by-directory adoption and composing governance with existing test lint rules.
+
 ### Fixed
 
 - Invalidate static values after writes through destructured aliases or object and array wrappers.
