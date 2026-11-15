@@ -11,7 +11,7 @@ const root = path.resolve(import.meta.dirname, '..');
 const read = (file: string): string => readFileSync(path.join(root, file), 'utf8');
 
 /** Evaluates a complete documented config with the same plugin and parser the package tests use. */
-function documentedConfig(file: string, name: string): Linter.Config[] {
+function documentedConfig(file: string, name: string, names: Record<string, unknown> = {}): Linter.Config[] {
   const match = new RegExp('<!-- config: ' + name + ' -->\\n+```js\\n([\\s\\S]*?)```').exec(read(file));
   assert.ok(match, `${file} has the complete ${name} config`);
   const module = { exports: [] as Linter.Config[] };
@@ -19,6 +19,7 @@ function documentedConfig(file: string, name: string): Linter.Config[] {
     module,
     testGovernance,
     tsParser,
+    ...names,
     require: (name: string): typeof testGovernance => {
       assert.equal(name, 'eslint-plugin-test-governance');
       return testGovernance;
@@ -28,6 +29,62 @@ function documentedConfig(file: string, name: string): Linter.Config[] {
 }
 
 describe('documented config files', () => {
+  it('the config retry recipe checks selected runner files and leaves application exports alone', async () => {
+    const eslint = new ESLint({
+      cwd: root,
+      overrideConfigFile: true,
+      overrideConfig: documentedConfig('docs/rules/limit-retries.md', 'config-retry-limit'),
+    });
+    for (const filePath of ['playwright.config.js', 'playwright.config.mjs', 'playwright.config.cjs']) {
+      const code = filePath.endsWith('.cjs') ? 'module.exports = { retries: 2 };' : 'export default { retries: 2 };';
+      const [excessive] = await eslint.lintText(code, { filePath });
+      assert.equal(excessive.messages.length, 1);
+      assert.equal(excessive.messages[0].messageId, 'excessiveRetries');
+      const [allowed] = await eslint.lintText(code.replace('2', '1'), { filePath });
+      assert.deepEqual(allowed.messages, []);
+    }
+    const [outside] = await eslint.lintText('export default { retries: 9 };', { filePath: 'application.js' });
+    assert.deepEqual(outside.messages, []);
+  });
+
+  it('directory rollout checks the new suite without adding policy to the legacy suite', async () => {
+    const eslint = new ESLint({
+      cwd: root,
+      overrideConfigFile: true,
+      overrideConfig: documentedConfig('docs/troubleshooting.md', 'directory-rollout'),
+    });
+    const code = "test.skip('cancels an order', () => {});";
+    const [fresh] = await eslint.lintText(code, { filePath: 'tests/new/order.spec.js' });
+    assert.deepEqual(
+      fresh.messages.map(({ ruleId }) => ruleId),
+      ['test-governance/require-ticket'],
+    );
+    const [legacy] = await eslint.lintText(code, { filePath: 'tests/legacy/order.spec.js' });
+    assert.deepEqual(legacy.messages, []);
+  });
+
+  it('companion composition replaces only the skip ban and retains existing correctness rules', async () => {
+    // The base represents the user's config; upstream runner implementations are not installed by this test.
+    const existingConfig = [{ rules: { 'playwright/no-skipped-test': 'error', 'no-debugger': 'error' } }];
+    const eslint = new ESLint({
+      cwd: root,
+      overrideConfigFile: true,
+      overrideConfig: documentedConfig('docs/troubleshooting.md', 'companion', { existingConfig }),
+    });
+    const filePath = 'tests/order.spec.js';
+    const [tracked] = await eslint.lintText("// SKIP: TRADE-123\ntest.skip('cancels an order', () => {});", {
+      filePath,
+    });
+    assert.deepEqual(tracked.messages, []);
+    const [untracked] = await eslint.lintText("test.skip('cancels an order', () => {}); debugger;", { filePath });
+    assert.deepEqual(untracked.messages.map(({ ruleId }) => ruleId).sort(), [
+      'no-debugger',
+      'test-governance/require-ticket',
+    ]);
+    const config = (await eslint.calculateConfigForFile(filePath)) as Linter.Config;
+    assert.deepEqual(config.rules?.['playwright/no-skipped-test'], [0]);
+  });
+
   it('the retry-limit config reports excessive counts independently of retry tickets', async () => {
     const eslint = new ESLint({
       cwd: root,

@@ -37,6 +37,18 @@ and lowercase-marker diagnostics do not offer suggestions. For a lowercase marke
 
 ## Adopt in an existing suite
 
+Start with one owned directory while the rest of the suite keeps its current policy. This complete
+config enforces governance only in `tests/new/`; expand `files` after each directory is ready:
+
+<!-- config: directory-rollout -->
+
+```js
+// eslint.config.mjs
+import testGovernance from 'eslint-plugin-test-governance';
+
+export default [{ files: ['tests/new/**/*.js'], ...testGovernance.configs.playwright }];
+```
+
 Start with one test directory and inspect the reports. If you need a transition period, override a
 rule's severity after spreading the config; the shared settings still apply. This complete config
 keeps the other rules at their default severities:
@@ -68,6 +80,56 @@ will still reject warnings; account for that before using this transition config
 
 Once the base policy works, enable optional states deliberately: custom tags that need tickets, `states: { retry: true }` for retries, and `requireReasonForConditional` or
 `requireTicketForConditional` for conditional skips. See [shared options](configuration.md#options).
+
+## Combine with a runner plugin
+
+Keep the runner plugin's assertion, async and focused-test checks. If your policy allows ticketed
+skips, replace its blanket skip ban only in the files governed here. For Playwright, the overlapping
+rule is `playwright/no-skipped-test`; the [runner plugin's catalog](https://github.com/mskelton/eslint-plugin-playwright#rules)
+lists its other checks. A ticket does not satisfy that plugin's blanket ban.
+
+This complete config assumes `eslint.base.mjs` exports your existing flat-config array and registers
+the Playwright plugin. The final object changes only the selected files, adds governance and turns
+off that one overlapping rule. Existing focused-test and other correctness rules remain configured:
+
+<!-- config: companion -->
+
+```js
+// eslint.config.mjs
+import existingConfig from './eslint.base.mjs';
+import testGovernance from 'eslint-plugin-test-governance';
+
+const policy = testGovernance.configure({ framework: 'playwright' });
+
+export default [
+  ...existingConfig,
+  {
+    files: ['tests/**/*.js'],
+    ...policy,
+    rules: { ...policy.rules, 'playwright/no-skipped-test': 'off' },
+  },
+];
+```
+
+Use the actual namespace registered in your existing config if it differs from `playwright`.
+This is a choice for suites that allow tracked skips; teams that prohibit every skip should keep
+their blanket ban. Check the final rule selection with ESLint's `--print-config` for a real test path.
+
+## Adopt without a separate baseline tool
+
+ESLint's [bulk suppressions](https://eslint.org/docs/latest/use/suppressions) can retain existing
+violations while enforcing errors on new code. They apply to error-severity rules, not warnings.
+Prefer the directory rollout above when every accepted skip must already have a ticket: a suppressed
+finding does not acquire tracking information. If your team chooses bulk suppressions, review the
+suppression file and prune unused entries as debt is removed. The plugin has no separate baseline CLI.
+
+## Connect retry policy to CI
+
+Enable [retry ceilings](rules/limit-retries.md) in test files and, with `checkConfigRetries`, in runner
+config files. `maxRetries` limits configured attempts; it cannot tell whether a run was flaky.
+For Playwright teams that want flaky results to fail CI, the runner's
+[`failOnFlakyTests`](https://playwright.dev/docs/api/class-testconfig#test-config-fail-on-flaky-tests)
+option supplies that runtime policy. Make that choice separately from ticket requirements.
 
 ## Report a wrong or missed diagnostic
 
