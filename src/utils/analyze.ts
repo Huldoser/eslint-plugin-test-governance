@@ -576,42 +576,99 @@ function isReassigned(sourceCode: SourceCode, id: TSESTree.Identifier): boolean 
   return written;
 }
 
-const mutatedBindings = new WeakMap<TSESLint.Scope.Variable, boolean>();
+const mutatedBindings = new WeakMap<TSESLint.Scope.Variable, Map<number, boolean>>();
+const checkingMutations = new WeakSet<TSESLint.Scope.Variable>();
 const ARRAY_MUTATORS = new Set(['copyWithin', 'fill', 'pop', 'push', 'reverse', 'shift', 'sort', 'splice', 'unshift']);
 const OBJECT_MUTATORS = new Set(['assign', 'defineProperty', 'defineProperties']);
 const REFLECT_MUTATORS = new Set(['set', 'deleteProperty', 'defineProperty']);
+
+/** A primitive snapshot cannot carry a mutable reference back to its source object. */
+function isPrimitiveValue(sourceCode: SourceCode, node: Node): boolean {
+  const own = unwrap(node);
+  const value = constantValue(sourceCode, own) ?? own;
+  return (
+    value.type === 'TemplateLiteral' ||
+    (value.type === 'Literal' && (value.value === null || typeof value.value !== 'object'))
+  );
+}
+
+/** Rest bindings copy their container; selected properties retain only references to their children. */
+function bindingMutationDepth(
+  sourceCode: SourceCode,
+  binding: TSESTree.Identifier,
+  pattern: Node,
+  initial: number,
+): number {
+  if (binding === pattern) return initial;
+  const ancestors = sourceCode.getAncestors(binding);
+  const path = [...ancestors.slice(ancestors.indexOf(pattern) + 1), binding];
+  let parent = pattern;
+  let depth = initial;
+  for (const node of path) {
+    if (parent.type === 'RestElement') depth = Math.max(2, depth);
+    if (
+      (parent.type === 'Property' && parent.parent.type === 'ObjectPattern' && parent.value === node) ||
+      (parent.type === 'ArrayPattern' && node.type !== 'RestElement')
+    )
+      depth = Math.max(1, depth - 1);
+    parent = node;
+  }
+  return depth;
+}
 
 /** Whether a binding's object is written through a property, an array mutator or a local alias. */
 function isMutated(
   sourceCode: SourceCode,
   id: TSESTree.Identifier,
   seen: readonly TSESLint.Scope.Variable[] = [],
+  minimumDepth = 1,
 ): boolean {
   const variable = declaredVariable(sourceCode, id);
-  if (variable === undefined || seen.includes(variable)) return false;
-  const cached = mutatedBindings.get(variable);
+  if (variable === undefined || seen.includes(variable) || checkingMutations.has(variable)) return false;
+  const cached = mutatedBindings.get(variable)?.get(minimumDepth);
   if (cached !== undefined) return cached;
+  checkingMutations.add(variable);
   const written = variable.references.some((reference) => {
     let value: Node = reference.identifier;
     let parent = value.parent;
-    while (
-      parent.type !== 'Program' &&
-      ((parent.type === 'MemberExpression' && parent.object === value) || unwrap(parent) === value)
-    ) {
-      value = parent;
-      parent = value.parent;
-    }
-    while (
-      (parent.type === 'Property' && parent.value === value && parent.parent.type === 'ObjectExpression') ||
-      parent.type === 'ArrayExpression'
-    ) {
-      value = parent.type === 'Property' ? parent.parent : parent;
+    let depth = minimumDepth;
+    while (parent.type !== 'Program') {
+      if (parent.type === 'MemberExpression' && parent.object === value) {
+        depth--;
+        value = parent;
+      } else if (unwrap(parent) === value) {
+        value = parent;
+      } else if (
+        parent.type === 'SpreadElement' &&
+        (parent.parent.type === 'ObjectExpression' || parent.parent.type === 'ArrayExpression')
+      ) {
+        if (isPrimitiveValue(sourceCode, value)) return false;
+        depth = Math.max(2, depth);
+        value = parent.parent;
+      } else if (
+        (parent.type === 'Property' && parent.value === value && parent.parent.type === 'ObjectExpression') ||
+        parent.type === 'ArrayExpression'
+      ) {
+        if (isPrimitiveValue(sourceCode, value)) return false;
+        depth = Math.max(1, depth) + 1;
+        value = parent.type === 'Property' ? parent.parent : parent;
+      } else break;
       parent = value.parent;
     }
     if (parent.type === 'VariableDeclarator' && parent.init === value) {
+      if (isPrimitiveValue(sourceCode, value)) return false;
       return sourceCode
         .getDeclaredVariables(parent)
-        .some((alias) => alias.identifiers.some((binding) => isMutated(sourceCode, binding, [...seen, variable])));
+        .some((alias) =>
+          alias.identifiers.some((binding) =>
+            isMutated(
+              sourceCode,
+              binding,
+              [...seen, variable],
+              bindingMutationDepth(sourceCode, binding, parent.id, Math.max(1, depth)),
+            ),
+          ),
+        );
     }
     if (parent.type === 'CallExpression' && parent.arguments[0] === value) {
       const callee = unwrap(parent.callee);
@@ -626,19 +683,23 @@ function isMutated(
             : callee.object.name === 'Reflect'
               ? REFLECT_MUTATORS
               : undefined;
-        if (methods?.has(memberName(callee) ?? '')) return true;
+        if (depth <= 1 && methods?.has(memberName(callee) ?? '')) return true;
       }
     }
     const member = unwrap(value);
     if (member.type !== 'MemberExpression') return false;
     return (
-      (parent.type === 'AssignmentExpression' && parent.left === value) ||
-      parent.type === 'UpdateExpression' ||
-      (parent.type === 'UnaryExpression' && parent.operator === 'delete') ||
-      (parent.type === 'CallExpression' && parent.callee === value && ARRAY_MUTATORS.has(memberName(member) ?? ''))
+      depth <= 0 &&
+      ((parent.type === 'AssignmentExpression' && parent.left === value) ||
+        parent.type === 'UpdateExpression' ||
+        (parent.type === 'UnaryExpression' && parent.operator === 'delete') ||
+        (parent.type === 'CallExpression' && parent.callee === value && ARRAY_MUTATORS.has(memberName(member) ?? '')))
     );
   });
-  mutatedBindings.set(variable, written);
+  checkingMutations.delete(variable);
+  const depths = mutatedBindings.get(variable) ?? new Map<number, boolean>();
+  depths.set(minimumDepth, written);
+  mutatedBindings.set(variable, depths);
   return written;
 }
 
@@ -982,7 +1043,8 @@ function constantValue(sourceCode: SourceCode, node: Node, seen: readonly Node[]
       : target;
   };
   if (node.type === 'Identifier') {
-    if (node.name === 'undefined' && declaredWhere(sourceCode, node) === 'global') return node;
+    if (['undefined', 'NaN', 'Infinity'].includes(node.name) && declaredWhere(sourceCode, node) === 'global')
+      return node;
     return follow(declaredValue(sourceCode, node, path));
   }
   if (node.type !== 'MemberExpression') return undefined;
@@ -1250,11 +1312,14 @@ function collectAnnotations(
     const unreadKeys: Node[] = [];
     const entries = objectDetails(sourceCode, object, unreadKeys);
     const type = entries.find(([key]) => key === 'type');
-    if (type === undefined) return;
+    if (type === undefined) {
+      unread.push(...unreadKeys);
+      return;
+    }
     const written = staticText(sourceCode, type[1]);
     if (written === undefined) {
       // The type might be the configured one, so the whole annotation may carry the ticket.
-      unread.push(type[1], ...unreadKeys);
+      unread.push(type[1]);
       return;
     }
     if (written !== annotations.type) return;
@@ -1266,7 +1331,7 @@ function collectAnnotations(
     }
     const text = staticText(sourceCode, description[1]);
     if (text === undefined) {
-      unread.push(...unreadKeys, description[1]);
+      unread.push(description[1]);
       return;
     }
     tickets.push({ text, node: description[1] });
@@ -1291,7 +1356,7 @@ function collectAnnotations(
         else {
           const text = staticText(sourceCode, entry[1]);
           if (text !== undefined) tickets.push({ text, node: entry[1] });
-          else unread.push(...unreadKeys, entry[1]);
+          else unread.push(entry[1]);
         }
       }
       return;

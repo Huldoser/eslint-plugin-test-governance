@@ -491,6 +491,10 @@ Static object spreads and computed string keys are resolved through these local 
 spreads and keys remain unread; a later explicit property still overrides an earlier unknown spread.
 Spreading `null`, `undefined`, booleans, numbers or an empty string leaves earlier properties intact.
 Writes through destructured aliases or objects and arrays holding a value make that value unreadable.
+Primitive snapshots and object/array spread or rest copies keep their own properties separate from
+the source. Nested objects stay shared through repeated shallow copies and make the source unreadable
+when mutated. Aliases selected
+through inline object/array wrappers and TypeScript assertions retain that shared identity.
 
 ### Shared settings
 

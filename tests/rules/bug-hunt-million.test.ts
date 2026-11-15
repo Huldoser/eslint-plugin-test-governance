@@ -1,0 +1,131 @@
+import requireTicket from '../../src/rules/require-ticket.ts';
+import limitRetries from '../../src/rules/limit-retries.ts';
+import { runRule, withOptions } from '../helpers.ts';
+
+runRule('require-ticket (primitive snapshots preserve their source)', requireTicket, {
+  valid: withOptions({ ticketsFromReasons: true }, [
+    "const source = { reason: 'EXAMPLE-843' }; const copy = { reason: source.reason }; copy.reason = 'TBD'; test.skip(true, source.reason);",
+    "const source = { reason: 'EXAMPLE-843' }; const copy = [source.reason]; copy[0] = 'TBD'; test.skip(true, source.reason);",
+    "const source = { reason: 'EXAMPLE-843' }; const copy = { ...source }; copy.reason = 'TBD'; test.skip(true, source.reason);",
+    "const source = { reason: 'EXAMPLE-843' }; const { ...copy } = source; copy.reason = 'TBD'; test.skip(true, source.reason);",
+    "const source = { reason: 'EXAMPLE-843' }; const { ...copy } = source; const wrapper = { copy }; wrapper.copy.reason = 'TBD'; test.skip(true, source.reason);",
+    "const source = ['EXAMPLE-843']; const copy = [...source]; copy[0] = 'TBD'; test.skip(true, source[0]);",
+    "const source = 'EXAMPLE-843'; const copy = [...source]; copy[0] = 'T'; test.skip(true, source);",
+    "const source = { nested: { reason: 'EXAMPLE-843' } }; const copy = { child: source.nested }; copy.child = { reason: 'TBD' }; test.skip(true, source.nested.reason);",
+    "const source = { nested: { reason: 'EXAMPLE-843' } }; const copy = [source.nested]; copy[0] = { reason: 'TBD' }; test.skip(true, source.nested.reason);",
+  ]),
+  invalid: withOptions({ customStates: { hold: { when: '@hold', marker: 'HOLD' } }, reportUnreadableTags: true }, [
+    {
+      code: "const source = { tag: '@hold' }; const copy = { tag: source.tag }; copy.tag = '@open'; test('snapshot', { tag: source.tag }, () => {});",
+      errors: [{ messageId: 'missingMarker' }],
+    },
+    {
+      code: "const source = { tag: '@hold' }; const alias = ({ nested: source }).nested; alias.tag = '@open'; test('alias', { tag: source.tag }, () => {});",
+      errors: [{ messageId: 'dynamicTags' }],
+    },
+    {
+      code: "const source = { tag: '@hold' }; const alias = [source][0]; alias.tag = '@open'; test('alias', { tag: source.tag }, () => {});",
+      errors: [{ messageId: 'dynamicTags' }],
+    },
+    {
+      code: "const source = { nested: { tag: '@hold' } }; const { ...copy } = source; copy.nested.tag = '@open'; test('shared child', { tag: source.nested.tag }, () => {});",
+      errors: [{ messageId: 'dynamicTags' }],
+    },
+    {
+      code: "const source = { nested: { tag: '@hold' } }; const copy = { ...source }; copy.nested.tag = '@open'; test('shared spread child', { tag: source.nested.tag }, () => {});",
+      errors: [{ messageId: 'dynamicTags' }],
+    },
+    {
+      code: "const source = [{ tag: '@hold' }]; const copy = [...source]; copy[0].tag = '@open'; test('shared array child', { tag: source[0].tag }, () => {});",
+      errors: [{ messageId: 'dynamicTags' }],
+    },
+  ]),
+});
+
+runRule('require-ticket (replacing captured primitive values)', requireTicket, {
+  valid: [],
+  invalid: [
+    {
+      code: 'const source = { enabled: !false }; const copy = { enabled: source.enabled }; copy.enabled = false; test.skip(source.enabled);',
+      errors: [{ messageId: 'missingMarker' }],
+    },
+    {
+      code: 'const source = { enabled: true ? true : false }; const copy = [source.enabled]; copy[0] = false; test.skip(source.enabled);',
+      errors: [{ messageId: 'missingMarker' }],
+    },
+  ],
+});
+
+runRule('limit-retries (replacing a captured count leaves its source intact)', limitRetries, {
+  valid: [],
+  invalid: [
+    {
+      code: 'const source = { count: +7 }; const copy = { count: source.count }; copy.count = 0; test.describe.configure({ retries: source.count });',
+      errors: [{ messageId: 'excessiveRetries' }],
+    },
+  ],
+});
+
+runRule('require-ticket (nested references shared by spreads)', requireTicket, {
+  valid: [],
+  invalid: withOptions({ ticketsFromReasons: true }, [
+    {
+      code: "const source = { nested: { reason: 'EXAMPLE-843' } }; const copy = { ...source }; copy.nested.reason = 'TBD'; test.skip(true, source.nested.reason);",
+      errors: [{ messageId: 'missingMarker' }],
+    },
+    {
+      code: "const source = [{ reason: 'EXAMPLE-843' }]; const copy = [...source]; copy[0].reason = 'TBD'; test.skip(true, source[0].reason);",
+      errors: [{ messageId: 'missingMarker' }],
+    },
+    {
+      code: "const source = { nested: { reason: 'EXAMPLE-843' } }; const copy = { ...{ ...source } }; copy.nested.reason = 'TBD'; test.skip(true, source.nested.reason);",
+      errors: [{ messageId: 'missingMarker' }],
+    },
+    {
+      code: "const source = { nested: { reason: 'EXAMPLE-843' } }; const { ...first } = source; const { ...copy } = first; copy.nested.reason = 'TBD'; test.skip(true, source.nested.reason);",
+      errors: [{ messageId: 'missingMarker' }],
+    },
+  ]),
+});
+
+runRule('require-ticket (immutable global primitives through reason aliases)', requireTicket, {
+  valid: withOptions({ ticketsFromReasons: true, ticket: { preset: 'pattern', pattern: 'EXAMPLE-(NaN|Infinity)' } }, [
+    'const value = NaN; test.skip(true, `EXAMPLE-${value}`);',
+    'const value = Infinity; test.skip(true, `EXAMPLE-${value}`);',
+    'const first = Infinity; const value = first; test.skip(true, `EXAMPLE-${value}`);',
+  ]),
+  invalid: withOptions({ ticketsFromReasons: true, ticket: { preset: 'pattern', pattern: 'EXAMPLE-(NaN|Infinity)' } }, [
+    {
+      code: 'function configure(Infinity) { const value = Infinity; test.skip(true, `EXAMPLE-${value}`); }',
+      errors: [{ messageId: 'missingMarker' }],
+    },
+  ]),
+});
+
+runRule('require-ticket (unknown annotation keys remain unreadable)', requireTicket, {
+  valid: [],
+  invalid: withOptions({ annotations: { only: true }, reportUnreadableTags: true }, [
+    {
+      code: "test.skip('opaque annotation', { annotation: { ...external } }, () => {});",
+      errors: [{ messageId: 'missingAnnotation' }, { messageId: 'unreadAnnotation' }],
+    },
+    {
+      code: "test.skip('overwritten annotation', { annotation: { type: 'other', ...external } }, () => {});",
+      errors: [{ messageId: 'missingAnnotation' }, { messageId: 'unreadAnnotation' }],
+    },
+    {
+      code: "test.skip('foreign annotation', { annotation: { type: 'other', description: external } }, () => {});",
+      errors: [{ messageId: 'missingAnnotation' }],
+    },
+    {
+      code: "test.skip('overridden spread', { annotation: { ...external, type: 'issue', description: ticket } }, () => {});",
+      errors: [{ messageId: 'missingAnnotation' }, { messageId: 'unreadAnnotation' }],
+    },
+    ...withOptions({ framework: 'vitest' }, [
+      {
+        code: "test.skip('overridden metadata', { meta: { ...external, issue: ticket } }, () => {});",
+        errors: [{ messageId: 'missingAnnotation' }, { messageId: 'unreadAnnotation' }],
+      },
+    ]),
+  ]),
+});
