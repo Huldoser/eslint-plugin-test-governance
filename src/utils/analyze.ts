@@ -605,7 +605,7 @@ function bindingMutationDepth(
   let parent = pattern;
   let depth = initial;
   for (const node of path) {
-    if (parent.type === 'RestElement') depth++;
+    if (parent.type === 'RestElement') depth = Math.max(2, depth);
     if (
       (parent.type === 'Property' && parent.parent.type === 'ObjectPattern' && parent.value === node) ||
       (parent.type === 'ArrayPattern' && node.type !== 'RestElement')
@@ -638,6 +638,13 @@ function isMutated(
         value = parent;
       } else if (unwrap(parent) === value) {
         value = parent;
+      } else if (
+        parent.type === 'SpreadElement' &&
+        (parent.parent.type === 'ObjectExpression' || parent.parent.type === 'ArrayExpression')
+      ) {
+        if (isPrimitiveValue(sourceCode, value)) return false;
+        depth = Math.max(2, depth);
+        value = parent.parent;
       } else if (
         (parent.type === 'Property' && parent.value === value && parent.parent.type === 'ObjectExpression') ||
         parent.type === 'ArrayExpression'

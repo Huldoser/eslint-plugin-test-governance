@@ -8,6 +8,8 @@ runRule('require-ticket (primitive snapshots preserve their source)', requireTic
     "const source = { reason: 'EXAMPLE-843' }; const copy = { ...source }; copy.reason = 'TBD'; test.skip(true, source.reason);",
     "const source = { reason: 'EXAMPLE-843' }; const { ...copy } = source; copy.reason = 'TBD'; test.skip(true, source.reason);",
     "const source = { reason: 'EXAMPLE-843' }; const { ...copy } = source; const wrapper = { copy }; wrapper.copy.reason = 'TBD'; test.skip(true, source.reason);",
+    "const source = ['EXAMPLE-843']; const copy = [...source]; copy[0] = 'TBD'; test.skip(true, source[0]);",
+    "const source = 'EXAMPLE-843'; const copy = [...source]; copy[0] = 'T'; test.skip(true, source);",
   ]),
   invalid: withOptions({ customStates: { hold: { when: '@hold', marker: 'HOLD' } }, reportUnreadableTags: true }, [
     {
@@ -25,6 +27,36 @@ runRule('require-ticket (primitive snapshots preserve their source)', requireTic
     {
       code: "const source = { nested: { tag: '@hold' } }; const { ...copy } = source; copy.nested.tag = '@open'; test('shared child', { tag: source.nested.tag }, () => {});",
       errors: [{ messageId: 'dynamicTags' }],
+    },
+    {
+      code: "const source = { nested: { tag: '@hold' } }; const copy = { ...source }; copy.nested.tag = '@open'; test('shared spread child', { tag: source.nested.tag }, () => {});",
+      errors: [{ messageId: 'dynamicTags' }],
+    },
+    {
+      code: "const source = [{ tag: '@hold' }]; const copy = [...source]; copy[0].tag = '@open'; test('shared array child', { tag: source[0].tag }, () => {});",
+      errors: [{ messageId: 'dynamicTags' }],
+    },
+  ]),
+});
+
+runRule('require-ticket (nested references shared by spreads)', requireTicket, {
+  valid: [],
+  invalid: withOptions({ ticketsFromReasons: true }, [
+    {
+      code: "const source = { nested: { reason: 'EXAMPLE-843' } }; const copy = { ...source }; copy.nested.reason = 'TBD'; test.skip(true, source.nested.reason);",
+      errors: [{ messageId: 'missingMarker' }],
+    },
+    {
+      code: "const source = [{ reason: 'EXAMPLE-843' }]; const copy = [...source]; copy[0].reason = 'TBD'; test.skip(true, source[0].reason);",
+      errors: [{ messageId: 'missingMarker' }],
+    },
+    {
+      code: "const source = { nested: { reason: 'EXAMPLE-843' } }; const copy = { ...{ ...source } }; copy.nested.reason = 'TBD'; test.skip(true, source.nested.reason);",
+      errors: [{ messageId: 'missingMarker' }],
+    },
+    {
+      code: "const source = { nested: { reason: 'EXAMPLE-843' } }; const { ...first } = source; const { ...copy } = first; copy.nested.reason = 'TBD'; test.skip(true, source.nested.reason);",
+      errors: [{ messageId: 'missingMarker' }],
     },
   ]),
 });
