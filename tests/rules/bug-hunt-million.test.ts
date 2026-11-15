@@ -1,4 +1,5 @@
 import requireTicket from '../../src/rules/require-ticket.ts';
+import limitRetries from '../../src/rules/limit-retries.ts';
 import { runRule, withOptions } from '../helpers.ts';
 
 runRule('require-ticket (primitive snapshots preserve their source)', requireTicket, {
@@ -10,6 +11,8 @@ runRule('require-ticket (primitive snapshots preserve their source)', requireTic
     "const source = { reason: 'EXAMPLE-843' }; const { ...copy } = source; const wrapper = { copy }; wrapper.copy.reason = 'TBD'; test.skip(true, source.reason);",
     "const source = ['EXAMPLE-843']; const copy = [...source]; copy[0] = 'TBD'; test.skip(true, source[0]);",
     "const source = 'EXAMPLE-843'; const copy = [...source]; copy[0] = 'T'; test.skip(true, source);",
+    "const source = { nested: { reason: 'EXAMPLE-843' } }; const copy = { child: source.nested }; copy.child = { reason: 'TBD' }; test.skip(true, source.nested.reason);",
+    "const source = { nested: { reason: 'EXAMPLE-843' } }; const copy = [source.nested]; copy[0] = { reason: 'TBD' }; test.skip(true, source.nested.reason);",
   ]),
   invalid: withOptions({ customStates: { hold: { when: '@hold', marker: 'HOLD' } }, reportUnreadableTags: true }, [
     {
@@ -37,6 +40,30 @@ runRule('require-ticket (primitive snapshots preserve their source)', requireTic
       errors: [{ messageId: 'dynamicTags' }],
     },
   ]),
+});
+
+runRule('require-ticket (replacing captured primitive values)', requireTicket, {
+  valid: [],
+  invalid: [
+    {
+      code: 'const source = { enabled: !false }; const copy = { enabled: source.enabled }; copy.enabled = false; test.skip(source.enabled);',
+      errors: [{ messageId: 'missingMarker' }],
+    },
+    {
+      code: 'const source = { enabled: true ? true : false }; const copy = [source.enabled]; copy[0] = false; test.skip(source.enabled);',
+      errors: [{ messageId: 'missingMarker' }],
+    },
+  ],
+});
+
+runRule('limit-retries (replacing a captured count leaves its source intact)', limitRetries, {
+  valid: [],
+  invalid: [
+    {
+      code: 'const source = { count: +7 }; const copy = { count: source.count }; copy.count = 0; test.describe.configure({ retries: source.count });',
+      errors: [{ messageId: 'excessiveRetries' }],
+    },
+  ],
 });
 
 runRule('require-ticket (nested references shared by spreads)', requireTicket, {

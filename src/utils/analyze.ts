@@ -650,7 +650,7 @@ function isMutated(
         parent.type === 'ArrayExpression'
       ) {
         if (isPrimitiveValue(sourceCode, value)) return false;
-        depth++;
+        depth = Math.max(1, depth) + 1;
         value = parent.type === 'Property' ? parent.parent : parent;
       } else break;
       parent = value.parent;
