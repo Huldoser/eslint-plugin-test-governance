@@ -639,6 +639,14 @@ function isMutated(
       } else if (unwrap(parent) === value) {
         value = parent;
       } else if (
+        parent.type === 'ConditionalExpression' &&
+        (parent.consequent === value || parent.alternate === value)
+      ) {
+        const selected = booleanOf(sourceCode, parent.test);
+        if (selected !== undefined && (selected ? parent.alternate : parent.consequent) === value) return false;
+        if (isPrimitiveValue(sourceCode, value)) return false;
+        value = parent;
+      } else if (
         parent.type === 'SpreadElement' &&
         (parent.parent.type === 'ObjectExpression' || parent.parent.type === 'ArrayExpression')
       ) {
