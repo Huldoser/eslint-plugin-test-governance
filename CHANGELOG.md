@@ -13,6 +13,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Track writes through conditional object aliases without invalidating unselected branches or primitive snapshots.
 - Distinguish primitive snapshots and shallow copies from shared object aliases when tracking mutations,
   and follow aliases selected through inline object/array wrappers and TypeScript assertions.
 - Report unreadable annotation keys without redundant diagnostics for spreads overridden by explicit keys.
