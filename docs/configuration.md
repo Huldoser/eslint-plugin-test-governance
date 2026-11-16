@@ -36,6 +36,8 @@ Marker syntax is strict by default so tickets remain easy to recognize and valid
 explanations in the issue, or enable `allowNotes` when a short local explanation helps reviewers.
 Spelling and commented-out-test checks warn because a near-miss tag or code-like comment can be
 intentional; review those findings before treating them as errors.
+Reason checks verify the presence of an explanation, not its quality. Reviewers still need to
+judge whether the stated reason justifies skipping the test.
 
 ## TypeScript
 

@@ -130,7 +130,7 @@ to guess later why it doesn't run. Any of these counts:
 
 - a comment above it or at the end of its line, above a statement around it, such as the `if`, or at the
   end of that statement's first line, as `if (isMobile) { // why`, or above the hook, step or test it is in.
-  Commented-out code, a marker keyword alone such as `// SKIP:`, and an `eslint-disable` comment without a
+  Recognized [commented-out test blocks](require-ticket-for-commented-out-tests.md), a marker keyword alone such as `// SKIP:`, and an `eslint-disable` comment without a
   description after `--` say nothing, so they don't count. The description of an `eslint-disable` block
   comment that turns a rule off for a stretch of the file says why the rule is off, so it doesn't count either;
 - for a test or describe whose function a constant picks, as `const posixTest = isWindows ? test.skip : test`,
@@ -145,6 +145,10 @@ to guess later why it doesn't run. Any of these counts:
 
 The same goes for the other states a condition can set, such as `test.fixme(condition)`. With
 `requireTicketForConditional` as well, the ticket is required and the reason alone is not enough.
+
+This check establishes that an explanation is present, not that it is useful. Commented-out test
+detection uses the selected framework's recognized functions; arbitrary code in comments can still
+pass as text. Review the reason itself when deciding whether a conditional skip is justified.
 
 With `requireReasonForConditional: true`:
 
@@ -167,6 +171,26 @@ With `framework: "mocha"`, `requireReasonForConditional: true`:
 it('places an order', function () {
   if (isWeekend) this.skip();
 });
+```
+
+With `framework: "jasmine"` and `requireReasonForConditional: true`, a recognized commented-out
+`xit` does not explain the conditional skip below it:
+
+<!-- example: invalid settings={"framework":"jasmine","requireReasonForConditional":true} -->
+
+```js
+// xit('disabled', () => {});
+(condition ? xit : it)('example', () => {});
+```
+
+The following passes the reason check because `test.skip` is not recognized as a Jasmine test.
+It demonstrates a detection limit; replace the code comment with an actual explanation:
+
+<!-- example: valid settings={"framework":"jasmine","requireReasonForConditional":true} -->
+
+```js
+// test.skip('disabled', () => {});
+(condition ? xit : it)('example', () => {});
 ```
 
 ## Titles and tags that can't be read

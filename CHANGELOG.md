@@ -10,6 +10,8 @@ All notable changes to this project are documented here. The format follows
 
 - Explain how to choose test-governance policies and their tradeoffs; correct framework prerequisites,
   retry terminology and autofix guidance, with checked reference examples.
+- Clarify that conditional-skip reasons exclude recognized commented-out test blocks, not arbitrary
+  code comments, and that the check cannot assess an explanation's quality.
 
 ## [0.16.0] - 2026-11-16
 
