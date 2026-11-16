@@ -3,6 +3,17 @@
 Run ESLint on your tests before and after updating. An upgrade may recognize syntax that an older
 version missed, producing new reports. Check the [changelog](../CHANGELOG.md) for fixes and additions.
 
+## Upgrading to 0.15 and 0.16
+
+No option migration is required from 0.14. The new native-reason tickets, ticketed lint suppressions,
+Cypress error-suppression rule and runner-config retry checks are opt-in. Existing configurations
+keep their policy, but improved detection of constants, aliases and mutations may produce new
+reports. Run your usual lint command before and after the update and inspect any differences.
+
+See the [0.15 changes](../CHANGELOG.md#0150---2026-11-15) and
+[0.16 changes](../CHANGELOG.md#0160---2026-11-16), then [choose a policy](configuration.md#choose-a-policy)
+if you want to enable the new checks. When upgrading from 0.13 or earlier, apply the migration below too.
+
 <a id="next-release-custom-tag-states"></a>
 
 ## Upgrading to 0.14: custom tag states

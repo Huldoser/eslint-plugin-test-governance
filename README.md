@@ -8,6 +8,9 @@ Require tracking tickets for disabled tests and TODO/FIXME comments with ESLint.
 Jest, Vitest, Mocha, Cypress, WebdriverIO, `node:test` and Jasmine. Custom tag policies and retry tracking
 are optional.
 
+A skipped test can leave a gap long after its original justification is forgotten. Requiring a
+ticket beside the exception gives reviewers a way to find the work needed to restore the test:
+
 <!-- example: valid -->
 
 ```js
@@ -18,6 +21,9 @@ test.skip('cancels an open order', () => {});
 Removing the skip leaves a stale marker, which the plugin reports too. Tickets can also come from
 [Playwright annotations or Vitest metadata](docs/configuration.md#tickets-from-annotations).
 Ticket formats are checked locally; the plugin does not verify that an issue exists or is open.
+Use it when your team allows tracked exceptions. Teams that prohibit all skips should keep their
+blanket ban. See [choosing a policy](docs/configuration.md#choose-a-policy) for the reasons and
+tradeoffs behind the optional checks.
 
 **Start here:** [Install](#install) · [First lint run](#usage) · [Choose a framework](#frameworks) ·
 [Rules](#rules) · [Configuration](docs/configuration.md) · [Troubleshooting](docs/troubleshooting.md) ·
@@ -41,6 +47,12 @@ Use a project that already has a supported test runner. Install the linter and p
 
 ```sh
 npm install --save-dev eslint eslint-plugin-test-governance
+```
+
+On Node.js 22.12, select ESLint 9 instead:
+
+```sh
+npm install --save-dev eslint@9 eslint-plugin-test-governance
 ```
 
 For TypeScript tests, follow the [TypeScript setup](docs/configuration.md#typescript), which also
@@ -135,6 +147,9 @@ All framework configs use the severities in [Defaults](#defaults).
 
 ## Defaults
 
+The defaults track disabled tests and unfinished work. [Choose additional policies](docs/configuration.md#choose-a-policy)
+when your team also needs to account for conditional skips, tags, retries or suppressions.
+
 | Setting                   | Default                                                                                                                    |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | States that need a ticket | `skip`, `fixme`; in the other frameworks `skip`, `todo`                                                                    |
@@ -185,8 +200,10 @@ need a parser; TypeScript config files also need an appropriate config loader.
 
 ## Contributing
 
-[CONTRIBUTING.md](CONTRIBUTING.md) covers setup, checks and documentation maintenance.
-[CHANGELOG.md](CHANGELOG.md) lists releases; [SECURITY.md](SECURITY.md) explains private vulnerability reports.
+[CONTRIBUTING.md](https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/CONTRIBUTING.md)
+covers setup, checks and documentation maintenance. [CHANGELOG.md](CHANGELOG.md) lists releases;
+[SECURITY.md](https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/SECURITY.md)
+explains private vulnerability reports.
 
 ## License
 

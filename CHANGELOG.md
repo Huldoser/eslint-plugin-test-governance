@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Explain how to choose test-governance policies and their tradeoffs; correct framework prerequisites,
+  retry terminology and autofix guidance, with checked reference examples.
+
 ## [0.16.0] - 2026-11-16
 
 ### Added

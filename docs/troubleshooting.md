@@ -14,7 +14,7 @@
 | A tag has no effect                         | Tags require an explicit `customStates` mapping to a marker. Use `knownTags` for spelling checks alone. See [Tag names](configuration.md#tag-names). The linter does not change runner execution.                                          |
 | Imported tags cannot be checked             | Keep readable tags or details in the file, or enable `reportUnreadableTags` to report the uncertainty when a tag state is on. It does not resolve imports.                                                                                 |
 | Vitest rejects a tag that ESLint accepts    | Vitest's `tags` and `meta` need 4.1+. Register tags in your [Vitest configuration](https://vitest.dev/guide/test-tags#defining-tags). Governance `knownTags` only configures spelling checks.                                              |
-| A warning fails CI                          | Check the command's `--max-warnings` threshold. The presets use warnings for tag conflicts and commented-out tests, but a zero-warning policy makes those fail too.                                                                        |
+| A warning fails CI                          | Check the command's `--max-warnings` threshold. The presets warn about tag case/spelling and commented-out tests; a zero-warning policy makes those fail too.                                                                              |
 | Config rejects an old option                | Follow the [upgrade guide](upgrading.md). Options go in `configure()` or shared settings, not the rule's option array.                                                                                                                     |
 
 Replace `tests/order.spec.js` in the diagnostic command with the path you are investigating. See
@@ -23,8 +23,10 @@ Replace `tests/order.spec.js` in the diagnostic command with the path you are in
 ## Understand fixes and suggestions
 
 `npx eslint tests --fix` applies automatic fixes, such as changing a literal `@Needs-review` tag to `@needs-review`
-when that tag is configured in `customStates` or `knownTags`. Near-miss tag spellings are reported for you to review. Shared constants
-are not autofixed, because other tests may use them.
+when that tag is configured in `customStates` or `knownTags`. Near-miss tag spellings are reported for you to review.
+A tag read through an object member is reported without an autofix. A string constant interpolated
+into a title can be fixed at its definition, including when several titles share it. Review the diff
+after `--fix`; see [tag fixes](rules/consistent-tag-names.md) for the distinction.
 
 Other changes are editor suggestions that you choose individually: removing a leftover marker,
 removing a note after a valid ticket, renaming a wrong-state marker, adding another state's marker,
@@ -126,7 +128,8 @@ suppression file and prune unused entries as debt is removed. The plugin has no 
 ## Connect retry policy to CI
 
 Enable [retry ceilings](rules/limit-retries.md) in test files and, with `checkConfigRetries`, in runner
-config files. `maxRetries` limits configured attempts; it cannot tell whether a run was flaky.
+config files. `maxRetries` limits retries after the first attempt: two retries allow up to three
+attempts. It cannot tell whether a run was flaky.
 For Playwright teams that want flaky results to fail CI, the runner's
 [`failOnFlakyTests`](https://playwright.dev/docs/api/class-testconfig#test-config-fail-on-flaky-tests)
 option supplies that runtime policy. Make that choice separately from ticket requirements.
@@ -136,4 +139,5 @@ option supplies that runtime policy. Make that choice separately from ticket req
 Use the repository's [issue forms](https://github.com/Huldoser/eslint-plugin-test-governance/issues/new/choose)
 with the smallest test file, relevant config, expected and actual output, and plugin/ESLint/Node/parser
 versions. Replace private ticket links and test data with examples. Report vulnerabilities through
-the [private security route](../SECURITY.md), not a public issue.
+the [private security route](https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/SECURITY.md),
+not a public issue.

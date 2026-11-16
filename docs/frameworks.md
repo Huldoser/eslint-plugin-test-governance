@@ -2,6 +2,9 @@
 
 [Getting started](../README.md#frameworks) · [Configuration](configuration.md) · [Troubleshooting](troubleshooting.md)
 
+[Playwright](#playwright) · [Jest](#jest) · [Vitest](#vitest) · [Mocha](#mocha) · [Cypress](#cypress) ·
+[WebdriverIO](#webdriverio) · [node:test](#node-test) · [Jasmine](#jasmine) · [Analysis limits](#static-analysis-limits)
+
 Choose the config for the runner that declares your tests. There is no default config. Scope each config
 with `files`; the file pattern also distinguishes runners whose `it` and `describe` calls look alike.
 Cypress and WebdriverIO's Mocha mode use Mocha syntax. For WebdriverIO's Jasmine mode, use `configs.jasmine`.
@@ -88,6 +91,8 @@ The rules also understand:
 | tags such as `@needs-review` (`// REVIEW:`) | the title, `{ tags }`, where `'needs-review'` and `'@needs-review'` both mean `@needs-review`                                                                                              |
 
 `tags` and `meta` require [Vitest 4.1+](https://vitest.dev/api/test.html#meta).
+The object retry form, `{ retry: { count: 3 } }`, also requires Vitest 4.1+;
+see [retry syntax and limits](rules/limit-retries.md#supported-syntax).
 Vitest writes tag names without the `@`: `{ tags: ['flaky'] }` matches the governance tag `@flaky`.
 Define those tags in your [Vitest config](https://vitest.dev/guide/test-tags#defining-tags) too; this plugin's
 `knownTags` does not register runner tags. A plain title containing `@flaky` is a separate convention.
@@ -169,7 +174,8 @@ Use the [Mocha syntax and imports](#mocha), plus the forms below.
 `{ skip: 'broker sandbox is down' }` always skips. `t.skip()` and `t.todo()` take a message, not a
 condition; `this.skip()` and `this.todo()` do the same in a test or hook written as `function`.
 
-An imported `getTestContext()` also supplies the current test context inside a recognized test,
+An imported [`getTestContext()`](https://nodejs.org/api/test.html#gettestcontext), available in Node 26.1+,
+also supplies the current test context inside a recognized test,
 `beforeEach` or `afterEach` body. Its `skip()` and `todo()` calls are checked, including stable aliases
 of the getter, context and methods. A saved context retains its original test owner inside subtests.
 
@@ -179,7 +185,8 @@ Node and is not a todo. A describe's body and its `before`/`after` hooks get the
 cannot skip. Node reports only one state, in the order skip, todo, expectFailure, so
 `describe.skip('title', { todo: 'why' }, fn)` needs only a `// SKIP:` marker.
 
-The `tags` option requires Node 26.2+. Like Vitest's tags, `['flaky']` matches `@flaky`.
+The [`tags` option](https://nodejs.org/api/test.html#test-tags) requires Node 26.2+ and is marked
+early development by Node. Like Vitest's tags, `['flaky']` matches `@flaky`.
 A skipped test or describe without a body still counts as skipped.
 
 ## Jasmine
@@ -238,3 +245,46 @@ These forms are not covered:
 The plugin validates ticket text and placeholders, not whether an issue exists or is open. It makes
 no issue-tracker requests and does not prevent focused tests such as `test.only`. Use your runner's
 ESLint plugin for checks outside ticket governance.
+
+### Local values and mutations
+
+Keep policy data in readable local constants when possible. The rules can read static object
+spreads, computed string keys and immutable object/array destructuring. Destructuring defaults,
+rest bindings and getters are not evaluated. Unknown spreads and keys make affected values
+unreadable; a later explicit property can supply a known value. Spreading `null`, `undefined`,
+booleans, numbers or an empty string leaves earlier properties intact.
+
+A copied string keeps its value when the source object later changes:
+
+With `customStates: { review: { when: '@needs-review', marker: 'REVIEW' } }`:
+
+<!-- example: valid settings={"customStates":{"review":{"when":"@needs-review","marker":"REVIEW"}}} -->
+
+```js
+const tags = { review: '@needs-review' };
+const snapshot = tags.review;
+tags.review = '@smoke';
+
+// REVIEW: EXAMPLE-123
+test('example', { tag: snapshot }, () => {});
+```
+
+An object alias shares the source. A write through that alias makes the affected data unreadable,
+so a strict policy asks you to provide readable data:
+
+With the same custom state and `reportUnreadableTags: true`:
+
+<!-- example: invalid settings={"reportUnreadableTags":true,"customStates":{"review":{"when":"@needs-review","marker":"REVIEW"}}} -->
+
+```js
+const tags = { review: '@needs-review' };
+const alias = tags;
+alias.review = getTag();
+test('example', { tag: tags.review }, () => {});
+```
+
+Object/array spread copies keep their own properties, but nested objects remain shared. A conditional
+alias follows readable branches; a possible reference to an object is enough for a write to make its
+value unreadable. This also applies to aliases obtained through destructuring or object/array wrappers.
+The linter does not execute the code to discover the new value. An unreadable value is not proof that
+it satisfies your policy; use literal data or the applicable unreadable-data diagnostic.

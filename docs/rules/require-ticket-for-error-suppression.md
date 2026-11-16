@@ -12,7 +12,12 @@ specs and support files, including files with no test declarations.
 
 ## Enable the rule
 
+This complete config includes Cypress specs and support files, where broad handlers are often registered:
+
+<!-- config: error-suppression -->
+
 ```js
+// eslint.config.mjs
 import testGovernance from 'eslint-plugin-test-governance';
 
 const policy = testGovernance.configure({ framework: 'cypress' });

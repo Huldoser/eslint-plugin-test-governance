@@ -160,6 +160,16 @@ for (const file of ruleDocs) {
   });
 }
 
+for (const file of referenceDocs) {
+  describe(`${file} examples`, () => {
+    examples(read(file)).forEach((example, i) => {
+      it(`example ${i + 1} is ${example.kind} with the framework rules`, () => {
+        checkExample(example, testGovernance.configs.playwright.rules);
+      });
+    });
+  });
+}
+
 describe('README and configuration reference', () => {
   const found = examples(readme);
 
