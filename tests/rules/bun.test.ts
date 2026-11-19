@@ -8,6 +8,11 @@ const missing = { messageId: 'missingMarker' as const };
 
 runRule('Bun test states', requireTicket, {
   valid: [
+    ...withOptions(requireConditional, [
+      "test.skipIf(0)('active', () => {});",
+      "test.if('yes')('active', () => {});",
+      "test.skipIf(null)('active', () => {});",
+    ]),
     ...withOptions(bun, [
       "import { test } from 'bun:test'; test.skipIf(false)('active', () => {});",
       "import { test } from 'bun:test'; test.if(true)('active', () => {});",
@@ -37,6 +42,10 @@ runRule('Bun test states', requireTicket, {
       { code: "xdescribe('missing', () => {});", errors: [missing] },
       { code: "test.skip.each([1])('case %s', () => {});", errors: [missing] },
       { code: "test.skipIf(true)('missing', () => {});", errors: [missing] },
+      { code: "test.skipIf(1)('missing', () => {});", errors: [missing] },
+      { code: "const supported = ''; test.if(supported)('missing', () => {});", errors: [missing] },
+      { code: "test.runIf(!1)('missing', () => {});", errors: [missing] },
+      { code: "test.skipIf(flag ? 1 : 'yes')('missing', () => {});", errors: [missing] },
       { code: "test.skipIf(true).skipIf(false)('missing', () => {});", errors: [missing] },
       { code: "test.skipIf(true).if(true)('missing', () => {});", errors: [missing] },
       { code: "const gated = test.skipIf(true); gated.skipIf(false)('missing', () => {});", errors: [missing] },

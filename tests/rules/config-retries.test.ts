@@ -74,6 +74,8 @@ runRule('config retry ceilings (Playwright)', limitRetries, {
   ]),
   invalid: withOptions({ checkConfigRetries: true }, [
     { code: 'export default { retries: 3 };', errors: [excessive()] },
+    { code: 'export default { retries: 3, ...(0 && { retries: 1 }) };', errors: [excessive()] },
+    { code: "export default { ...('CI' ? { retries: 3 } : { retries: 0 }) };", errors: [excessive()] },
     { code: 'export default { retries: 3, ...(false && { retries: 0 }) };', errors: [excessive()] },
     { code: 'export default { ...(true && { retries: 3 }) };', errors: [excessive()] },
     { code: 'export default { retries: 3, ...(flag && { timeout: 10 }) };', errors: [excessive()] },

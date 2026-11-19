@@ -14,6 +14,7 @@ All notable changes to this project are documented here. The format follows
 
 - Preserve readable config retry counts across inline conditional spreads that cannot overwrite them.
 - Keep Bun skip and todo states when chained modifiers include an inactive condition.
+- Use JavaScript truthiness for literal Bun conditions and conditional config spreads.
 
 ### Changed
 

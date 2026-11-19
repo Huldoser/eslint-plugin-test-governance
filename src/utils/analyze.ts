@@ -1193,11 +1193,11 @@ function objectDetails(
       if (readConditionalSpreads) {
         let branches: Node[] = [];
         if (spread.type === 'ConditionalExpression') {
-          const condition = booleanOf(sourceCode, spread.test);
+          const condition = booleanOf(sourceCode, spread.test, [], true);
           if (condition !== undefined) spread = resolve(condition ? spread.consequent : spread.alternate);
           else branches = [resolve(spread.consequent), resolve(spread.alternate)];
         } else if (spread.type === 'LogicalExpression' && spread.operator === '&&') {
-          const condition = booleanOf(sourceCode, spread.left);
+          const condition = booleanOf(sourceCode, spread.left, [], true);
           if (condition === false) continue;
           if (condition === true) spread = resolve(spread.right);
           else branches = [resolve(spread.right)];
@@ -1548,25 +1548,32 @@ function thisFunction(node: Node): Node | undefined {
   return current;
 }
 
-/** A readable local boolean, negation or selected branch; undefined when runtime data decides it. */
-function booleanOf(sourceCode: SourceCode, node: Node | undefined, seen: readonly Node[] = []): boolean | undefined {
+/** A readable condition, optionally using the truthiness of non-boolean literals; undefined when runtime data decides it. */
+function booleanOf(
+  sourceCode: SourceCode,
+  node: Node | undefined,
+  seen: readonly Node[] = [],
+  truthiness = false,
+): boolean | undefined {
   if (node === undefined) return undefined;
   const own = unwrap(node);
   const value = constantValue(sourceCode, own, seen) ?? own;
   if (seen.includes(value)) return undefined;
   const path = [...seen, value];
   if (value.type === 'UnaryExpression' && value.operator === '!') {
-    const argument = booleanOf(sourceCode, value.argument, path);
+    const argument = booleanOf(sourceCode, value.argument, path, truthiness);
     return argument === undefined ? undefined : !argument;
   }
   if (value.type === 'ConditionalExpression') {
-    const test = booleanOf(sourceCode, value.test, path);
-    if (test !== undefined) return booleanOf(sourceCode, test ? value.consequent : value.alternate, path);
-    const consequent = booleanOf(sourceCode, value.consequent, path);
-    const alternate = booleanOf(sourceCode, value.alternate, path);
+    const test = booleanOf(sourceCode, value.test, path, truthiness);
+    if (test !== undefined) return booleanOf(sourceCode, test ? value.consequent : value.alternate, path, truthiness);
+    const consequent = booleanOf(sourceCode, value.consequent, path, truthiness);
+    const alternate = booleanOf(sourceCode, value.alternate, path, truthiness);
     return consequent === alternate ? consequent : undefined;
   }
-  return value.type === 'Literal' && typeof value.value === 'boolean' ? value.value : undefined;
+  return value.type === 'Literal' && (truthiness || typeof value.value === 'boolean')
+    ? Boolean(value.value)
+    : undefined;
 }
 
 /**
@@ -2242,7 +2249,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       if (framework.name === 'bun') {
         for (const [factory, argument] of args) {
           if (factory !== member) continue;
-          const condition = booleanOf(sourceCode, argument);
+          const condition = booleanOf(sourceCode, argument, [], true);
           if (condition === undefined) add(effect.modifier, false);
           else if (condition === effect.when) add(effect.modifier, true);
         }
