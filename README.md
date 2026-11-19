@@ -125,7 +125,8 @@ See [Framework syntax](docs/frameworks.md) for imports, supported calls and vers
 | Bun                                         | `configs.bun`          |
 
 For mixed suites, give each framework its own `files` pattern. See
-[multiple frameworks](docs/configuration.md#multiple-frameworks).
+[multiple frameworks](docs/configuration.md#multiple-frameworks). See the
+[older runner targets](docs/frameworks.md#older-runner-targets) for version-specific syntax.
 
 ## Rules
 

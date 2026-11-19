@@ -15,6 +15,25 @@ A marker is the comment keyword for that state, such as `// SKIP:`. Tag rows bel
 `customStates: { review: { when: '@needs-review', marker: 'REVIEW' } }`. Every tag policy is explicit;
 see [Tag names](configuration.md#tag-names). The linter does not change which tests your runner executes.
 
+### Older runner targets
+
+These are the oldest runner versions in [test-inventory's comparison matrix](https://github.com/Huldoser/test-inventory/blob/06eaf326a83796a57e93b9de717d706f53d96e67/.github/workflows/ci.yml#L206).
+The plugin checks common source syntax in those fixtures. The framework sections below identify features
+that require newer releases. Check the [installation requirements](../README.md#install) for the Node.js
+and ESLint versions that run the plugin.
+
+| Runner      | Older version checked for common syntax |
+| ----------- | --------------------------------------- |
+| Playwright  | 1.31.2                                  |
+| Jest        | 27.5.1                                  |
+| Vitest      | 1.6.1 for explicit skips and todos      |
+| Mocha       | 10.8.2                                  |
+| Cypress     | 10.11.0                                 |
+| WebdriverIO | 7.40.0 in Mocha mode                    |
+| node:test   | Node.js 22.23.4                         |
+| Jasmine     | 3.99.0                                  |
+| Bun         | 1.2.23                                  |
+
 ## Playwright
 
 - `test` imported from `@playwright/test`, `playwright/test` or a component-testing package such as
@@ -100,13 +119,15 @@ Vitest's `.for` and `.each` table-driven forms count too.
 Vitest also accepts a function as the name, as in `test.skip(function namedTest() {}, fn)`.
 The name function is not executed; the separate body supplies the test context.
 
-A title-only test imported from `vitest`, such as `import { test } from 'vitest'; test('title')`,
-is a todo and needs a TODO ticket. This also covers namespace imports and stable aliases. A global
-title-only `test('title')` remains ambiguous and is not checked.
+Starting with [Vitest 4.0](https://github.com/vitest-dev/vitest/blob/v4.0.0/packages/runner/src/suite.ts#L322-L325),
+a title-only test imported from `vitest`, such as `import { test } from 'vitest'; test('title')`, is a todo.
+The plugin applies that behavior to imported names, namespace imports and stable aliases. It leaves
+ambiguous global title-only calls alone.
 
-Implicit todo detection follows the [current Vitest API](https://vitest.dev/api/test.html).
-The plugin does not inspect installed runner versions. Older Vitest releases can run missing-body
-tests as no-ops instead of marking them todo; for example, [Vitest 1.2.2 supplies an empty body](https://github.com/vitest-dev/vitest/blob/v1.2.2/packages/runner/src/suite.ts).
+The plugin uses the same behavior regardless of the installed Vitest version. Older releases such as
+[Vitest 3.2.6](https://github.com/vitest-dev/vitest/blob/v3.2.6/packages/runner/src/suite.ts#L245-L273)
+supply an empty body for a title-only test, so the plugin can report a todo that the runner treats as active.
+Use explicit `test.todo('title')` to mark an intentional todo on older Vitest versions.
 
 ## Mocha
 
