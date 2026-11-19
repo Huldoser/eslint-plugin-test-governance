@@ -253,7 +253,7 @@ interface Chain {
   root: TSESTree.Identifier | TSESTree.CallExpression;
   path: string[];
   /** The first argument of each member called to build the function: `isMobile` in `test.skipIf(isMobile)`. */
-  args: Map<string, Node | undefined>;
+  args: [member: string, argument: Node | undefined][];
 }
 
 /**
@@ -308,7 +308,7 @@ function memberKey(node: TSESTree.MemberExpression): string | undefined {
  */
 function chainOf(node: Node, factories: ReadonlySet<string>): Chain | undefined {
   const path: string[] = [];
-  const args = new Map<string, Node | undefined>();
+  const args: Chain['args'] = [];
   let current = unwrap(node);
   for (;;) {
     if (current.type === 'MemberExpression') {
@@ -328,7 +328,7 @@ function chainOf(node: Node, factories: ReadonlySet<string>): Chain | undefined 
     const name = memberName(factory);
     if (name === undefined || !factories.has(name)) return undefined;
     path.unshift(`${name}()`);
-    if (current.type === 'CallExpression' && !args.has(`${name}()`)) args.set(`${name}()`, current.arguments.at(0));
+    if (current.type === 'CallExpression') args.push([`${name}()`, current.arguments.at(0)]);
     current = unwrap(factory.object);
   }
   return current.type === 'Identifier' || current.type === 'CallExpression' ? { root: current, path, args } : undefined;
@@ -1185,27 +1185,33 @@ function objectDetails(
   const entries = new Map<string, Node>();
   for (const prop of object.properties) {
     if (prop.type === 'SpreadElement') {
-      const argument = unwrap(prop.argument);
-      const value = constantValue(sourceCode, argument, [...path, object]) ?? argument;
-      let spread = unwrap(value);
-      if (readConditionalSpreads && spread.type === 'ConditionalExpression') {
-        const condition = booleanOf(sourceCode, spread.test);
-        if (condition !== undefined) {
-          const branch = unwrap(condition ? spread.consequent : spread.alternate);
-          spread = unwrap(constantValue(sourceCode, branch, [...path, object]) ?? branch);
-        } else {
-          const branches = [unwrap(spread.consequent), unwrap(spread.alternate)];
-          if (branches.every((branch) => branch.type === 'ObjectExpression')) {
-            const before = unread.length;
-            const branchEntries = branches.flatMap((branch) =>
-              objectDetails(sourceCode, branch, unread, [...path, object], readConditionalSpreads),
-            );
-            if (unread.length > before) entries.clear();
-            for (const [key] of branchEntries) entries.delete(key);
-            // A parent spread must still account for keys this object may supply.
-            if (branchEntries.length > 0 && path.length > 0) unread.push(prop.argument);
-            continue;
-          }
+      const resolve = (node: Node): Node => {
+        const own = unwrap(node);
+        return unwrap(constantValue(sourceCode, own, [...path, object]) ?? own);
+      };
+      let spread = resolve(prop.argument);
+      if (readConditionalSpreads) {
+        let branches: Node[] = [];
+        if (spread.type === 'ConditionalExpression') {
+          const condition = booleanOf(sourceCode, spread.test);
+          if (condition !== undefined) spread = resolve(condition ? spread.consequent : spread.alternate);
+          else branches = [resolve(spread.consequent), resolve(spread.alternate)];
+        } else if (spread.type === 'LogicalExpression' && spread.operator === '&&') {
+          const condition = booleanOf(sourceCode, spread.left);
+          if (condition === false) continue;
+          if (condition === true) spread = resolve(spread.right);
+          else branches = [resolve(spread.right)];
+        }
+        if (branches.length > 0 && branches.every((branch) => branch.type === 'ObjectExpression')) {
+          const before = unread.length;
+          const branchEntries = branches.flatMap((branch) =>
+            objectDetails(sourceCode, branch, unread, [...path, object], readConditionalSpreads),
+          );
+          if (unread.length > before) entries.clear();
+          for (const [key] of branchEntries) entries.delete(key);
+          // A parent spread must still account for keys this object may supply.
+          if (branchEntries.length > 0 && path.length > 0) unread.push(prop.argument);
+          continue;
         }
       }
       if (
@@ -1937,15 +1943,12 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       const init = chainOf(unwrap(declarator.init), framework.factories);
       return key === undefined || init === undefined
         ? undefined
-        : target({ ...init, path: [...init.path, key, ...path], args: new Map([...init.args, ...args]) }, [
-            ...seen,
-            declarator,
-          ]);
+        : target({ ...init, path: [...init.path, key, ...path], args: [...args, ...init.args] }, [...seen, declarator]);
     }
     const value = declaredValue(sourceCode, root);
     if (value === undefined || seen.includes(value)) return undefined;
     const alias = target(chainOf(unwrap(value), framework.factories), [...seen, value]);
-    return alias && { root: alias.root, path: [...alias.path, ...path], args: new Map([...alias.args, ...args]) };
+    return alias && { root: alias.root, path: [...alias.path, ...path], args: [...args, ...alias.args] };
   };
   let usesTest = testNames.usesModule;
   const subjects: Subject[] = [];
@@ -2228,7 +2231,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const add = (modifier: string, always: boolean): void => {
       if (!modifiers.get(modifier)) modifiers.set(modifier, always);
     };
-    for (const member of members) {
+    for (const member of framework.name === 'bun' ? new Set(members) : members) {
       const effect = framework.effects.get(member);
       if (!effect) continue;
       if (effect.when === undefined) {
@@ -2236,7 +2239,16 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
         continue;
       }
       // `skipIf(true)` always skips and `skipIf(false)` never does, like `{ skip: true }` and `{ skip: false }`.
-      const condition = booleanOf(sourceCode, args.get(member));
+      if (framework.name === 'bun') {
+        for (const [factory, argument] of args) {
+          if (factory !== member) continue;
+          const condition = booleanOf(sourceCode, argument);
+          if (condition === undefined) add(effect.modifier, false);
+          else if (condition === effect.when) add(effect.modifier, true);
+        }
+        continue;
+      }
+      const condition = booleanOf(sourceCode, args.find(([factory]) => factory === member)?.[1]);
       if (condition === undefined) modifiers.set(effect.modifier, false);
       else if (condition === effect.when) modifiers.set(effect.modifier, true);
       else modifiers.delete(effect.modifier);
@@ -2536,7 +2548,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       kind: 'test',
       members: [],
       written: [],
-      args: new Map(),
+      args: [],
       todoWithoutBody: false,
     };
     return declares(declaration, call.arguments)

@@ -28,6 +28,9 @@ runRule('config retry ceilings (Playwright)', limitRetries, {
     'export default { use: { retries: 9 }, metadata: { retries: 9 } };',
     'export default { retries: imported };',
     'export default { retries: 9, ...unknown };',
+    'export default { retries: 9, ...(flag && { retries: 1 }) };',
+    'export default { retries: 9, ...(true && { retries: 1 }) };',
+    'export default { retries: 9, ...(flag || { timeout: 10 }) };',
     'export default { retries: 9, ...(flag ? { ...unknown } : {}) };',
     'export default { retries: 9, ...(flag ? unknown : {}) };',
     'export default { retries: 9, ...{ ...(flag ? { retries: 1 } : {}) } };',
@@ -71,6 +74,13 @@ runRule('config retry ceilings (Playwright)', limitRetries, {
   ]),
   invalid: withOptions({ checkConfigRetries: true }, [
     { code: 'export default { retries: 3 };', errors: [excessive()] },
+    { code: 'export default { retries: 3, ...(false && { retries: 0 }) };', errors: [excessive()] },
+    { code: 'export default { ...(true && { retries: 3 }) };', errors: [excessive()] },
+    { code: 'export default { retries: 3, ...(flag && { timeout: 10 }) };', errors: [excessive()] },
+    {
+      code: 'const extras = { timeout: 10 }; export default { retries: 3, ...(flag ? extras : {}) };',
+      errors: [excessive()],
+    },
     { code: 'export default { retries: 3, ...(false ? { retries: 0 } : {}) };', errors: [excessive()] },
     { code: 'export default { retries: 3, ...(flag ? { timeout: 10 } : {}) };', errors: [excessive()] },
     { code: 'export default { retries: 3, ...(true ? {} : { retries: 0 }) };', errors: [excessive()] },

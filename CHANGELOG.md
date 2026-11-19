@@ -13,6 +13,7 @@ All notable changes to this project are documented here. The format follows
 ### Fixed
 
 - Preserve readable config retry counts across inline conditional spreads that cannot overwrite them.
+- Keep Bun skip and todo states when chained modifiers include an inactive condition.
 
 ### Changed
 
