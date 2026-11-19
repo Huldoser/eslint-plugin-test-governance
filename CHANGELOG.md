@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-11-19
+
 ### Added
 
 - Add a Bun preset for test state governance and per-test retry limits.
@@ -762,7 +764,8 @@ First release.
 - Support for ESLint 9 and 10 flat config, JavaScript and TypeScript test files, `.extend()`
   fixtures, describe blocks, runtime skips and tags in titles or the `tag` option.
 
-[Unreleased]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.14.0...v0.14.1
