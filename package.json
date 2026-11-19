@@ -77,5 +77,14 @@
     "prettier": "^3.9.9",
     "typescript": "6.0",
     "typescript-eslint": "^8.71.0"
+  },
+  "overrides": {
+    "test-exclude": {
+      "glob": "14.0.2",
+      "minimatch": "11.0.9"
+    },
+    "editorconfig": {
+      "minimatch": "11.0.9"
+    }
   }
 }
