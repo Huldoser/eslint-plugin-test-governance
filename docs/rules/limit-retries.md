@@ -63,11 +63,13 @@ each test that inherits it. It does not change the runner's configuration or off
 | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | Playwright                  | `test.describe.configure({ retries: 3 })`                                                                                              |
 | Jest                        | `jest.retryTimes(3)`                                                                                                                   |
+| Bun                         | `test('name', fn, { retry: 3 })` or the options-before-body form                                                                       |
 | Vitest                      | A test or describe's `{ retry: 3 }` or `{ retry: { count: 3 } }`                                                                       |
 | Mocha, Cypress, WebdriverIO | `this.retries(3)` in a suite, test or hook written as `function`, and `it('name', fn).retries(3)` or `describe('name', fn).retries(3)` |
 | Cypress                     | A test or describe's `{ retries: 3 }` or `{ retries: { runMode: 3, openMode: 0 } }`                                                    |
 
 Cypress's run and open counts are checked separately; Vitest's `delay` is not a retry count.
+Vitest's [object form of `retry`](https://vitest.dev/api/test.html#retry) requires Vitest 4.1+.
 Imports, local aliases and custom test functions follow the [framework reference](../frameworks.md).
 `node:test` and Jasmine have no native retries, so this rule has nothing to check in those configs.
 

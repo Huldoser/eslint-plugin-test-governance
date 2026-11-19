@@ -59,7 +59,7 @@ reached, remove it rather than excluding it.
   case, and assert the full message data and any suggestion output.
 - Each rule has a page in `docs/rules/`. Examples marked `<!-- example: valid -->` or
   `<!-- example: invalid -->` run as tests, so keep them correct. Code samples in the README marked
-  the same way run with all the rules on. Show an example's settings in visible prose as well as its
+  the same way run with the framework defaults. Marked reference-page examples run too. Show an example's settings in visible prose as well as its
   test marker. Correct rule-page examples must also pass the complete framework preset.
 - `README.md` holds the first-run instructions and default policy. Keep shared options and ticket
   formats in [docs/configuration.md](docs/configuration.md), runner syntax in
@@ -77,6 +77,11 @@ Docs change in the same pull request as the code. Facts repeated in the docs are
 `tests/docs.test.ts` or `npm run docs:check`: names, defaults, selected examples and local links.
 `tests/docs-configs.test.ts` runs the complete marked configs against failing and passing samples.
 These checks do not verify every behavioral statement or execute the test runners themselves.
+
+Explain the problem a rule solves and when a team would enable it before listing syntax. For an
+optional policy, state its tradeoff and detection limits. Keep the README focused on the reason
+to adopt the plugin and the first lint run; link to the configuration guide for policy choices.
+When documenting an autofix, show its effect on shared values as well as on inline literals.
 
 | When you change                                     | Update                                                                                                                                                            | Checked by                                                              |
 | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |

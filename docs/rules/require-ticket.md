@@ -20,13 +20,14 @@ A test is in a state when it is:
 | `retry`        | `describe.configure({ retries })`, `jest.retryTimes()`, Vitest's `{ retry }`, `this.retries()`, Cypress's `{ retries }`               | `// RETRY:`            | no                        |
 | custom         | any tag you list in `customStates`                                                                                                    | your keyword           | when configured           |
 
-In Jest and Vitest, `xit`, `xdescribe`, Vitest's `{ skip: true }`, `skipIf(true)`, `context.skip()` and
-`context.skip('note')`, in a test or in `beforeEach`, skip a test too, and `test.failing` and `test.fails` put it in the `fail` state. Any retry count but `0` puts a test, describe or file in the `retry` state, including one known only when the tests run, such as `process.env.CI ? 2 : 0`; node:test and Jasmine have no retries. In Mocha, Cypress and WebdriverIO, `xit`, `xdescribe` and
-`this.skip()` in a test or hook skip a test too, and Cypress's `{ browser: '!webkit' }` skips it in other
-browsers, which counts as a conditional skip. In `node:test`, `{ skip: 'reason' }`, `t.skip()` and `this.skip()` skip a test, `{ todo: true }`,
-`t.todo()` and `this.todo()` make it a todo, `t.test()` subtests count as tests, and `test.expectFailure` puts it in the `fail` state. In
-Jasmine, `xit`, `xdescribe`, and `pending()` or `notApplicable()` in a test, `beforeEach` or `afterEach` skip a test. The
-[framework reference](../frameworks.md) lists every form.
+Jest's `xit` and `xdescribe` are skipped declarations. Vitest uses `test.skip`, `describe.skip`,
+`{ skip: true }`, `skipIf(true)` and runtime `context.skip()` calls. Each runner has its own syntax;
+the [framework reference](../frameworks.md) describes imports, runtime calls and version requirements.
+
+When retry ticketing is enabled, a count that is not known to be zero puts the test, describe or file
+in the `retry` state. This includes dynamic counts such as `process.env.CI ? 2 : 0`. A readable
+constant condition selects only its reachable branch. See [retry ceilings](limit-retries.md) to
+bound readable counts independently of tickets.
 
 Tag examples on this page use this policy:
 
@@ -129,7 +130,7 @@ to guess later why it doesn't run. Any of these counts:
 
 - a comment above it or at the end of its line, above a statement around it, such as the `if`, or at the
   end of that statement's first line, as `if (isMobile) { // why`, or above the hook, step or test it is in.
-  Commented-out code, a marker keyword alone such as `// SKIP:`, and an `eslint-disable` comment without a
+  Recognized [commented-out test blocks](require-ticket-for-commented-out-tests.md), a marker keyword alone such as `// SKIP:`, and an `eslint-disable` comment without a
   description after `--` say nothing, so they don't count. The description of an `eslint-disable` block
   comment that turns a rule off for a stretch of the file says why the rule is off, so it doesn't count either;
 - for a test or describe whose function a constant picks, as `const posixTest = isWindows ? test.skip : test`,
@@ -144,6 +145,10 @@ to guess later why it doesn't run. Any of these counts:
 
 The same goes for the other states a condition can set, such as `test.fixme(condition)`. With
 `requireTicketForConditional` as well, the ticket is required and the reason alone is not enough.
+
+This check establishes that an explanation is present, not that it is useful. Commented-out test
+detection uses the selected framework's recognized functions; arbitrary code in comments can still
+pass as text. Review the reason itself when deciding whether a conditional skip is justified.
 
 With `requireReasonForConditional: true`:
 
@@ -168,12 +173,34 @@ it('places an order', function () {
 });
 ```
 
+With `framework: "jasmine"` and `requireReasonForConditional: true`, a recognized commented-out
+`xit` does not explain the conditional skip below it:
+
+<!-- example: invalid settings={"framework":"jasmine","requireReasonForConditional":true} -->
+
+```js
+// xit('disabled', () => {});
+(condition ? xit : it)('example', () => {});
+```
+
+The following passes the reason check because `test.skip` is not recognized as a Jasmine test.
+It demonstrates a detection limit; replace the code comment with an actual explanation:
+
+<!-- example: valid settings={"framework":"jasmine","requireReasonForConditional":true} -->
+
+```js
+// test.skip('disabled', () => {});
+(condition ? xit : it)('example', () => {});
+```
+
 ## Titles and tags that can't be read
 
 Tags can only be read from text: a string or a template literal such as `` `buys ${symbol} @needs-review` ``,
 written in the call or kept in a `const` or an enum in the same file. A title built another way, such
 as `'buys ' + symbol`, and a tag or details object imported from another module may hide a tag. With
-`reportUnreadableTags: true`, the rule reports those whenever a custom tag state is configured, so no tagged test slips past.
+`reportUnreadableTags: true`, the rule reports unreadable tag data on recognized tests whenever a
+custom tag state is configured. `knownTags` alone does not enable those reports. This option cannot
+discover tests hidden behind unsupported helpers; see [analysis limits](../frameworks.md#static-analysis-limits).
 
 With the custom tag policy above, `reportUnreadableTags: true`:
 
@@ -460,6 +487,9 @@ test.skip('fills an order', () => {});
 
 ### Tickets from native reasons
 
+A runtime reason already travels with the runner's skip report. If your team puts the tracking
+reference there, this option avoids repeating the same ticket in a separate comment.
+
 Set `ticketsFromReasons: true` to accept a ticket prefix in a readable runtime reason as a fallback
 when no comment marker or annotation supplies the ticket. Supported calls are Playwright runtime
 `skip` and `fixme` (including recognized test-info methods), and `node:test` runtime `skip` and
@@ -487,16 +517,8 @@ bindings and getters are not evaluated. This option does not search test titles,
 `{ skip: 'reason' }`, or messages from other runners. Issue references buried in prose are not
 extracted. The runner receives the original message unchanged.
 
-Static object spreads and computed string keys are resolved through these local bindings. Unknown
-spreads and keys remain unread; a later explicit property still overrides an earlier unknown spread.
-Spreading `null`, `undefined`, booleans, numbers or an empty string leaves earlier properties intact.
-Writes through destructured aliases or objects and arrays holding a value make that value unreadable.
-Conditional aliases follow reachable branches; a possible shared reference makes its source unreadable
-after a write, while unselected branches and copied primitive values stay separate.
-Primitive snapshots and object/array spread or rest copies keep their own properties separate from
-the source. Nested objects stay shared through repeated shallow copies and make the source unreadable
-when mutated. Aliases selected
-through inline object/array wrappers and TypeScript assertions retain that shared identity.
+See [local values and mutations](../frameworks.md#local-values-and-mutations) for how constants,
+spreads and aliases affect readability.
 
 ### Shared settings
 

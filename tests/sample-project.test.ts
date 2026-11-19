@@ -34,6 +34,7 @@ const config = [
   { files: ['tests/cypress/**/*.cy.js'], ...testGovernance.configs.cypress },
   { files: ['tests/node/**/*.test.js'], ...testGovernance.configs['node-test'] },
   { files: ['tests/jasmine/**/*.spec.js'], ...testGovernance.configs.jasmine },
+  { files: ['tests/bun/**/*.test.js'], ...testGovernance.configs.bun },
 ] as Linter.Config[];
 
 test('lints the sample project', async () => {

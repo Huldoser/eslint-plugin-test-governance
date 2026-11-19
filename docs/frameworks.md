@@ -2,6 +2,9 @@
 
 [Getting started](../README.md#frameworks) · [Configuration](configuration.md) · [Troubleshooting](troubleshooting.md)
 
+[Playwright](#playwright) · [Jest](#jest) · [Vitest](#vitest) · [Mocha](#mocha) · [Cypress](#cypress) ·
+[WebdriverIO](#webdriverio) · [node:test](#node-test) · [Jasmine](#jasmine) · [Bun](#bun) · [Analysis limits](#static-analysis-limits)
+
 Choose the config for the runner that declares your tests. There is no default config. Scope each config
 with `files`; the file pattern also distinguishes runners whose `it` and `describe` calls look alike.
 Cypress and WebdriverIO's Mocha mode use Mocha syntax. For WebdriverIO's Jasmine mode, use `configs.jasmine`.
@@ -11,6 +14,25 @@ A state is a condition the linter tracks, such as a skipped test or a tag config
 A marker is the comment keyword for that state, such as `// SKIP:`. Tag rows below use the example
 `customStates: { review: { when: '@needs-review', marker: 'REVIEW' } }`. Every tag policy is explicit;
 see [Tag names](configuration.md#tag-names). The linter does not change which tests your runner executes.
+
+### Older runner targets
+
+These are the oldest runner versions in [test-inventory's comparison matrix](https://github.com/Huldoser/test-inventory/blob/06eaf326a83796a57e93b9de717d706f53d96e67/.github/workflows/ci.yml#L206).
+The plugin checks common source syntax in those fixtures. The framework sections below identify features
+that require newer releases. Check the [installation requirements](../README.md#install) for the Node.js
+and ESLint versions that run the plugin.
+
+| Runner      | Older version checked for common syntax |
+| ----------- | --------------------------------------- |
+| Playwright  | 1.31.2                                  |
+| Jest        | 27.5.1                                  |
+| Vitest      | 1.6.1 for explicit skips and todos      |
+| Mocha       | 10.8.2                                  |
+| Cypress     | 10.11.0                                 |
+| WebdriverIO | 7.40.0 in Mocha mode                    |
+| node:test   | Node.js 22.23.4                         |
+| Jasmine     | 3.99.0                                  |
+| Bun         | 1.2.23                                  |
 
 ## Playwright
 
@@ -88,6 +110,8 @@ The rules also understand:
 | tags such as `@needs-review` (`// REVIEW:`) | the title, `{ tags }`, where `'needs-review'` and `'@needs-review'` both mean `@needs-review`                                                                                              |
 
 `tags` and `meta` require [Vitest 4.1+](https://vitest.dev/api/test.html#meta).
+The object retry form, `{ retry: { count: 3 } }`, also requires Vitest 4.1+;
+see [retry syntax and limits](rules/limit-retries.md#supported-syntax).
 Vitest writes tag names without the `@`: `{ tags: ['flaky'] }` matches the governance tag `@flaky`.
 Define those tags in your [Vitest config](https://vitest.dev/guide/test-tags#defining-tags) too; this plugin's
 `knownTags` does not register runner tags. A plain title containing `@flaky` is a separate convention.
@@ -95,13 +119,15 @@ Vitest's `.for` and `.each` table-driven forms count too.
 Vitest also accepts a function as the name, as in `test.skip(function namedTest() {}, fn)`.
 The name function is not executed; the separate body supplies the test context.
 
-A title-only test imported from `vitest`, such as `import { test } from 'vitest'; test('title')`,
-is a todo and needs a TODO ticket. This also covers namespace imports and stable aliases. A global
-title-only `test('title')` remains ambiguous and is not checked.
+Starting with [Vitest 4.0](https://github.com/vitest-dev/vitest/blob/v4.0.0/packages/runner/src/suite.ts#L322-L325),
+a title-only test imported from `vitest`, such as `import { test } from 'vitest'; test('title')`, is a todo.
+The plugin applies that behavior to imported names, namespace imports and stable aliases. It leaves
+ambiguous global title-only calls alone.
 
-Implicit todo detection follows the [current Vitest API](https://vitest.dev/api/test.html).
-The plugin does not inspect installed runner versions. Older Vitest releases can run missing-body
-tests as no-ops instead of marking them todo; for example, [Vitest 1.2.2 supplies an empty body](https://github.com/vitest-dev/vitest/blob/v1.2.2/packages/runner/src/suite.ts).
+The plugin uses the same behavior regardless of the installed Vitest version. Older releases such as
+[Vitest 3.2.6](https://github.com/vitest-dev/vitest/blob/v3.2.6/packages/runner/src/suite.ts#L245-L273)
+supply an empty body for a title-only test, so the plugin can report a todo that the runner treats as active.
+Use explicit `test.todo('title')` to mark an intentional todo on older Vitest versions.
 
 ## Mocha
 
@@ -169,7 +195,8 @@ Use the [Mocha syntax and imports](#mocha), plus the forms below.
 `{ skip: 'broker sandbox is down' }` always skips. `t.skip()` and `t.todo()` take a message, not a
 condition; `this.skip()` and `this.todo()` do the same in a test or hook written as `function`.
 
-An imported `getTestContext()` also supplies the current test context inside a recognized test,
+An imported [`getTestContext()`](https://nodejs.org/api/test.html#gettestcontext), available in Node 26.1+,
+also supplies the current test context inside a recognized test,
 `beforeEach` or `afterEach` body. Its `skip()` and `todo()` calls are checked, including stable aliases
 of the getter, context and methods. A saved context retains its original test owner inside subtests.
 
@@ -179,7 +206,8 @@ Node and is not a todo. A describe's body and its `before`/`after` hooks get the
 cannot skip. Node reports only one state, in the order skip, todo, expectFailure, so
 `describe.skip('title', { todo: 'why' }, fn)` needs only a `// SKIP:` marker.
 
-The `tags` option requires Node 26.2+. Like Vitest's tags, `['flaky']` matches `@flaky`.
+The [`tags` option](https://nodejs.org/api/test.html#test-tags) requires Node 26.2+ and is marked
+early development by Node. Like Vitest's tags, `['flaky']` matches `@flaky`.
 A skipped test or describe without a body still counts as skipped.
 
 ## Jasmine
@@ -203,6 +231,21 @@ A skipped test or describe without a body still counts as skipped.
 In `beforeAll`, `afterAll` or a describe body they fail the suite instead, so the plugin leaves them
 alone there. Their argument is a reason, not a condition. A local helper named `pending` is not
 Jasmine's function. `xit('title')` without a body is skipped.
+
+## Bun
+
+Use `configs.bun` for JavaScript and TypeScript files run by Bun. The rules recognize
+globals and imports from `bun:test`, including named aliases, namespace imports and
+CommonJS imports. Apply the preset only to Bun files in a mixed-runner project.
+
+- Skip and todo governance covers `test.skip`, `test.todo`, suite modifiers and the
+  conditional `if`, `runIf`, `skipIf` and `todoIf` forms.
+- Enable `states.fail` to track `failing`, `fails` and `failingIf`. Enable
+  `states.retry` for tickets on per-test `{ retry: count }` options and use
+  `limit-retries` for a ceiling. The `repeats` option runs a test repeatedly
+  regardless of its outcome and counts separately.
+- The preset reads test source. `bunfig.toml` and Bun's compatibility imports from
+  `vitest` and `@jest/globals` are outside this preset's scope.
 
 ## Shared behavior
 
@@ -238,3 +281,46 @@ These forms are not covered:
 The plugin validates ticket text and placeholders, not whether an issue exists or is open. It makes
 no issue-tracker requests and does not prevent focused tests such as `test.only`. Use your runner's
 ESLint plugin for checks outside ticket governance.
+
+### Local values and mutations
+
+Keep policy data in readable local constants when possible. The rules can read static object
+spreads, computed string keys and immutable object/array destructuring. Destructuring defaults,
+rest bindings and getters are not evaluated. Unknown spreads and keys make affected values
+unreadable; a later explicit property can supply a known value. Spreading `null`, `undefined`,
+booleans, numbers or an empty string leaves earlier properties intact.
+
+A copied string keeps its value when the source object later changes:
+
+With `customStates: { review: { when: '@needs-review', marker: 'REVIEW' } }`:
+
+<!-- example: valid settings={"customStates":{"review":{"when":"@needs-review","marker":"REVIEW"}}} -->
+
+```js
+const tags = { review: '@needs-review' };
+const snapshot = tags.review;
+tags.review = '@smoke';
+
+// REVIEW: EXAMPLE-123
+test('example', { tag: snapshot }, () => {});
+```
+
+An object alias shares the source. A write through that alias makes the affected data unreadable,
+so a strict policy asks you to provide readable data:
+
+With the same custom state and `reportUnreadableTags: true`:
+
+<!-- example: invalid settings={"reportUnreadableTags":true,"customStates":{"review":{"when":"@needs-review","marker":"REVIEW"}}} -->
+
+```js
+const tags = { review: '@needs-review' };
+const alias = tags;
+alias.review = getTag();
+test('example', { tag: tags.review }, () => {});
+```
+
+Object/array spread copies keep their own properties, but nested objects remain shared. A conditional
+alias follows readable branches; a possible reference to an object is enough for a write to make its
+value unreadable. This also applies to aliases obtained through destructuring or object/array wrappers.
+The linter does not execute the code to discover the new value. An unreadable value is not proof that
+it satisfies your policy; use literal data or the applicable unreadable-data diagnostic.

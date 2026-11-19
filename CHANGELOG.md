@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Add a Bun preset for test state governance and per-test retry limits.
+
+### Fixed
+
+- Preserve readable config retry counts across inline conditional spreads that cannot overwrite them.
+- Keep Bun skip and todo states when chained modifiers include an inactive condition.
+- Use JavaScript truthiness for literal Bun conditions and conditional config spreads.
+
+### Changed
+
+- Explain how to choose test-governance policies and their tradeoffs; correct framework prerequisites,
+  retry terminology and autofix guidance, with checked reference examples.
+- Clarify that conditional-skip reasons exclude recognized commented-out test blocks, not arbitrary
+  code comments, and that the check cannot assess an explanation's quality.
+
 ## [0.16.0] - 2026-11-16
 
 ### Added

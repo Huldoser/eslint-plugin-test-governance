@@ -253,7 +253,7 @@ interface Chain {
   root: TSESTree.Identifier | TSESTree.CallExpression;
   path: string[];
   /** The first argument of each member called to build the function: `isMobile` in `test.skipIf(isMobile)`. */
-  args: Map<string, Node | undefined>;
+  args: [member: string, argument: Node | undefined][];
 }
 
 /**
@@ -308,7 +308,7 @@ function memberKey(node: TSESTree.MemberExpression): string | undefined {
  */
 function chainOf(node: Node, factories: ReadonlySet<string>): Chain | undefined {
   const path: string[] = [];
-  const args = new Map<string, Node | undefined>();
+  const args: Chain['args'] = [];
   let current = unwrap(node);
   for (;;) {
     if (current.type === 'MemberExpression') {
@@ -328,7 +328,7 @@ function chainOf(node: Node, factories: ReadonlySet<string>): Chain | undefined 
     const name = memberName(factory);
     if (name === undefined || !factories.has(name)) return undefined;
     path.unshift(`${name}()`);
-    if (current.type === 'CallExpression' && !args.has(`${name}()`)) args.set(`${name}()`, current.arguments.at(0));
+    if (current.type === 'CallExpression') args.push([`${name}()`, current.arguments.at(0)]);
     current = unwrap(factory.object);
   }
   return current.type === 'Identifier' || current.type === 'CallExpression' ? { root: current, path, args } : undefined;
@@ -1176,6 +1176,7 @@ function objectDetails(
   object: TSESTree.ObjectExpression,
   unread: Node[],
   path: readonly Node[] = [],
+  readConditionalSpreads = false,
 ): [string, Node][] {
   if (path.includes(object)) {
     unread.push(object);
@@ -1184,9 +1185,35 @@ function objectDetails(
   const entries = new Map<string, Node>();
   for (const prop of object.properties) {
     if (prop.type === 'SpreadElement') {
-      const argument = unwrap(prop.argument);
-      const value = constantValue(sourceCode, argument, [...path, object]) ?? argument;
-      const spread = unwrap(value);
+      const resolve = (node: Node): Node => {
+        const own = unwrap(node);
+        return unwrap(constantValue(sourceCode, own, [...path, object]) ?? own);
+      };
+      let spread = resolve(prop.argument);
+      if (readConditionalSpreads) {
+        let branches: Node[] = [];
+        if (spread.type === 'ConditionalExpression') {
+          const condition = booleanOf(sourceCode, spread.test, [], true);
+          if (condition !== undefined) spread = resolve(condition ? spread.consequent : spread.alternate);
+          else branches = [resolve(spread.consequent), resolve(spread.alternate)];
+        } else if (spread.type === 'LogicalExpression' && spread.operator === '&&') {
+          const condition = booleanOf(sourceCode, spread.left, [], true);
+          if (condition === false) continue;
+          if (condition === true) spread = resolve(spread.right);
+          else branches = [resolve(spread.right)];
+        }
+        if (branches.length > 0 && branches.every((branch) => branch.type === 'ObjectExpression')) {
+          const before = unread.length;
+          const branchEntries = branches.flatMap((branch) =>
+            objectDetails(sourceCode, branch, unread, [...path, object], readConditionalSpreads),
+          );
+          if (unread.length > before) entries.clear();
+          for (const [key] of branchEntries) entries.delete(key);
+          // A parent spread must still account for keys this object may supply.
+          if (branchEntries.length > 0 && path.length > 0) unread.push(prop.argument);
+          continue;
+        }
+      }
       if (
         (spread.type === 'Identifier' &&
           spread.name === 'undefined' &&
@@ -1199,7 +1226,9 @@ function objectDetails(
         continue;
       const before = unread.length;
       const values =
-        spread.type === 'ObjectExpression' ? objectDetails(sourceCode, spread, unread, [...path, object]) : [];
+        spread.type === 'ObjectExpression'
+          ? objectDetails(sourceCode, spread, unread, [...path, object], readConditionalSpreads)
+          : [];
       if (spread.type !== 'ObjectExpression') unread.push(prop.argument);
       // An unread spread may replace any earlier property; later known properties still win.
       if (unread.length > before) entries.clear();
@@ -1219,8 +1248,8 @@ function objectDetails(
  * `test('title', { tag: '@smoke' }, fn)` or Vitest's `test('title', { skip: true }, fn)`, also when it
  * is a constant declared in this file. With `optionsFirst`, the first: node:test's `test({ skip: true }, fn)`.
  */
-function detailsOf(sourceCode: SourceCode, call: TSESTree.CallExpression, optionsFirst: boolean): Details {
-  const details = call.arguments.at(optionsFirst ? 0 : 1);
+function detailsOf(sourceCode: SourceCode, call: TSESTree.CallExpression, detailsIndex: number): Details {
+  const details = call.arguments.at(detailsIndex);
   if (details === undefined || isFunction(details)) return { entries: [], unread: [] };
   const target = unwrap(details);
   const value = target.type === 'ObjectExpression' ? target : constantValue(sourceCode, target);
@@ -1519,25 +1548,32 @@ function thisFunction(node: Node): Node | undefined {
   return current;
 }
 
-/** A readable local boolean, negation or selected branch; undefined when runtime data decides it. */
-function booleanOf(sourceCode: SourceCode, node: Node | undefined, seen: readonly Node[] = []): boolean | undefined {
+/** A readable condition, optionally using the truthiness of non-boolean literals; undefined when runtime data decides it. */
+function booleanOf(
+  sourceCode: SourceCode,
+  node: Node | undefined,
+  seen: readonly Node[] = [],
+  truthiness = false,
+): boolean | undefined {
   if (node === undefined) return undefined;
   const own = unwrap(node);
   const value = constantValue(sourceCode, own, seen) ?? own;
   if (seen.includes(value)) return undefined;
   const path = [...seen, value];
   if (value.type === 'UnaryExpression' && value.operator === '!') {
-    const argument = booleanOf(sourceCode, value.argument, path);
+    const argument = booleanOf(sourceCode, value.argument, path, truthiness);
     return argument === undefined ? undefined : !argument;
   }
   if (value.type === 'ConditionalExpression') {
-    const test = booleanOf(sourceCode, value.test, path);
-    if (test !== undefined) return booleanOf(sourceCode, test ? value.consequent : value.alternate, path);
-    const consequent = booleanOf(sourceCode, value.consequent, path);
-    const alternate = booleanOf(sourceCode, value.alternate, path);
+    const test = booleanOf(sourceCode, value.test, path, truthiness);
+    if (test !== undefined) return booleanOf(sourceCode, test ? value.consequent : value.alternate, path, truthiness);
+    const consequent = booleanOf(sourceCode, value.consequent, path, truthiness);
+    const alternate = booleanOf(sourceCode, value.alternate, path, truthiness);
     return consequent === alternate ? consequent : undefined;
   }
-  return value.type === 'Literal' && typeof value.value === 'boolean' ? value.value : undefined;
+  return value.type === 'Literal' && (truthiness || typeof value.value === 'boolean')
+    ? Boolean(value.value)
+    : undefined;
 }
 
 /**
@@ -1631,6 +1667,13 @@ function configBinding(
   return undefined;
 }
 const CYPRESS_RETRY_COUNT_KEYS = new Set(['runMode', 'openMode']);
+const NO_RETRY_COUNT_KEYS = new Set<string>();
+
+function retryOptionKeys(framework: Framework): ReadonlySet<string> {
+  if (framework.name === 'vitest') return VITEST_RETRY_COUNT_KEYS;
+  if (framework.name === 'bun') return NO_RETRY_COUNT_KEYS;
+  return CYPRESS_RETRY_COUNT_KEYS;
+}
 
 /**
  * Whether a retry count gives retries: anything but `0`, `false`, `null` or `undefined` written out, since a
@@ -1877,6 +1920,8 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       return exported === undefined ? undefined : { root: exported, path: path.slice(1), args };
     }
     if (isReassigned(sourceCode, root)) return undefined;
+    if (framework.name === 'bun' && declaredVariable(sourceCode, root)?.defs.some((def) => def.type === 'Parameter'))
+      return undefined;
     let base = testNames.roots.get(root.name);
     let rest = path;
     // `pw.test.skip`, or node:test's `test.describe`, whose module is also its `test` even when
@@ -1905,15 +1950,12 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       const init = chainOf(unwrap(declarator.init), framework.factories);
       return key === undefined || init === undefined
         ? undefined
-        : target({ ...init, path: [...init.path, key, ...path], args: new Map([...init.args, ...args]) }, [
-            ...seen,
-            declarator,
-          ]);
+        : target({ ...init, path: [...init.path, key, ...path], args: [...args, ...init.args] }, [...seen, declarator]);
     }
     const value = declaredValue(sourceCode, root);
     if (value === undefined || seen.includes(value)) return undefined;
     const alias = target(chainOf(unwrap(value), framework.factories), [...seen, value]);
-    return alias && { root: alias.root, path: [...alias.path, ...path], args: new Map([...alias.args, ...args]) };
+    return alias && { root: alias.root, path: [...alias.path, ...path], args: [...args, ...alias.args] };
   };
   let usesTest = testNames.usesModule;
   const subjects: Subject[] = [];
@@ -1981,7 +2023,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       } else if (stage === 'projects' && value.type === 'ArrayExpression') {
         for (const element of value.elements) if (element !== null) readConfig(element, 'root', path);
       } else if (stage !== 'projects' && value.type === 'ObjectExpression') {
-        for (const [key, property] of objectDetails(sourceCode, value, [])) {
+        for (const [key, property] of objectDetails(sourceCode, value, [], [], true)) {
           if (stage === 'root' && framework.name === 'vitest') {
             if (key === 'test') readConfig(property, 'options', path);
           } else if (key === (framework.name === 'vitest' ? 'retry' : 'retries')) {
@@ -2196,7 +2238,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const add = (modifier: string, always: boolean): void => {
       if (!modifiers.get(modifier)) modifiers.set(modifier, always);
     };
-    for (const member of members) {
+    for (const member of framework.name === 'bun' ? new Set(members) : members) {
       const effect = framework.effects.get(member);
       if (!effect) continue;
       if (effect.when === undefined) {
@@ -2204,7 +2246,16 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
         continue;
       }
       // `skipIf(true)` always skips and `skipIf(false)` never does, like `{ skip: true }` and `{ skip: false }`.
-      const condition = booleanOf(sourceCode, args.get(member));
+      if (framework.name === 'bun') {
+        for (const [factory, argument] of args) {
+          if (factory !== member) continue;
+          const condition = booleanOf(sourceCode, argument, [], true);
+          if (condition === undefined) add(effect.modifier, false);
+          else if (condition === effect.when) add(effect.modifier, true);
+        }
+        continue;
+      }
+      const condition = booleanOf(sourceCode, args.find(([factory]) => factory === member)?.[1]);
       if (condition === undefined) modifiers.set(effect.modifier, false);
       else if (condition === effect.when) modifiers.set(effect.modifier, true);
       else modifiers.delete(effect.modifier);
@@ -2212,10 +2263,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     // `{ skip: true }` always skips, `{ skip: isMobile }` only sometimes, `{ skip: false }` never.
     for (const [key, value] of details) {
       if (key === framework.retryOption) {
-        if (
-          retries(sourceCode, value, framework.name === 'vitest' ? VITEST_RETRY_COUNT_KEYS : CYPRESS_RETRY_COUNT_KEYS)
-        )
-          add('retry', true);
+        if (retries(sourceCode, value, retryOptionKeys(framework))) add('retry', true);
         continue;
       }
       const modifier = framework.optionEffects.get(key);
@@ -2339,7 +2387,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const [first] = alternatives;
     if (!alternatives.every((choice) => choice.kind === first.kind && declares(choice, args))) return undefined;
     usesTest = true;
-    const { details, tagInfo } = headOf(call);
+    const { details, tagInfo } = headOf(call, first.kind);
     const branches = alternatives.map(({ members, args: conditions, todoWithoutBody }) =>
       declarationModifiers(first.kind, args, modifiersOf(members, details.entries, conditions), todoWithoutBody),
     );
@@ -2358,13 +2406,19 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   };
 
   /** The details, tags and annotations of a declaration; node:test lets it leave out its title. */
-  const headOf = (call: TSESTree.CallExpression): { details: Details; tagInfo: TagInfo } => {
+  const headOf = (call: TSESTree.CallExpression, kind: 'test' | 'describe'): { details: Details; tagInfo: TagInfo } => {
     const args = call.arguments;
     const untitled = leavesOutTitle(sourceCode, framework, args);
-    const details = detailsOf(sourceCode, call, untitled && !isFunction(args[0]));
-    if (framework.name === 'vitest' || framework.name === 'cypress') {
+    const index = untitled && !isFunction(args[0]) ? 0 : 1;
+    const details =
+      framework.name === 'bun'
+        ? kind === 'describe' || args.length < 3
+          ? { entries: [], unread: [] }
+          : detailsOf(sourceCode, call, isObject(sourceCode, args[1]) ? 1 : 2)
+        : detailsOf(sourceCode, call, index);
+    if (framework.name === 'vitest' || framework.name === 'cypress' || framework.name === 'bun') {
       const count = details.entries.findLast(([key]) => key === framework.retryOption);
-      recordRetryCounts(count?.[1], framework.name === 'vitest' ? VITEST_RETRY_COUNT_KEYS : CYPRESS_RETRY_COUNT_KEYS);
+      recordRetryCounts(count?.[1], retryOptionKeys(framework));
     }
     const annotations =
       options.annotations === undefined || framework.annotations === undefined
@@ -2389,7 +2443,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     infos: InfoName[],
   ): { subject: Subject; infos: InfoName[] } => {
     const args = call.arguments;
-    const { details, tagInfo } = headOf(call);
+    const { details, tagInfo } = headOf(call, kind);
     const modifiers = declarationModifiers(
       kind,
       args,
@@ -2501,7 +2555,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       kind: 'test',
       members: [],
       written: [],
-      args: new Map(),
+      args: [],
       todoWithoutBody: false,
     };
     return declares(declaration, call.arguments)
@@ -2610,7 +2664,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const configure =
       path.join('.') === 'describe.configure' || (callee.root === DESCRIBE && path.join('.') === 'configure');
     if (framework.retryCall === 'describe.configure' && configure) {
-      const count = detailsOf(sourceCode, call, true).entries.findLast(([key]) => key === 'retries');
+      const count = detailsOf(sourceCode, call, 0).entries.findLast(([key]) => key === 'retries');
       return { subject: retrySubject(call, count?.[1], 'configure') };
     }
     const declaration = declarationOf(callee);

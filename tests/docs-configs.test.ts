@@ -29,6 +29,47 @@ function documentedConfig(file: string, name: string, names: Record<string, unkn
 }
 
 describe('documented config files', () => {
+  it('the tag examples show which shared values --fix changes and which it leaves alone', async () => {
+    const text = read('docs/rules/consistent-tag-names.md');
+    const sample = (name: string): string => {
+      const match = new RegExp(`<!-- fix: ${name} -->[\\s\\S]*?\`\`\`js\\n([\\s\\S]*?)\`\`\``).exec(text);
+      assert.ok(match, name);
+      return match[1];
+    };
+    const eslint = new ESLint({
+      overrideConfigFile: true,
+      overrideConfig: [testGovernance.configure({ framework: 'playwright', knownTags: ['@smoke'] })],
+      fix: true,
+    });
+    const [shared] = await eslint.lintText(sample('shared-title-before'));
+    assert.equal(shared.output, sample('shared-title-after'));
+    assert.deepEqual(shared.messages, []);
+    const [member] = await eslint.lintText(sample('object-member'));
+    assert.equal(member.output, undefined);
+    assert.deepEqual(
+      member.messages.map(({ messageId }) => messageId),
+      ['tagCase'],
+    );
+  });
+
+  it('the suppression recipe requires a ticket in support files without test declarations', async () => {
+    const eslint = new ESLint({
+      cwd: root,
+      overrideConfigFile: true,
+      overrideConfig: documentedConfig('docs/rules/require-ticket-for-error-suppression.md', 'error-suppression'),
+    });
+    const code = "Cypress.on('uncaught:exception', () => false);";
+    for (const filePath of ['cypress/support/e2e.js', 'cypress/e2e/order.cy.js']) {
+      const [missing] = await eslint.lintText(code, { filePath });
+      assert.equal(missing.errorCount, 1);
+      assert.equal(missing.messages[0].ruleId, 'test-governance/require-ticket-for-error-suppression');
+      const [tracked] = await eslint.lintText(`// SUPPRESS: EXAMPLE-123\n${code}`, { filePath });
+      assert.deepEqual(tracked.messages, []);
+    }
+    const [outside] = await eslint.lintText(code, { filePath: 'application.js' });
+    assert.deepEqual(outside.messages, []);
+  });
+
   it('the config retry recipe checks selected runner files and leaves application exports alone', async () => {
     const eslint = new ESLint({
       cwd: root,

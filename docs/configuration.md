@@ -6,6 +6,39 @@ Use a framework config for its defaults, or `configure()` to change shared optio
 `settings['test-governance']`; the rules have no individual options. This page describes configuration
 fragments unless a block names a complete config file. Keep the imports from that file when combining examples.
 
+[Choose a policy](#choose-a-policy) · [TypeScript](#typescript) · [Config file forms](#config-file-forms) ·
+[Options](#options) · [Tags](#tag-names) · [Ticket formats](#ticket-presets)
+
+## Choose a policy
+
+Start with the framework defaults to connect disabled tests and unfinished work to tracking tickets.
+A ticket lets a reviewer find the reason for an exception and the work needed to remove it. The plugin
+checks that reference locally; your team still needs to review the issue and decide when to restore the test.
+
+| Need                              | Policy                                                                                                            | Why and tradeoff                                                                                                                               |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Explain a platform-dependent skip | [`requireReasonForConditional`](#requirereasonforconditional)                                                     | Records why a test cannot run in that environment. A permanent platform limitation may need an explanation without a work item.                |
+| Track every conditional exception | [`requireTicketForConditional`](#requireticketforconditional)                                                     | Requires follow-up work even for conditional skips. Use it when a reason alone is insufficient for your policy.                                |
+| Track team-specific statuses      | [`customStates`](#tag-names)                                                                                      | Requires tickets for chosen tags. Tags acquire no execution or promotion behavior from this plugin. Use `knownTags` for spelling checks alone. |
+| Account for retries               | [`states.retry`](#states) and [`limit-retries`](rules/limit-retries.md)                                           | Ticketing explains the exception; a retry ceiling bounds extra attempts. Neither detects flakiness during a run.                               |
+| Include tracking data in reports  | [Annotations](#tickets-from-annotations) or [native reasons](rules/require-ticket.md#tickets-from-native-reasons) | Reuses data the runner can report. Supported syntax differs by runner; dynamic text cannot supply a verified ticket.                           |
+| Track lint exceptions             | [`comments.ticketedDisables`](rules/require-ticket-in-comments.md#tickets-for-selected-lint-suppressions)         | Connects selected lint suppressions to follow-up work. A ticket does not establish that disabling the rule is safe.                            |
+| Track blanket error suppression   | [`require-ticket-for-error-suppression`](rules/require-ticket-for-error-suppression.md)                           | Makes a broad Cypress exception traceable. The rule checks only the documented handler forms and does not assess their safety.                 |
+
+`fail`, `slow` and `retry` states are opt-in. Expected failures, extra execution time and retries can
+be intentional runner settings; enable their ticket requirements when your team treats them as
+exceptions that need follow-up. A ticket never exempts a retry count from an enabled retry ceiling.
+
+Use a [directory rollout](troubleshooting.md#adopt-in-an-existing-suite) to introduce the policy
+gradually. Keep the runner plugin's assertion, async and focused-test checks alongside governance.
+
+Marker syntax is strict by default so tickets remain easy to recognize and validate. Keep longer
+explanations in the issue, or enable `allowNotes` when a short local explanation helps reviewers.
+Spelling and commented-out-test checks warn because a near-miss tag or code-like comment can be
+intentional; review those findings before treating them as errors.
+Reason checks verify the presence of an explanation, not its quality. Reviewers still need to
+judge whether the stated reason justifies skipping the test.
+
 ## TypeScript
 
 For TypeScript test files, install the parser as well as ESLint and this plugin:
@@ -176,25 +209,25 @@ yourself. `framework` is required, and every other option has a default. The rul
 of their own: they all read these shared settings, so they always agree on ticket formats, states
 and markers. To turn a rule off, set it to `'off'` as usual.
 
-| Option                        | Type                                                     | Default                           | Description                                                                                                                                                                                  |
-| ----------------------------- | -------------------------------------------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `framework`                   | `FrameworkName`                                          | required                          | The test framework of the files the config applies to. Each framework's config, such as `configs.playwright`, sets it, and `configure()` needs it. See [Frameworks](frameworks.md).          |
-| `ticket`                      | `TicketSpec \| TicketSpec[]`                             | `{ preset: 'any' }`               | Accepted ticket formats. An array accepts a ticket that matches any entry. See [Ticket presets](#ticket-presets).                                                                            |
-| `placeholders`                | `string[]`                                               | [defaults](../README.md#defaults) | See [placeholders details](#placeholders).                                                                                                                                                   |
-| `states`                      | `{ [state]: boolean \| { enabled?, marker?, ticket? } }` | `skip`, `fixme` and `todo` on     | See [states details](#states).                                                                                                                                                               |
-| `customStates`                | `{ [name]: { when, marker, ticket? } }`                  | `{}`                              | Adds a state for a tag, e.g. `{ 'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' } }`. `when` is a tag and `marker` an uppercase keyword; neither can be shared with another state. |
-| `knownTags`                   | `string[]`                                               | `[]`                              | See [knownTags details](#knowntags).                                                                                                                                                         |
-| `maxRetries`                  | `number`                                                 | `2`                               | Maximum retry count for the opt-in [limit-retries](rules/limit-retries.md) rule. A non-negative integer; `0` forbids retries.                                                                |
-| `checkConfigRetries`          | `boolean`                                                | `false`                           | Include supported runner config exports in [limit-retries](rules/limit-retries.md#runner-configuration-files). Apply only to selected config files.                                          |
-| `ticketsFromReasons`          | `boolean`                                                | `false`                           | Accept ticket prefixes in supported runtime skip reasons when no marker or annotation supplies one. See [native reason tickets](rules/require-ticket.md#tickets-from-native-reasons).        |
-| `requireTicketForConditional` | `boolean`                                                | `false`                           | See [requireTicketForConditional details](#requireticketforconditional).                                                                                                                     |
-| `requireReasonForConditional` | `boolean`                                                | `false`                           | See [requireReasonForConditional details](#requirereasonforconditional).                                                                                                                     |
-| `allowBlankLine`              | `boolean`                                                | `false`                           | Let blank lines separate a marker from its test.                                                                                                                                             |
-| `allowNotes`                  | `boolean`                                                | `false`                           | Allow free text after the tickets, e.g. `// SKIP: TRADE-123 flaky on CI`. Applies to markers and to `FIXME` / `TODO` comments.                                                               |
-| `comments`                    | `false \| { keywords?: string[] }`                       | `{ keywords: ['FIXME', 'TODO'] }` | Comment keywords that must start with a ticket anywhere in a test file, e.g. `// TODO: TRADE-123`. Your keywords replace the default ones. `false` allows free-form comments.                |
-| `annotations`                 | `false \| { type?: string, only?: boolean }`             | `{ type: 'issue' }`               | See [annotations details](#annotations).                                                                                                                                                     |
-| `testFunctions`               | `string[]`                                               | `['test']`                        | See [testFunctions details](#testfunctions).                                                                                                                                                 |
-| `reportUnreadableTags`        | `boolean`                                                | `false`                           | See [reportUnreadableTags details](#reportunreadabletags).                                                                                                                                   |
+| Option                        | Type                                                            | Default                           | Description                                                                                                                                                                                                                                             |
+| ----------------------------- | --------------------------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `framework`                   | `FrameworkName`                                                 | required                          | The test framework of the files the config applies to. Each framework's config, such as `configs.playwright`, sets it, and `configure()` needs it. See [Frameworks](frameworks.md).                                                                     |
+| `ticket`                      | `TicketSpec \| TicketSpec[]`                                    | `{ preset: 'any' }`               | Accepted ticket formats. An array accepts a ticket that matches any entry. See [Ticket presets](#ticket-presets).                                                                                                                                       |
+| `placeholders`                | `string[]`                                                      | [defaults](../README.md#defaults) | See [placeholders details](#placeholders).                                                                                                                                                                                                              |
+| `states`                      | `{ [state]: boolean \| { enabled?, marker?, ticket? } }`        | `skip`, `fixme` and `todo` on     | See [states details](#states).                                                                                                                                                                                                                          |
+| `customStates`                | `{ [name]: { when, marker, ticket? } }`                         | `{}`                              | Adds a state for a tag, e.g. `{ 'needs-data': { when: '@needs-data', marker: 'NEEDS-DATA' } }`. `when` is a tag and `marker` an uppercase keyword; neither can be shared with another state.                                                            |
+| `knownTags`                   | `string[]`                                                      | `[]`                              | See [knownTags details](#knowntags).                                                                                                                                                                                                                    |
+| `maxRetries`                  | `number`                                                        | `2`                               | Maximum retry count for the opt-in [limit-retries](rules/limit-retries.md) rule. A non-negative integer; `0` forbids retries.                                                                                                                           |
+| `checkConfigRetries`          | `boolean`                                                       | `false`                           | Include supported runner config exports in [limit-retries](rules/limit-retries.md#runner-configuration-files). Apply only to selected config files.                                                                                                     |
+| `ticketsFromReasons`          | `boolean`                                                       | `false`                           | Accept ticket prefixes in supported runtime skip reasons when no marker or annotation supplies one. See [native reason tickets](rules/require-ticket.md#tickets-from-native-reasons).                                                                   |
+| `requireTicketForConditional` | `boolean`                                                       | `false`                           | See [requireTicketForConditional details](#requireticketforconditional).                                                                                                                                                                                |
+| `requireReasonForConditional` | `boolean`                                                       | `false`                           | See [requireReasonForConditional details](#requirereasonforconditional).                                                                                                                                                                                |
+| `allowBlankLine`              | `boolean`                                                       | `false`                           | Let blank lines separate a marker from its test.                                                                                                                                                                                                        |
+| `allowNotes`                  | `boolean`                                                       | `false`                           | Allow free text after the tickets, e.g. `// SKIP: TRADE-123 flaky on CI`. Applies to markers and to `FIXME` / `TODO` comments.                                                                                                                          |
+| `comments`                    | `false \| { keywords?: string[], ticketedDisables?: string[] }` | `{ keywords: ['FIXME', 'TODO'] }` | Comment keywords that must start with a ticket anywhere in a test file, e.g. `// TODO: TRADE-123`. Your keywords replace the default ones. `false` allows free-form comments. `ticketedDisables` selects lint exceptions to track; it defaults to `[]`. |
+| `annotations`                 | `false \| { type?: string, only?: boolean }`                    | `{ type: 'issue' }`               | See [annotations details](#annotations).                                                                                                                                                                                                                |
+| `testFunctions`               | `string[]`                                                      | `['test']`                        | See [testFunctions details](#testfunctions).                                                                                                                                                                                                            |
+| `reportUnreadableTags`        | `boolean`                                                       | `false`                           | See [reportUnreadableTags details](#reportunreadabletags).                                                                                                                                                                                              |
 
 To require tickets when selected lint rules are disabled, set
 `comments: { ticketedDisables: ['cypress/no-force'] }`. These are exact IDs, including your plugin
@@ -213,7 +246,7 @@ Turns built-in states (`skip`, `fixme`, `fail`, `slow`, `todo`, `retry`) on or o
 
 `fail`, `slow` and `retry` are off by default. Configure tag policies separately with `customStates`; see [Tag names](#tag-names).
 
-`fixme` and `slow` exist only in Playwright, `todo` in every framework but Playwright, `fail` in Playwright, Jest, Vitest and node:test, and `retry` in every framework but node:test and Jasmine, so turning one on elsewhere has no effect.
+`fixme` and `slow` exist only in Playwright, `todo` in every framework but Playwright, `fail` in Playwright, Jest, Vitest, node:test and Bun, and `retry` in every framework but node:test and Jasmine, so turning one on elsewhere has no effect.
 
 ### knownTags
 
@@ -239,11 +272,16 @@ Accept the ticket from a test annotation as well: Playwright's `annotation` of t
 
 ### testFunctions
 
-Names treated as the framework's `test`. Jest, Vitest and node:test default to `['test', 'it']`, Mocha, Cypress and WebdriverIO to `['it', 'specify', 'test']`, and Jasmine to `['it']`. Your list replaces the default one, so include those names if you still need them. See [recognized functions](frameworks.md).
+Names treated as the framework's `test`. Jest, Vitest, node:test and Bun default to `['test', 'it']`, Mocha, Cypress and WebdriverIO to `['it', 'specify', 'test']`, and Jasmine to `['it']`. Your list replaces the default one, so include those names if you still need them. See [recognized functions](frameworks.md).
 
 ### reportUnreadableTags
 
 When a tag state is on, report titles that aren't static text, and tags or details that can't be read in the file, such as ones imported from another module, since their tags can't be checked.
+
+It also reports unreadable annotation tickets when a test needs a ticket, even without a custom
+tag state. It does not resolve imports or make unreadable retry counts fail `limit-retries`.
+See [static analysis limits](frameworks.md#static-analysis-limits) before using a clean lint run
+as evidence that every value was checked.
 
 ## Tag names
 

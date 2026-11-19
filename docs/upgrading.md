@@ -3,6 +3,17 @@
 Run ESLint on your tests before and after updating. An upgrade may recognize syntax that an older
 version missed, producing new reports. Check the [changelog](../CHANGELOG.md) for fixes and additions.
 
+## Upgrading to 0.15 and 0.16
+
+No option migration is required from 0.14. The new native-reason tickets, ticketed lint suppressions,
+Cypress error-suppression rule and runner-config retry checks are opt-in. Existing configurations
+keep their policy, but improved detection of constants, aliases and mutations may produce new
+reports. Run your usual lint command before and after the update and inspect any differences.
+
+See the [0.15 changes](../CHANGELOG.md#0150---2026-11-15) and
+[0.16 changes](../CHANGELOG.md#0160---2026-11-16), then [choose a policy](configuration.md#choose-a-policy)
+if you want to enable the new checks. When upgrading from 0.13 or earlier, apply the migration below too.
+
 <a id="next-release-custom-tag-states"></a>
 
 ## Upgrading to 0.14: custom tag states
@@ -164,7 +175,7 @@ becomes `extends: ['test-governance/playwright']`.
 A config that still reads `configs.recommended` fails when it loads:
 
 ```text
-eslint-plugin-test-governance: configs.recommended was removed in 0.5.0. Use the config for your framework: configs.playwright, configs.jest, configs.vitest, configs.mocha, configs.cypress, configs.webdriverio, configs['node-test'] or configs.jasmine. See https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/upgrading.md
+eslint-plugin-test-governance: configs.recommended was removed in 0.5.0. Use the config for your framework: configs.playwright, configs.jest, configs.vitest, configs.mocha, configs.cypress, configs.webdriverio, configs['node-test'], configs.jasmine or configs.bun. See https://github.com/Huldoser/eslint-plugin-test-governance/blob/main/docs/upgrading.md
 ```
 
 ### The framework option
@@ -193,7 +204,7 @@ Without it, the config fails when it loads:
 
 ```text
 eslint-plugin-test-governance: invalid options:
-  - framework is required: set it to "playwright", "jest", "vitest", "mocha", "cypress", "webdriverio", "node-test" or "jasmine", or use configs.playwright, configs.jest, configs.vitest, configs.mocha, configs.cypress, configs.webdriverio, configs['node-test'] or configs.jasmine
+  - framework is required: set it to "playwright", "jest", "vitest", "mocha", "cypress", "webdriverio", "node-test", "jasmine" or "bun", or use configs.playwright, configs.jest, configs.vitest, configs.mocha, configs.cypress, configs.webdriverio, configs['node-test'], configs.jasmine or configs.bun
 ```
 
 If you write `settings['test-governance']` yourself instead of calling `configure()`, add `framework`

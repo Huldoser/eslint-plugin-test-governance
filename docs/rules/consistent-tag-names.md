@@ -24,6 +24,38 @@ constant interpolated into a title is reported once at its definition and can be
 source range is known. Vitest and node:test tag names may be written without `@`; diagnostics and
 fixes preserve that form.
 
+For example, with `knownTags: ['@smoke']`, running `--fix` updates a shared title constant:
+
+<!-- fix: shared-title-before -->
+<!-- example: invalid settings={"knownTags":["@smoke"]} -->
+
+```js
+const TAG = '@Smoke';
+test(`first ${TAG}`, () => {});
+test(`second ${TAG}`, () => {});
+```
+
+After `--fix`:
+
+<!-- fix: shared-title-after -->
+<!-- example: valid settings={"knownTags":["@smoke"]} -->
+
+```js
+const TAG = '@smoke';
+test(`first ${TAG}`, () => {});
+test(`second ${TAG}`, () => {});
+```
+
+With the same policy, this object-member tag is reported but left unchanged by `--fix`:
+
+<!-- fix: object-member -->
+<!-- example: invalid settings={"knownTags":["@smoke"]} -->
+
+```js
+const TAGS = { SMOKE: '@Smoke' };
+test('example', { tag: TAGS.SMOKE }, () => {});
+```
+
 ## Examples
 
 Examples use Playwright unless noted. Settings shown with an example go in `configure()` alongside

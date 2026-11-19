@@ -83,6 +83,10 @@ test('places a limit order', async ({ page }) => {});
 
 ### Tickets for selected lint suppressions
 
+A lint suppression can outlive the workaround that needed it. Requiring a ticket for selected
+rules gives reviewers a place to track its removal while keeping other suppressions under their
+existing policy.
+
 Set `comments.ticketedDisables` to exact rule IDs to require a ticketed description when those
 rules are disabled in a test file. The default is an empty list. For example:
 
