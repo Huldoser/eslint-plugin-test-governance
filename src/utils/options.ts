@@ -39,12 +39,12 @@ export interface CustomState {
 export interface GovernanceOptions {
   /**
    * The test framework of the files the config applies to: `'playwright'`, `'jest'`, `'vitest'`, `'mocha'`,
-   * `'cypress'`, `'webdriverio'`, `'node-test'` or `'jasmine'`. Required; each framework's config, such as `configs.mocha`, sets it.
+   * `'cypress'`, `'webdriverio'`, `'node-test'`, `'jasmine'` or `'bun'`. Required; each framework's config, such as `configs.mocha`, sets it.
    */
   framework: FrameworkName;
   /**
    * Names that are treated as the framework's `test` function. Defaults to `['test']` for Playwright,
-   * `['test', 'it']` for Jest, Vitest and node:test, `['it', 'specify', 'test']` for Mocha, Cypress and
+   * `['test', 'it']` for Jest, Vitest, node:test and Bun, `['it', 'specify', 'test']` for Mocha, Cypress and
    * WebdriverIO, and `['it']` for Jasmine. Your list replaces the default one, so include those names if you
    * still need them.
    */

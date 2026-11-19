@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Add a Bun preset for test state governance and per-test retry limits.
+
+### Fixed
+
+- Preserve readable config retry counts across inline conditional spreads that cannot overwrite them.
+
 ### Changed
 
 - Explain how to choose test-governance policies and their tradeoffs; correct framework prerequisites,

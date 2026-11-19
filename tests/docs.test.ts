@@ -469,7 +469,7 @@ describe('option defaults', () => {
   it('lists the test functions each framework uses by default', () => {
     const description = optionDescription('testFunctions');
     for (const [names, frameworks] of [
-      ['Jest, Vitest and node:test default to', ['jest', 'vitest', 'node-test']],
+      ['Jest, Vitest, node:test and Bun default to', ['jest', 'vitest', 'node-test', 'bun']],
       ['Mocha, Cypress and WebdriverIO to', ['mocha', 'cypress', 'webdriverio']],
       ['Jasmine to', ['jasmine']],
     ] as const) {
@@ -479,7 +479,7 @@ describe('option defaults', () => {
         assert.deepEqual(resolved({ framework, testFunctions: evaluate(literal) }), resolved({ framework }), framework);
       }
     }
-    assert.ok(hoverDocs.get('testFunctions')?.includes("`['test', 'it']` for Jest, Vitest and node:test"));
+    assert.ok(hoverDocs.get('testFunctions')?.includes("`['test', 'it']` for Jest, Vitest, node:test and Bun"));
   });
 
   it('lists the default placeholders', () => {

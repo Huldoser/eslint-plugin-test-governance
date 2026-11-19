@@ -3,7 +3,7 @@
 [Getting started](../README.md#frameworks) · [Configuration](configuration.md) · [Troubleshooting](troubleshooting.md)
 
 [Playwright](#playwright) · [Jest](#jest) · [Vitest](#vitest) · [Mocha](#mocha) · [Cypress](#cypress) ·
-[WebdriverIO](#webdriverio) · [node:test](#node-test) · [Jasmine](#jasmine) · [Analysis limits](#static-analysis-limits)
+[WebdriverIO](#webdriverio) · [node:test](#node-test) · [Jasmine](#jasmine) · [Bun](#bun) · [Analysis limits](#static-analysis-limits)
 
 Choose the config for the runner that declares your tests. There is no default config. Scope each config
 with `files`; the file pattern also distinguishes runners whose `it` and `describe` calls look alike.
@@ -210,6 +210,21 @@ A skipped test or describe without a body still counts as skipped.
 In `beforeAll`, `afterAll` or a describe body they fail the suite instead, so the plugin leaves them
 alone there. Their argument is a reason, not a condition. A local helper named `pending` is not
 Jasmine's function. `xit('title')` without a body is skipped.
+
+## Bun
+
+Use `configs.bun` for JavaScript and TypeScript files run by Bun. The rules recognize
+globals and imports from `bun:test`, including named aliases, namespace imports and
+CommonJS imports. Apply the preset only to Bun files in a mixed-runner project.
+
+- Skip and todo governance covers `test.skip`, `test.todo`, suite modifiers and the
+  conditional `if`, `runIf`, `skipIf` and `todoIf` forms.
+- Enable `states.fail` to track `failing`, `fails` and `failingIf`. Enable
+  `states.retry` for tickets on per-test `{ retry: count }` options and use
+  `limit-retries` for a ceiling. The `repeats` option runs a test repeatedly
+  regardless of its outcome and counts separately.
+- The preset reads test source. `bunfig.toml` and Bun's compatibility imports from
+  `vitest` and `@jest/globals` are outside this preset's scope.
 
 ## Shared behavior
 

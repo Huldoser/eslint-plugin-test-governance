@@ -22,6 +22,7 @@ export const FRAMEWORK_NAMES = [
   'webdriverio',
   'node-test',
   'jasmine',
+  'bun',
 ] as const;
 export type FrameworkName = (typeof FRAMEWORK_NAMES)[number];
 

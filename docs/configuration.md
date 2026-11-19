@@ -246,7 +246,7 @@ Turns built-in states (`skip`, `fixme`, `fail`, `slow`, `todo`, `retry`) on or o
 
 `fail`, `slow` and `retry` are off by default. Configure tag policies separately with `customStates`; see [Tag names](#tag-names).
 
-`fixme` and `slow` exist only in Playwright, `todo` in every framework but Playwright, `fail` in Playwright, Jest, Vitest and node:test, and `retry` in every framework but node:test and Jasmine, so turning one on elsewhere has no effect.
+`fixme` and `slow` exist only in Playwright, `todo` in every framework but Playwright, `fail` in Playwright, Jest, Vitest, node:test and Bun, and `retry` in every framework but node:test and Jasmine, so turning one on elsewhere has no effect.
 
 ### knownTags
 
@@ -272,7 +272,7 @@ Accept the ticket from a test annotation as well: Playwright's `annotation` of t
 
 ### testFunctions
 
-Names treated as the framework's `test`. Jest, Vitest and node:test default to `['test', 'it']`, Mocha, Cypress and WebdriverIO to `['it', 'specify', 'test']`, and Jasmine to `['it']`. Your list replaces the default one, so include those names if you still need them. See [recognized functions](frameworks.md).
+Names treated as the framework's `test`. Jest, Vitest, node:test and Bun default to `['test', 'it']`, Mocha, Cypress and WebdriverIO to `['it', 'specify', 'test']`, and Jasmine to `['it']`. Your list replaces the default one, so include those names if you still need them. See [recognized functions](frameworks.md).
 
 ### reportUnreadableTags
 

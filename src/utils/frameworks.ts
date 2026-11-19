@@ -236,6 +236,38 @@ const jest: Framework = {
   playwright: false,
 };
 
+const BUN_FUNCTIONS = new Map([...JEST_FUNCTIONS].filter(([name]) => name !== 'fit' && name !== 'fdescribe'));
+const BUN_MODES = ['only', 'skip', 'todo', 'concurrent', 'serial'];
+const BUN_CONDITIONS = ['if', 'runIf', 'skipIf', 'todoIf', 'concurrentIf', 'serialIf'];
+const BUN_FACTORIES = ['each', 'for', ...BUN_CONDITIONS];
+const BUN_MEMBERS = [...BUN_MODES, ...BUN_FACTORIES.map((name) => name + '()')];
+
+const bun: Framework = {
+  ...jest,
+  name: 'bun',
+  ownsModule: (source) => source === 'bun:test',
+  exports: BUN_FUNCTIONS,
+  globals: new Map([...BUN_FUNCTIONS].filter(([name]) => name !== 'test' && name !== 'it')),
+  testMembers: new Set([...BUN_MEMBERS, 'failing', 'fails', 'failingIf()']),
+  describeMembers: new Set(BUN_MEMBERS),
+  factories: new Set([...BUN_FACTORIES, 'failingIf']),
+  effects: effects([
+    ['skip', 'skip'],
+    ['todo', 'todo'],
+    ['failing', 'fail'],
+    ['fails', 'fail'],
+    ['if()', 'skip', false],
+    ['runIf()', 'skip', false],
+    ['skipIf()', 'skip', true],
+    ['todoIf()', 'todo', true],
+    ['failingIf()', 'fail', true],
+  ]),
+  exclusiveStates: ['skip', 'todo', 'fail'],
+  skipWithoutBody: true,
+  retryOption: 'retry',
+  retryCall: undefined,
+};
+
 const VITEST_FACTORIES = ['each()', 'for()', 'skipIf()', 'runIf()'];
 
 const vitest: Framework = {
@@ -462,6 +494,7 @@ export const FRAMEWORKS: Record<FrameworkName, Framework> = {
   webdriverio: { name: 'webdriverio', ...mocha },
   'node-test': nodeTest,
   jasmine,
+  bun,
 };
 
 /** Whether `source` belongs to a test runner other than `framework`, so its names are never tests here. */

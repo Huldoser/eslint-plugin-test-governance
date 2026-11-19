@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/npm/l/eslint-plugin-test-governance)](LICENSE)
 
 Require tracking tickets for disabled tests and TODO/FIXME comments with ESLint. Supports Playwright,
-Jest, Vitest, Mocha, Cypress, WebdriverIO, `node:test` and Jasmine. Custom tag policies and retry tracking
+Jest, Vitest, Mocha, Cypress, WebdriverIO, `node:test`, Jasmine and Bun. Custom tag policies and retry tracking
 are optional.
 
 A skipped test can leave a gap long after its original justification is forgotten. Requiring a
@@ -122,6 +122,7 @@ See [Framework syntax](docs/frameworks.md) for imports, supported calls and vers
 | WebdriverIO with Mocha                      | `configs.webdriverio`  |
 | Node's built-in runner                      | `configs['node-test']` |
 | Jasmine, including WebdriverIO with Jasmine | `configs.jasmine`      |
+| Bun                                         | `configs.bun`          |
 
 For mixed suites, give each framework its own `files` pattern. See
 [multiple frameworks](docs/configuration.md#multiple-frameworks).
