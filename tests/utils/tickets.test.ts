@@ -132,6 +132,9 @@ const tables: Record<string, Table> = {
     ],
     rejects: [
       'project#1',
+      'https://gitlab.com/-/issues/9',
+      'https://gitlab.com/project/-/merge_requests/7',
+      'https://gitlab.com/group//project/-/work_items/3',
       'https://gitlab.com/g/p/issues/9',
       'https://example.com/g/p/-/issues/9',
       'https://gitlab.com/g/p/-/issues/9x',
@@ -1040,6 +1043,8 @@ describe('messages', () => {
       [5, 5],
       [2, 3],
       [8, 10],
+      [25, 25],
+      [32, 64],
     ]) {
       const sample = example(min, max);
       assert.ok(sample.length >= min);
@@ -1049,6 +1054,11 @@ describe('messages', () => {
         'ok',
       );
     }
+  });
+
+  it('uses a length hint for numeric examples too long to display', () => {
+    const spec = { preset: 'numeric', minLength: 1000000, maxLength: 1000000 } as const;
+    assert.equal(expectedOf(spec).example, '<1000000-digit ticket>');
   });
 
   it('rejects an invalid custom pattern', () => {

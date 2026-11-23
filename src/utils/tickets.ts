@@ -53,7 +53,7 @@ const DIGITS_RE = /^\d+$/;
 const JIRA_PATH_RE = /\/browse\/([A-Z][A-Z0-9_]+-\d+)\/?$/;
 // Gitea, Forgejo and Codeberg write a pull request as `/pulls/N`, GitHub as `/pull/N`.
 const GITHUB_PATH_RE = /^\/[^/]+\/[^/]+\/(?:issues|pulls?)\/(\d+)\/?$/;
-const GITLAB_PATH_RE = /\/-\/(?:issues|merge_requests|work_items)\/(\d+)\/?$/;
+const GITLAB_PATH_RE = /^\/[^/]+(?:\/[^/]+)+\/-\/(?:issues|merge_requests|work_items)\/(\d+)\/?$/;
 const LINEAR_PATH_RE = /^\/[^/]+\/issue\/([A-Z][A-Z0-9]*-\d+)(?:\/[^/]+)?\/?$/;
 const AZURE_PATH_RE = /\/_workitems\/edit\/(\d+)\/?$/;
 const TRELLO_PATH_RE = /^\/c\/([A-Za-z0-9]{8})(?:\/[^/]+)?\/?$/;
@@ -536,10 +536,11 @@ function compilePreset(spec: TicketSpec): CompiledPreset {
     case 'numeric': {
       const min = spec.minLength ?? 1;
       const max = spec.maxLength ?? NUMERIC_MAX_LENGTH;
+      const length = Math.min(Math.max(4, min), max);
       return {
         find: (t) => (DIGITS_RE.test(t) && t.length >= min && t.length <= max ? t : undefined),
         expected: min === max ? `a ${min}-digit number` : `a number with ${min} to ${max} digits`,
-        example: '482173'.repeat(4).slice(0, Math.min(Math.max(4, min), max)),
+        example: length > 64 ? `<${length}-digit ticket>` : '482173'.repeat(Math.ceil(length / 6)).slice(0, length),
       };
     }
     case 'pattern': {
