@@ -125,6 +125,59 @@ Prefer the directory rollout above when every accepted skip must already have a 
 finding does not acquire tracking information. If your team chooses bulk suppressions, review the
 suppression file and prune unused entries as debt is removed. The plugin has no separate baseline CLI.
 
+## Run quarantined Playwright tests separately
+
+A quarantined test still needs a runner lane. Give the test a tag so Playwright can select it,
+and require a ticket for the tag with this ESLint config:
+
+<!-- config: quarantine -->
+
+```js
+import testGovernance from 'eslint-plugin-test-governance';
+
+export default [
+  {
+    files: ['tests/**/*.spec.js'],
+    ...testGovernance.configure({
+      framework: 'playwright',
+      customStates: { quarantined: { when: '@quarantined', marker: 'QUARANTINE' } },
+    }),
+  },
+];
+```
+
+In `tests/upload.spec.js`, keep the quarantined test runnable:
+
+<!-- quarantine: tests -->
+
+```js
+import { expect, test } from '@playwright/test';
+
+test('resolves a relative upload URL', async () => {
+  expect(new URL('upload', 'https://example.test/').pathname).toBe('/upload');
+});
+
+// QUARANTINE: EXAMPLE-123
+test('preserves a trailing slash in the upload URL @quarantined', async () => {
+  expect(new URL('/upload/', 'https://example.test/').pathname).toBe('/upload/');
+});
+```
+
+Run ESLint over **both** lanes. Use complementary Playwright filters for the blocking
+and quarantine jobs. These commands preview the selection without executing tests:
+
+```sh
+npx eslint tests
+npx playwright test --list --grep-invert '(^|\s)@quarantined(\s|$)'
+npx playwright test --list --grep '(^|\s)@quarantined(\s|$)'
+```
+
+The first Playwright list contains only the relative-URL test. The second contains only the
+trailing-slash test. Remove `--list` in the two CI jobs to execute each lane, and retain the quarantine
+job's results for the ticket owner. Remove the tag and marker together after fixing the test.
+Playwright matches these filters against the full test name and tags, so reserve this tag for
+quarantine. See [Playwright test tags](https://playwright.dev/docs/test-annotations#tag-tests).
+
 ## Connect retry policy to CI
 
 Enable [retry ceilings](rules/limit-retries.md) in test files and, with `checkConfigRetries`, in runner

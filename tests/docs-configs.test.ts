@@ -200,3 +200,37 @@ describe('documented config files', () => {
     }
   });
 });
+
+it('the quarantine recipe requires the tag ticket on tests selected for either CI lane', async () => {
+  const file = 'docs/troubleshooting.md';
+  const source = read(file).split('<!-- quarantine: tests -->')[1].split('```js\n')[1].split('\n```')[0];
+  const eslint = new ESLint({
+    cwd: root,
+    overrideConfigFile: true,
+    overrideConfig: documentedConfig(file, 'quarantine'),
+  });
+  const lint = async (code: string) => (await eslint.lintText(code, { filePath: 'tests/upload.spec.js' }))[0].messages;
+  assert.deepEqual(await lint(source), []);
+  assert.deepEqual(
+    (await lint(source.replace('// QUARANTINE: EXAMPLE-123', ''))).map((m) => m.messageId),
+    ['missingMarker'],
+  );
+});
+
+it('the snapshot rule recipe scopes reports to Playwright config files', async () => {
+  const eslint = new ESLint({
+    cwd: root,
+    overrideConfigFile: true,
+    overrideConfig: documentedConfig('docs/rules/require-ticket-for-snapshot-suppression.md', 'snapshot-suppression'),
+  });
+  for (const filePath of ['playwright.config.js', 'playwright.config.mjs', 'playwright.config.cjs', 'app.js']) {
+    const code = filePath.endsWith('.cjs')
+      ? 'module.exports = {ignoreSnapshots:true};'
+      : 'export default {ignoreSnapshots:true};';
+    const [result] = await eslint.lintText(code, { filePath });
+    assert.deepEqual(
+      result.messages.map((m) => m.messageId),
+      filePath === 'app.js' ? [] : ['missingTicket'],
+    );
+  }
+});
