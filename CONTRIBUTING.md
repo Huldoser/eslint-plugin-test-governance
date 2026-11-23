@@ -35,7 +35,8 @@ npm run docs:check     # the README rules list and rule doc headers are up to da
 
 CI also checks the packed type declarations with [are the types wrong](https://github.com/arethetypeswrong/arethetypeswrong.github.io),
 and the workflows with [actionlint](https://github.com/rhysd/actionlint) and [zizmor](https://github.com/zizmorcore/zizmor).
-It runs again every Monday, so a new ESLint, TypeScript or Node release that breaks the plugin shows up on its own.
+The Monday run refreshes the selected Node and ESLint versions. Typechecking the source uses the
+locked TypeScript version. The packed-consumer check also tests the declarations with the latest TypeScript.
 
 The tests include a speed check, `tests/speed.test.ts`. It lints a generated 20,000-line spec and fails
 when the rules take too long or their time grows faster than the spec does.
@@ -47,7 +48,7 @@ support EditorConfig, ESLint and Prettier pick up the settings automatically; VS
 Prefer fixing a lint error over disabling the rule. When a line really needs an exception, use
 `eslint-disable-next-line <rule> -- <reason>`.
 
-Coverage must stay at 100% for lines, branches and functions. If a branch can't be
+Coverage must stay at 100% for statements, lines, branches and functions. If a branch can't be
 reached, remove it rather than excluding it.
 
 ## Changing a rule

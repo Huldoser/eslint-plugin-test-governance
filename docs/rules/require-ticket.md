@@ -11,14 +11,14 @@ at the ticket that explains it, so disabled tests show up in planning instead of
 
 A test is in a state when it is:
 
-| State          | Put there by                                                                                                                          | Marker                 | On by default             |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | ------------------------- |
-| `skip`         | `test.skip('title', fn)`, `test.describe.skip`, `test.skip()` in a body, `testInfo.skip()`, `test.step.skip`, `step.skip()` in a step | `// SKIP:`             | yes                       |
-| `fixme`        | `test.fixme(...)`, `test.describe.fixme`, `testInfo.fixme()`                                                                          | `// FIXME:`            | yes                       |
-| `todo`         | Jest's, Vitest's and `node:test`'s `test.todo`, and a Mocha or Jasmine test with only a title, `it('title')`                          | `// TODO:`             | yes, except in Playwright |
-| `fail`, `slow` | `test.fail(...)`, `test.slow()`, `testInfo.fail()`, `testInfo.slow()`                                                                 | `// FAIL:`, `// SLOW:` | no                        |
-| `retry`        | `describe.configure({ retries })`, `jest.retryTimes()`, Vitest's `{ retry }`, `this.retries()`, Cypress's `{ retries }`               | `// RETRY:`            | no                        |
-| custom         | any tag you list in `customStates`                                                                                                    | your keyword           | when configured           |
+| State          | Put there by                                                                                                                               | Marker                 | On by default             |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------- | ------------------------- |
+| `skip`         | `test.skip('title', fn)`, `test.describe.skip`, `test.skip()` in a body, `testInfo.skip()`, `test.step.skip`, `step.skip()` in a step      | `// SKIP:`             | yes                       |
+| `fixme`        | `test.fixme(...)`, `test.describe.fixme`, `testInfo.fixme()`                                                                               | `// FIXME:`            | yes                       |
+| `todo`         | Jest, Vitest, Bun and `node:test` declarations such as `test.todo`, and a Mocha or Jasmine test with only a title, `it('title')`           | `// TODO:`             | yes, except in Playwright |
+| `fail`, `slow` | `test.fail(...)`, `test.slow()`, `testInfo.fail()`, `testInfo.slow()`                                                                      | `// FAIL:`, `// SLOW:` | no                        |
+| `retry`        | `describe.configure({ retries })`, `jest.retryTimes()`, Vitest's `{ retry }`, `this.retries()`, Cypress's `{ retries }`, Bun's `{ retry }` | `// RETRY:`            | no                        |
+| custom         | any tag you list in `customStates`                                                                                                         | your keyword           | when configured           |
 
 Jest's `xit` and `xdescribe` are skipped declarations. Vitest uses `test.skip`, `describe.skip`,
 `{ skip: true }`, `skipIf(true)` and runtime `context.skip()` calls. Each runner has its own syntax;
@@ -28,6 +28,16 @@ When retry ticketing is enabled, a count that is not known to be zero puts the t
 in the `retry` state. This includes dynamic counts such as `process.env.CI ? 2 : 0`. A readable
 constant condition selects only its reachable branch. See [retry ceilings](limit-retries.md) to
 bound readable counts independently of tickets.
+
+The ticket preset also applies to marker URLs. With `ticket: { preset: 'gitlab' }`,
+this URL is missing the project path:
+
+<!-- example: invalid settings={"ticket":{"preset":"gitlab"}} -->
+
+```js
+// SKIP: https://gitlab.com/-/issues/42
+test.skip('resumes an upload', () => {});
+```
 
 Tag examples on this page use this policy:
 

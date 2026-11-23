@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Require a namespace and project path in GitLab ticket URLs.
+- Show numeric ticket examples that respect the configured length, or a length hint for long IDs.
+- Correct the Bun coverage limits and TypeScript installation instructions.
 - Honor wildcard placeholders when the ticket text itself contains an asterisk.
 - Recognize signed numeric conditions in Bun test modifiers and conditional config spreads.
 

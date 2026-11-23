@@ -41,11 +41,16 @@ judge whether the stated reason justifies skipping the test.
 
 ## TypeScript
 
-For TypeScript test files, install the parser as well as ESLint and this plugin:
+For a new project on Node 24 or later, install the parser and a compatible TypeScript version
+alongside ESLint and the plugin. This combination uses the versions tested together in development:
 
 ```sh
-npm install --save-dev eslint eslint-plugin-test-governance @typescript-eslint/parser typescript
+npm install --save-dev eslint@10 eslint-plugin-test-governance @typescript-eslint/parser@8.73.0 typescript@~6.0.0
 ```
+
+For an existing TypeScript project, check the parser's peer range with
+`npm view @typescript-eslint/parser@8.73.0 peerDependencies` before changing the compiler.
+On Node 22.12 use `eslint@9` in the install command.
 
 You can use a JavaScript config file even when the tests are TypeScript. Add this configuration to your existing
 ESLint config, or create `eslint.config.mjs` at the project root:
@@ -207,7 +212,8 @@ set the same rule defaults. See [Framework syntax](frameworks.md) for the calls 
 All options go in `configure({...})`, or in `settings['test-governance']` if you build the config
 yourself. `framework` is required, and every other option has a default. The rules have no options
 of their own: they all read these shared settings, so they always agree on ticket formats, states
-and markers. To turn a rule off, set it to `'off'` as usual.
+and markers. The table shows Playwright's default for `testFunctions`; the
+[per-framework list](#testfunctions) gives the names for the other runners. To turn a rule off, set it to `'off'` as usual.
 
 | Option                        | Type                                                            | Default                           | Description                                                                                                                                                                                                                                             |
 | ----------------------------- | --------------------------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -238,6 +244,7 @@ for syntax, scope and how ESLint suppression affects the checker.
 
 Tickets rejected as placeholders. `*` matches any characters. Case-insensitive, and a leading `#` on the ticket or the placeholder is ignored. Your list replaces the default one, so repeat the defaults you want to keep.
 
+For example, `placeholders: ['EXAMPLE-*']` rejects both `EXAMPLE-123` and `EXAMPLE-*123`.
 Tickets numbered 0 are always rejected.
 
 ### states
@@ -348,6 +355,9 @@ Migrating from `lifecycleTags` or `states.new` / `states.quarantined`? See the
 | `url`          | links to the hosts you list, and nothing else                                                                                                                                 | `hosts`, required: host names such as `tasks.example.com`, with no scheme, port or path; `*.example.com` matches its subdomains    |
 | `numeric`      | `4821`                                                                                                                                                                        | `minLength` (1), `maxLength` (20)                                                                                                  |
 | `pattern`      | anything matching your regex, anchored at both ends                                                                                                                           | `pattern`, `flags`                                                                                                                 |
+
+GitLab issue, merge request and work item URLs need a namespace and project before `/-/`.
+Nested subgroups are supported, as in `https://gitlab.com/group/subgroup/project/-/issues/123`.
 
 `projects` (Jira, YouTrack, Plane), `teams` (Linear) and `prefixes` (Notion, ClickUp, monday.com,
 ServiceNow) are keys as they appear in tickets, in uppercase: `TRADE` for `TRADE-123`, `STRY` for

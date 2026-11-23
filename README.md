@@ -46,7 +46,7 @@ See [ESLint's prerequisites](https://eslint.org/docs/latest/use/getting-started#
 Use a project that already has a supported test runner. Install the linter and plugin:
 
 ```sh
-npm install --save-dev eslint eslint-plugin-test-governance
+npm install --save-dev eslint@10 eslint-plugin-test-governance
 ```
 
 On Node.js 22.12, select ESLint 9 instead:
@@ -154,7 +154,7 @@ when your team also needs to account for conditional skips, tags, retries or sup
 
 | Setting                   | Default                                                                                                                    |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| States that need a ticket | `skip`, `fixme`; in the other frameworks `skip`, `todo`                                                                    |
+| States that need a ticket | In Playwright `skip`, `fixme`; in the other frameworks `skip`, `todo`                                                      |
 | Tag ticket requirements   | none by default; configure your own with `customStates`                                                                    |
 | Conditional skips         | no ticket or reason required; opt in with `requireTicketForConditional` or `requireReasonForConditional`                   |
 | `fail`, `slow`, `retry`   | off; enable the states your framework supports with `states`                                                               |
