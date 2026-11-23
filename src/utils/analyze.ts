@@ -231,7 +231,7 @@ export interface Analysis {
   /** Direct Cypress handlers that unconditionally suppress uncaught application errors. */
   errorSuppressions: { node: TSESTree.CallExpression; comments: Comment[] }[];
   /** Statically readable native retry counts, collected even when retry ticketing is off. */
-  retryCounts: { node: Node; count: number }[];
+  retryCounts: { node: Node; count: number; wholeFile: boolean }[];
   /** Markers that are not in the comment block of any test, describe or runtime call. */
   detachedMarkers: StateMarker[];
   /** Markers of `eslint-disable` regions that cover tests, none of them in the marker's state. */
@@ -1177,12 +1177,12 @@ function objectDetails(
   unread: Node[],
   path: readonly Node[] = [],
   readConditionalSpreads = false,
-): [string, Node][] {
+): [string, TSESTree.Property['value']][] {
   if (path.includes(object)) {
     unread.push(object);
     return [];
   }
-  const entries = new Map<string, Node>();
+  const entries = new Map<string, TSESTree.Property['value']>();
   for (const prop of object.properties) {
     if (prop.type === 'SpreadElement') {
       const resolve = (node: Node): Node => {
@@ -1676,7 +1676,98 @@ function configBinding(
   return undefined;
 }
 const CYPRESS_RETRY_COUNT_KEYS = new Set(['runMode', 'openMode']);
+const CYPRESS_FLAKE_STRATEGIES = new Set(['detect-flake-and-pass-on-threshold', 'detect-flake-but-always-fail']);
 const NO_RETRY_COUNT_KEYS = new Set<string>();
+
+function visitRunnerConfig(
+  sourceCode: SourceCode,
+  framework: Framework,
+  visit: (key: string, property: TSESTree.Property['value']) => void,
+): void {
+  /** Reads only config schema paths, never arbitrary nested application options or config callbacks. */
+  const readConfig = (node: Node, stage: 'root' | 'options' | 'projects', seen: readonly Node[] = []): void => {
+    const own = unwrap(node);
+    const value = constantValue(sourceCode, own) ?? own;
+    if (seen.includes(value)) return;
+    const path = [...seen, value];
+    if (value.type === 'ConditionalExpression') {
+      const condition = booleanOf(sourceCode, value.test);
+      if (condition !== false) readConfig(value.consequent, stage, path);
+      if (condition !== true) readConfig(value.alternate, stage, path);
+    } else if (stage === 'root' && value.type === 'CallExpression') {
+      const argument = value.arguments.at(0);
+      if (
+        argument !== undefined &&
+        value.arguments.length === 1 &&
+        framework.name !== 'webdriverio' &&
+        configBinding(sourceCode, value.callee, framework) === 'factory'
+      )
+        readConfig(argument, stage, path);
+    } else if (
+      stage === 'root' &&
+      framework.name === 'vitest' &&
+      isFunction(value) &&
+      !value.async &&
+      !value.generator
+    ) {
+      const body = value.body;
+      if (body.type !== 'BlockStatement') readConfig(body, stage, path);
+      else if (body.body.length === 1 && body.body[0].type === 'ReturnStatement' && body.body[0].argument)
+        readConfig(body.body[0].argument, stage, path);
+    } else if (stage === 'projects' && value.type === 'ArrayExpression') {
+      for (const element of value.elements) if (element !== null) readConfig(element, 'root', path);
+    } else if (stage !== 'projects' && value.type === 'ObjectExpression') {
+      for (const [key, property] of objectDetails(sourceCode, value, [], [], true)) {
+        if (stage === 'root' && framework.name === 'vitest') {
+          if (key === 'test') readConfig(property, 'options', path);
+        } else if (key === 'projects' && (framework.name === 'playwright' || framework.name === 'vitest')) {
+          readConfig(property, 'projects', path);
+        } else if (framework.name === 'cypress' && stage === 'root' && ['e2e', 'component'].includes(key)) {
+          readConfig(property, 'options', path);
+        } else visit(key, property);
+      }
+    }
+  };
+  for (const statement of sourceCode.ast.body) {
+    if (
+      framework.name === 'webdriverio' &&
+      statement.type === 'ExportNamedDeclaration' &&
+      statement.declaration?.type === 'VariableDeclaration'
+    ) {
+      for (const decl of statement.declaration.declarations)
+        if (decl.id.type === 'Identifier' && decl.id.name === 'config' && decl.init) readConfig(decl.id, 'root');
+    } else if (statement.type === 'ExportDefaultDeclaration' && framework.name !== 'webdriverio')
+      readConfig(statement.declaration, 'root');
+    else if (statement.type === 'ExpressionStatement' && statement.expression.type === 'AssignmentExpression') {
+      const { left, right, operator } = statement.expression;
+      if (
+        operator === '=' &&
+        left.type === 'MemberExpression' &&
+        left.object.type === 'Identifier' &&
+        (framework.name === 'webdriverio'
+          ? left.object.name === 'exports' && memberName(left) === 'config'
+          : left.object.name === 'module' && memberName(left) === 'exports') &&
+        configGlobal(sourceCode, left.object)
+      )
+        readConfig(right, 'root');
+    }
+  }
+}
+
+export function snapshotSuppressions(
+  sourceCode: SourceCode,
+  options: ResolvedOptions,
+): { node: Node; comments: Comment[] }[] {
+  const found = new Map<Node, Comment[]>();
+  if (options.framework.name === 'playwright')
+    visitRunnerConfig(sourceCode, options.framework, (key, property) => {
+      const value = unwrap(property);
+      if (key === 'ignoreSnapshots' && value.type === 'Literal' && value.value === true) {
+        found.set(property.parent, commentBlock(sourceCode, property.parent, options.allowBlankLine));
+      }
+    });
+  return [...found].map(([node, comments]) => ({ node, comments }));
+}
 
 function retryOptionKeys(framework: Framework): ReadonlySet<string> {
   if (framework.name === 'vitest') return VITEST_RETRY_COUNT_KEYS;
@@ -1976,97 +2067,74 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       .getScope(sourceCode.ast)
       .through.some((reference) => reference.identifier.name === 'Cypress' && reference.isWrite());
   /** Follows local constants and conditional branches without executing a runtime expression. */
-  const recordRetryCounts = (node: Node | undefined, keys?: ReadonlySet<string>, seen: readonly Node[] = []): void => {
+  const recordRetryCounts = (
+    node: Node | undefined,
+    keys?: ReadonlySet<string>,
+    seen: readonly Node[] = [],
+    scope: 'test' | 'file' | 'cypress-config' = 'test',
+  ): void => {
     if (node === undefined) return;
     const own = unwrap(node);
     const value = constantValue(sourceCode, own) ?? own;
     if (seen.includes(value)) return;
     const path = [...seen, value];
     if (value.type === 'Literal' && typeof value.value === 'number') {
-      retryCounts.push({ node: own, count: value.value });
+      retryCounts.push({ node: own, count: value.value, wholeFile: scope === 'file' });
     } else if (value.type === 'UnaryExpression' && (value.operator === '+' || value.operator === '-')) {
       const argument = constantValue(sourceCode, unwrap(value.argument)) ?? unwrap(value.argument);
       if (argument.type === 'Literal' && typeof argument.value === 'number') {
-        retryCounts.push({ node: own, count: value.operator === '-' ? -argument.value : argument.value });
+        retryCounts.push({
+          node: own,
+          count: value.operator === '-' ? -argument.value : argument.value,
+          wholeFile: scope === 'file',
+        });
       }
     } else if (value.type === 'ConditionalExpression') {
       const condition = booleanOf(sourceCode, value.test);
-      if (condition !== false) recordRetryCounts(value.consequent, keys, path);
-      if (condition !== true) recordRetryCounts(value.alternate, keys, path);
+      if (condition !== false) recordRetryCounts(value.consequent, keys, path, scope);
+      if (condition !== true) recordRetryCounts(value.alternate, keys, path, scope);
     } else if (value.type === 'ObjectExpression' && keys !== undefined) {
-      for (const [key, count] of objectDetails(sourceCode, value, [])) {
+      const entries = new Map(objectDetails(sourceCode, value, [], [], scope === 'cypress-config'));
+      if (scope === 'cypress-config') {
+        const strategy = entries.get('experimentalStrategy');
+        const settings = entries.get('experimentalOptions');
+        if (
+          strategy &&
+          settings &&
+          CYPRESS_FLAKE_STRATEGIES.has(staticText(sourceCode, strategy) ?? '') &&
+          [...CYPRESS_RETRY_COUNT_KEYS].some((mode) => booleanOf(sourceCode, entries.get(mode)) === true)
+        ) {
+          const object = constantValue(sourceCode, unwrap(settings)) ?? unwrap(settings);
+          if (object.type === 'ObjectExpression')
+            recordRetryCounts(
+              new Map(objectDetails(sourceCode, object, [], [], true)).get('maxRetries'),
+              undefined,
+              path,
+            );
+        }
+      }
+      for (const [key, count] of entries) {
         if (keys.has(key)) recordRetryCounts(count, undefined, path);
       }
     }
   };
-  if (options.checkConfigRetries && ['playwright', 'vitest', 'cypress'].includes(framework.name)) {
-    /** Reads only config schema paths, never arbitrary nested application options or config callbacks. */
-    const readConfig = (node: Node, stage: 'root' | 'options' | 'projects', seen: readonly Node[] = []): void => {
-      const own = unwrap(node);
-      const value = constantValue(sourceCode, own) ?? own;
-      if (seen.includes(value)) return;
-      const path = [...seen, value];
-      if (value.type === 'ConditionalExpression') {
-        const condition = booleanOf(sourceCode, value.test);
-        if (condition !== false) readConfig(value.consequent, stage, path);
-        if (condition !== true) readConfig(value.alternate, stage, path);
-      } else if (stage === 'root' && value.type === 'CallExpression') {
-        const argument = value.arguments.at(0);
-        if (
-          argument !== undefined &&
-          value.arguments.length === 1 &&
-          configBinding(sourceCode, value.callee, framework) === 'factory'
-        )
-          readConfig(argument, stage, path);
-      } else if (
-        stage === 'root' &&
-        framework.name === 'vitest' &&
-        isFunction(value) &&
-        !value.async &&
-        !value.generator
-      ) {
-        const body = value.body;
-        if (body.type !== 'BlockStatement') readConfig(body, stage, path);
-        else if (body.body.length === 1 && body.body[0].type === 'ReturnStatement' && body.body[0].argument)
-          readConfig(body.body[0].argument, stage, path);
-      } else if (stage === 'projects' && value.type === 'ArrayExpression') {
-        for (const element of value.elements) if (element !== null) readConfig(element, 'root', path);
-      } else if (stage !== 'projects' && value.type === 'ObjectExpression') {
-        for (const [key, property] of objectDetails(sourceCode, value, [], [], true)) {
-          if (stage === 'root' && framework.name === 'vitest') {
-            if (key === 'test') readConfig(property, 'options', path);
-          } else if (key === (framework.name === 'vitest' ? 'retry' : 'retries')) {
-            recordRetryCounts(
-              property,
-              framework.name === 'vitest'
-                ? VITEST_RETRY_COUNT_KEYS
-                : framework.name === 'cypress'
-                  ? CYPRESS_RETRY_COUNT_KEYS
-                  : undefined,
-            );
-          } else if (key === 'projects' && framework.name !== 'cypress') {
-            readConfig(property, 'projects', path);
-          } else if (framework.name === 'cypress' && stage === 'root' && ['e2e', 'component'].includes(key)) {
-            readConfig(property, 'options', path);
-          }
-        }
+  if (options.checkConfigRetries && ['playwright', 'vitest', 'cypress', 'webdriverio'].includes(framework.name)) {
+    visitRunnerConfig(sourceCode, framework, (key, property) => {
+      if (framework.name === 'webdriverio') {
+        if (key === 'specFileRetries') recordRetryCounts(property, undefined, [], 'file');
+      } else if (key === (framework.name === 'vitest' ? 'retry' : 'retries')) {
+        recordRetryCounts(
+          property,
+          framework.name === 'vitest'
+            ? VITEST_RETRY_COUNT_KEYS
+            : framework.name === 'cypress'
+              ? CYPRESS_RETRY_COUNT_KEYS
+              : undefined,
+          [],
+          framework.name === 'cypress' ? 'cypress-config' : 'test',
+        );
       }
-    };
-    for (const statement of sourceCode.ast.body) {
-      if (statement.type === 'ExportDefaultDeclaration') readConfig(statement.declaration, 'root');
-      else if (statement.type === 'ExpressionStatement' && statement.expression.type === 'AssignmentExpression') {
-        const { left, right, operator } = statement.expression;
-        if (
-          operator === '=' &&
-          left.type === 'MemberExpression' &&
-          memberName(left) === 'exports' &&
-          left.object.type === 'Identifier' &&
-          left.object.name === 'module' &&
-          configGlobal(sourceCode, left.object)
-        )
-          readConfig(right, 'root');
-      }
-    }
+    });
   }
   const claimed = new Set<Comment>();
   const allComments = sourceCode.getAllComments();

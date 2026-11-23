@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Check Cypress flake-detection retry ceilings and WebdriverIO whole-spec retries in selected config files.
+- Add an opt-in rule for ticketing Playwright snapshot suppression and a two-lane quarantine recipe.
+
 ### Fixed
 
 - Require a namespace and project path in GitLab ticket URLs.
