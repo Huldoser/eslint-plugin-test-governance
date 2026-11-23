@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Honor wildcard placeholders when the ticket text itself contains an asterisk.
 - Recognize signed numeric conditions in Bun test modifiers and conditional config spreads.
 
 ## [0.17.0] - 2026-11-19

@@ -580,13 +580,13 @@ function matchesGlob(glob: string, value: string): boolean {
   let star = -1;
   let mark = 0;
   while (t < text.length) {
-    if (p < pattern.length && pattern[p] === text[t]) {
-      p += 1;
-      t += 1;
-    } else if (p < pattern.length && pattern[p] === '*') {
+    if (pattern[p] === '*') {
       star = p;
       p += 1;
       mark = t;
+    } else if (pattern[p] === text[t]) {
+      p += 1;
+      t += 1;
     } else if (star !== -1) {
       mark += 1;
       t = mark;
