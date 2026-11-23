@@ -672,6 +672,11 @@ runRule('require-ticket', rule, {
       code: `// SKIP: ${ticket}\ntest.skip('places an order', async () => {});`,
       errors: [{ messageId: 'placeholderTicket' as const, data: { ticket } }],
     })),
+    {
+      code: "// SKIP: EXAMPLE-*1\ntest.skip('pending', () => {});",
+      settings: settings({ ticket: { preset: 'pattern', pattern: '.+' }, placeholders: ['EXAMPLE-*'] }),
+      errors: [{ messageId: 'placeholderTicket', data: { ticket: 'EXAMPLE-*1' } }],
+    },
     // Ticket-only markers: anything after the tickets is reported, with a suggestion to remove it.
     ...[
       ['// SKIP: TRADE-123 flaky on CI', 'flaky on CI', '// SKIP: TRADE-123'],

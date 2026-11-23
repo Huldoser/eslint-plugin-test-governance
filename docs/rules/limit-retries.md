@@ -129,7 +129,23 @@ export default { retries: 2 };
 | Vitest     | `test.retry`, including `{ count }`, and `test.projects` inline projects' `test.retry`    |
 | Cypress    | Root, `e2e` and `component` `retries`, including separate `runMode` and `openMode` counts |
 
-The rule reads ESM default exports and top-level `module.exports = ...`, including readable local
+For Cypress's [experimental retry strategies](https://docs.cypress.io/app/references/experiments),
+the ceiling applies to `retries.experimentalOptions.maxRetries` when either `runMode` or `openMode`
+is statically enabled. Both supported strategies use this count. Boolean mode switches and the
+passing-attempt threshold are separate from retry counts.
+
+For WebdriverIO, enable the rule with `framework: 'webdriverio'` and `checkConfigRetries: true`
+on your WDIO config file. The named `export const config` and CommonJS `exports.config` forms
+support `specFileRetries`. This count repeats the **whole spec file**, including setup. Connection
+retry counts, delays and deferred scheduling are separate settings.
+
+<!-- example: invalid settings={"framework":"webdriverio","checkConfigRetries":true} -->
+
+```js
+export const config = { specFileRetries: 5 };
+```
+
+For Playwright, Vitest and Cypress, the rule reads ESM default exports and top-level `module.exports = ...`, including readable local
 constants. It recognizes single-argument `defineConfig` calls imported from `@playwright/test`,
 `playwright/test`, `vitest/config`, `vite` or `cypress` for the selected framework, plus Vitest's
 `defineProject`. Named imports, namespace imports, CommonJS module imports and destructured
@@ -153,6 +169,7 @@ Negated boolean literals select their branch too. Immutable object and array des
 supply local counts; destructuring defaults, rest bindings and getters are not evaluated.
 Local boolean aliases and conditional boolean predicates select branches consistently. Static object
 spreads and computed string keys can supply local counts; unknown properties remain unread.
+For example, `{ retries: 3, ...(-0 && { retries: 1 }) }` keeps the retry count at three.
 TypeScript assertions, non-null assertions and `satisfies` around native retry calls preserve detection.
 
 Imported values, mutable variables, arithmetic expressions and function results are not evaluated.

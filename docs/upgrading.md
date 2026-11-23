@@ -3,6 +3,18 @@
 Run ESLint on your tests before and after updating. An upgrade may recognize syntax that an older
 version missed, producing new reports. Check the [changelog](../CHANGELOG.md) for fixes and additions.
 
+## Upgrading from 0.16 to 0.17
+
+Existing framework presets keep their names. For files run by Bun, select
+[`configs.bun`](frameworks.md#bun) in the ESLint config object whose `files` pattern matches
+those tests. In a mixed suite, give the other runners separate patterns so that a later config
+does not apply a different framework to the same file.
+
+The Bun preset checks skipped and todo tests by default. Enable `states.retry` if per-test retries
+need tickets, or enable [limit-retries](rules/limit-retries.md) to enforce a ceiling.
+Teams already checking runner configuration retries may see newly reported counts in conditional
+object spreads. See the [0.17.0 changelog](../CHANGELOG.md#0170---2026-11-19).
+
 ## Upgrading to 0.15 and 0.16
 
 No option migration is required from 0.14. The new native-reason tickets, ticketed lint suppressions,

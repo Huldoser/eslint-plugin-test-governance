@@ -239,13 +239,34 @@ globals and imports from `bun:test`, including named aliases, namespace imports 
 CommonJS imports. Apply the preset only to Bun files in a mixed-runner project.
 
 - Skip and todo governance covers `test.skip`, `test.todo`, suite modifiers and the
-  conditional `if`, `runIf`, `skipIf` and `todoIf` forms.
+  conditional `if`, `runIf`, `skipIf` and `todoIf` forms, including signed numeric conditions.
 - Enable `states.fail` to track `failing`, `fails` and `failingIf`. Enable
   `states.retry` for tickets on per-test `{ retry: count }` options and use
   `limit-retries` for a ceiling. The `repeats` option runs a test repeatedly
   regardless of its outcome and counts separately.
 - The preset reads test source. `bunfig.toml` and Bun's compatibility imports from
   `vitest` and `@jest/globals` are outside this preset's scope.
+
+For example, with the Bun preset, an unconditional todo needs a ticket:
+
+<!-- example: invalid settings={"framework":"bun"} -->
+
+```js
+import { test } from 'bun:test';
+
+test.todo('retries an interrupted upload');
+```
+
+Place the ticket directly above the declaration:
+
+<!-- example: valid settings={"framework":"bun"} -->
+
+```js
+import { test } from 'bun:test';
+
+// TODO: EXAMPLE-123
+test.todo('retries an interrupted upload');
+```
 
 ## Shared behavior
 
@@ -276,7 +297,7 @@ These forms are not covered:
 - Cypress's @cypress/skip-test `skipOn()` and `onlyOn()`.
 - `node:test`'s `getTestContext()` inside arbitrary helper functions outside recognized test/hook bodies.
 - Jasmine's `pending()` in a helper called by tests, or Jasmine 5/6's `jasmine-core.noGlobals()`.
-- Other runners, such as Bun.
+- Tests owned by runners without a preset, such as AVA, tap and uvu.
 
 The plugin validates ticket text and placeholders, not whether an issue exists or is open. It makes
 no issue-tracker requests and does not prevent focused tests such as `test.only`. Use your runner's

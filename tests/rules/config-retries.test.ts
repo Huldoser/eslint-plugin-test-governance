@@ -74,6 +74,7 @@ runRule('config retry ceilings (Playwright)', limitRetries, {
   ]),
   invalid: withOptions({ checkConfigRetries: true }, [
     { code: 'export default { retries: 3 };', errors: [excessive()] },
+    { code: 'export default { retries: 3, ...(-0 && { retries: 1 }) };', errors: [excessive()] },
     { code: 'export default { retries: 3, ...(0 && { retries: 1 }) };', errors: [excessive()] },
     { code: "export default { ...('CI' ? { retries: 3 } : { retries: 0 }) };", errors: [excessive()] },
     { code: 'export default { retries: 3, ...(false && { retries: 0 }) };', errors: [excessive()] },
@@ -185,4 +186,45 @@ it('config checks are opt-in and do not create retry ticket requirements', () =>
     reports.map(({ ruleId }) => ruleId),
     ['test-governance/limit-retries'],
   );
+});
+
+const wdio = { framework: 'webdriverio' as const, checkConfigRetries: true };
+runRule('whole spec file retry limits', limitRetries, {
+  valid: withOptions(wdio, [
+    'export const config = { specFileRetries: 2, specFileRetriesDelay: 10, connectionRetryCount: 9 };',
+    'export const other = { specFileRetries: 8 };',
+    'export const config = { retries: 9, projects: [{ specFileRetries: 9 }] };',
+    'export function config() {}',
+    'export const { config } = obj;',
+    'export let config;',
+    'const exports = {}; exports.config = { specFileRetries: 9 };',
+  ]),
+  invalid: withOptions(wdio, [
+    { code: 'export const config = { specFileRetries: 5 };', errors: [{ messageId: 'excessiveSpecFileRetries' }] },
+    { code: 'exports.config = { specFileRetries: ci ? 3 : 1 };', errors: [{ messageId: 'excessiveSpecFileRetries' }] },
+  ]),
+});
+
+const flake = (strategy: string, count: string, modes: string) =>
+  `export default { retries: {experimentalStrategy:'${strategy}', experimentalOptions:{maxRetries:${count}}, ${modes}} };`;
+const threshold = 'detect-flake-and-pass-on-threshold';
+const alwaysFail = 'detect-flake-but-always-fail';
+const cypressConfig = { framework: 'cypress' as const, checkConfigRetries: true };
+runRule('Cypress flake detection retry limits', limitRetries, {
+  valid: withOptions(cypressConfig, [
+    flake(threshold, '2', 'openMode:true,runMode:true'),
+    flake(alwaysFail, '5', 'openMode:false,runMode:false'),
+    flake('other', '5', 'openMode:true'),
+    'export default {retries:{experimentalStrategy:policyName, experimentalOptions:{maxRetries:9}, openMode:true}};',
+    "it('does not use experimental retries per test', { retries: {experimentalStrategy:'detect-flake-but-always-fail',experimentalOptions:{maxRetries:5},runMode:true} }, function () {});",
+    'export default { retries: {openMode:true, experimentalOptions:{maxRetries:5}} };',
+    "export default { retries: {experimentalStrategy:'detect-flake-but-always-fail', openMode:true} };",
+    "export default { retries: {experimentalStrategy:'detect-flake-but-always-fail', openMode:true, experimentalOptions:unknown} };",
+    "export default { retries: {experimentalStrategy:'detect-flake-but-always-fail', openMode:true, experimentalOptions:{maxRetries:4,...unknown}} };",
+  ]),
+  invalid: withOptions(cypressConfig, [
+    { code: flake(threshold, '4', 'openMode:true,runMode:false'), errors: [excessive(4)] },
+    { code: flake(alwaysFail, '5', 'openMode:false,runMode:true'), errors: [excessive(5)] },
+    { code: flake(alwaysFail, '3', 'openMode:true,runMode:true'), errors: [excessive(3)] },
+  ]),
 });
