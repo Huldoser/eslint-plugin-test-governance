@@ -92,6 +92,7 @@ Conditional skips such as `test.skip(browserName === 'webkit', 'Not supported')`
 permanent platform limit, so they need no ticket unless you set `requireTicketForConditional: true`.
 Readable local boolean constants, negations and selected conditional-expression branches are resolved:
 a known `true` condition always applies and needs a ticket; a known `false` condition does not apply.
+Bun also reads signed numeric literals. For example, both `test.skipIf(-1)` and `test.runIf(-0)` always skip.
 A runtime skip under an `if`, a `switch` case, a ternary or `&&` counts as conditional too, since
 `if (!enabled) test.skip()` does the same as `test.skip(!enabled)`. So does a skip in a `catch` block,
 such as `catch { test.skip(true, 'Market data feed is down') }`, a skip after other code in a `try`

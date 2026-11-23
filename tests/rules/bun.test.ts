@@ -9,6 +9,9 @@ const missing = { messageId: 'missingMarker' as const };
 runRule('Bun test states', requireTicket, {
   valid: [
     ...withOptions(requireConditional, [
+      "test.skipIf(-0)('active', () => {});",
+      "test.if(+1)('active', () => {});",
+      "test.skipIf(-0n)('active', () => {});",
       "test.skipIf(0)('active', () => {});",
       "test.if('yes')('active', () => {});",
       "test.skipIf(null)('active', () => {});",
@@ -19,6 +22,8 @@ runRule('Bun test states', requireTicket, {
       "import { test } from '@jest/globals'; test.skip('outside configured runner', () => {});",
       "import { test } from 'vitest'; test.todo('outside configured runner');",
       "import { test } from 'bun:test'; function helper(test) { test.skip('shadowed', () => {}); }",
+      "test.skipIf(-platform)('runtime value', () => {});",
+      "test.skipIf(-'unknown')('string coercion', () => {});",
       "test.todoIf(false)('active', () => {});",
       "test.skipIf(false).skipIf(false)('active', () => {});",
       "test.skipIf(false).if(true)('active', () => {});",
@@ -42,6 +47,9 @@ runRule('Bun test states', requireTicket, {
       { code: "xdescribe('missing', () => {});", errors: [missing] },
       { code: "test.skip.each([1])('case %s', () => {});", errors: [missing] },
       { code: "test.skipIf(true)('missing', () => {});", errors: [missing] },
+      { code: "test.skipIf(-1)('missing', () => {});", errors: [missing] },
+      { code: "const delta = -1n; test.todoIf(delta)('missing', () => {});", errors: [missing] },
+      { code: "test.runIf(+0)('missing', () => {});", errors: [missing] },
       { code: "test.skipIf(1)('missing', () => {});", errors: [missing] },
       { code: "const supported = ''; test.if(supported)('missing', () => {});", errors: [missing] },
       { code: "test.runIf(!1)('missing', () => {});", errors: [missing] },

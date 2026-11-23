@@ -153,6 +153,7 @@ Negated boolean literals select their branch too. Immutable object and array des
 supply local counts; destructuring defaults, rest bindings and getters are not evaluated.
 Local boolean aliases and conditional boolean predicates select branches consistently. Static object
 spreads and computed string keys can supply local counts; unknown properties remain unread.
+For example, `{ retries: 3, ...(-0 && { retries: 1 }) }` keeps the retry count at three.
 TypeScript assertions, non-null assertions and `satisfies` around native retry calls preserve detection.
 
 Imported values, mutable variables, arithmetic expressions and function results are not evaluated.

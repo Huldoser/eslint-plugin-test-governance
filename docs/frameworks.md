@@ -239,7 +239,7 @@ globals and imports from `bun:test`, including named aliases, namespace imports 
 CommonJS imports. Apply the preset only to Bun files in a mixed-runner project.
 
 - Skip and todo governance covers `test.skip`, `test.todo`, suite modifiers and the
-  conditional `if`, `runIf`, `skipIf` and `todoIf` forms.
+  conditional `if`, `runIf`, `skipIf` and `todoIf` forms, including signed numeric conditions.
 - Enable `states.fail` to track `failing`, `fails` and `failingIf`. Enable
   `states.retry` for tickets on per-test `{ retry: count }` options and use
   `limit-retries` for a ceiling. The `repeats` option runs a test repeatedly

@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Recognize signed numeric conditions in Bun test modifiers and conditional config spreads.
+
 ## [0.17.0] - 2026-11-19
 
 ### Added

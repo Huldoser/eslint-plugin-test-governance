@@ -1564,6 +1564,15 @@ function booleanOf(
     const argument = booleanOf(sourceCode, value.argument, path, truthiness);
     return argument === undefined ? undefined : !argument;
   }
+  if (truthiness && value.type === 'UnaryExpression' && (value.operator === '+' || value.operator === '-')) {
+    const operand = unwrap(value.argument);
+    if (
+      operand.type === 'Literal' &&
+      (typeof operand.value === 'number' || (value.operator === '-' && typeof operand.value === 'bigint'))
+    ) {
+      return Boolean(operand.value);
+    }
+  }
   if (value.type === 'ConditionalExpression') {
     const test = booleanOf(sourceCode, value.test, path, truthiness);
     if (test !== undefined) return booleanOf(sourceCode, test ? value.consequent : value.alternate, path, truthiness);
