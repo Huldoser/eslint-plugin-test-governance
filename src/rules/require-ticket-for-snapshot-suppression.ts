@@ -1,5 +1,5 @@
 import { snapshotSuppressions } from '../utils/analyze.ts';
-import { checkSuppressionTickets, suppressionMessages } from '../utils/suppression-tickets.ts';
+import { checkCommentTickets, commentTicketMessages } from '../utils/comment-tickets.ts';
 import { createRule } from '../utils/create-rule.ts';
 
 export default createRule({
@@ -13,10 +13,10 @@ export default createRule({
     schema: [],
     messages: {
       missingTicket: 'Disabling snapshot assertions needs a `// SUPPRESS: {{example}}` comment directly above it.',
-      ...suppressionMessages,
+      ...commentTicketMessages,
     },
   },
   create(context, _analysis, options) {
-    checkSuppressionTickets(context, snapshotSuppressions(context.sourceCode, options), options);
+    checkCommentTickets(context, snapshotSuppressions(context.sourceCode, options), options, 'SUPPRESS');
   },
 });

@@ -8,6 +8,7 @@ import requireTicketInComments from './rules/require-ticket-in-comments.ts';
 import requireTicket from './rules/require-ticket.ts';
 import limitRetries from './rules/limit-retries.ts';
 import requireTicketForSnapshotSuppression from './rules/require-ticket-for-snapshot-suppression.ts';
+import requireTicketForSerialGroups from './rules/require-ticket-for-serial-groups.ts';
 import requireTicketForErrorSuppression from './rules/require-ticket-for-error-suppression.ts';
 import { FRAMEWORK_NAMES, type FrameworkName } from './utils/constants.ts';
 import { ConfigError } from './utils/errors.ts';
@@ -29,6 +30,7 @@ export type RuleName =
   | 'require-ticket-in-comments'
   | 'require-ticket-for-commented-out-tests'
   | 'require-ticket-for-snapshot-suppression'
+  | 'require-ticket-for-serial-groups'
   | 'limit-retries'
   | 'require-ticket-for-error-suppression';
 
@@ -40,6 +42,7 @@ const ruleModules: Record<RuleName, { meta: { docs: { recommended: 'error' | 'wa
   'require-ticket-in-comments': requireTicketInComments,
   'require-ticket-for-commented-out-tests': requireTicketForCommentedOutTests,
   'require-ticket-for-snapshot-suppression': requireTicketForSnapshotSuppression,
+  'require-ticket-for-serial-groups': requireTicketForSerialGroups,
   'limit-retries': limitRetries,
   'require-ticket-for-error-suppression': requireTicketForErrorSuppression,
 };

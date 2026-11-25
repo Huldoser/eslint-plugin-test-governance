@@ -234,3 +234,22 @@ it('the snapshot rule recipe scopes reports to Playwright config files', async (
     );
   }
 });
+
+it('the serial groups recipe requires tickets only on selected specs', async () => {
+  const eslint = new ESLint({
+    cwd: root,
+    overrideConfigFile: true,
+    overrideConfig: documentedConfig('docs/rules/require-ticket-for-serial-groups.md', 'serial-groups'),
+  });
+  const code = "test.describe.configure({ mode: 'serial' });";
+  const filePath = 'e2e/order.spec.js';
+  const [missing] = await eslint.lintText(code, { filePath });
+  assert.deepEqual(
+    missing.messages.map(({ ruleId }) => ruleId),
+    ['test-governance/require-ticket-for-serial-groups'],
+  );
+  const [tracked] = await eslint.lintText(`// SERIAL: EXAMPLE-123\n${code}`, { filePath });
+  assert.deepEqual(tracked.messages, []);
+  const [outside] = await eslint.lintText(code, { filePath: 'app.js' });
+  assert.deepEqual(outside.messages, []);
+});

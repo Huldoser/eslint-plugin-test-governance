@@ -1,4 +1,4 @@
-import { checkSuppressionTickets, suppressionMessages } from '../utils/suppression-tickets.ts';
+import { checkCommentTickets, commentTicketMessages } from '../utils/comment-tickets.ts';
 import { createRule } from '../utils/create-rule.ts';
 
 export default createRule({
@@ -12,10 +12,10 @@ export default createRule({
     schema: [],
     messages: {
       missingTicket: 'This blanket error suppression needs a `// SUPPRESS: {{example}}` comment directly above it.',
-      ...suppressionMessages,
+      ...commentTicketMessages,
     },
   },
   create(context, analysis, options) {
-    checkSuppressionTickets(context, analysis.errorSuppressions, options);
+    checkCommentTickets(context, analysis.errorSuppressions, options, 'SUPPRESS');
   },
 });

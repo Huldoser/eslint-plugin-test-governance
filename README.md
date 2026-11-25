@@ -147,6 +147,7 @@ All framework configs use the severities in [Defaults](#defaults).
 | [require-ticket](docs/rules/require-ticket.md)                                                   | Require a ticket for skipped, fixme, todo, retried and tagged tests  |
 | [require-ticket-for-commented-out-tests](docs/rules/require-ticket-for-commented-out-tests.md)   | Require a ticket marker on commented-out tests                       |
 | [require-ticket-for-error-suppression](docs/rules/require-ticket-for-error-suppression.md)       | Require a ticket for blanket Cypress error suppression               |
+| [require-ticket-for-serial-groups](docs/rules/require-ticket-for-serial-groups.md)               | Require a ticket for Playwright serial groups                        |
 | [require-ticket-for-snapshot-suppression](docs/rules/require-ticket-for-snapshot-suppression.md) | Require a ticket for Playwright snapshot suppression                 |
 | [require-ticket-in-comments](docs/rules/require-ticket-in-comments.md)                           | Require FIXME and TODO comments in test files to start with a ticket |
 
@@ -174,6 +175,7 @@ when your team also needs to account for conditional skips, tags, retries or sup
 | Runner config retries     | unchecked; opt in with `checkConfigRetries: true` on selected runner config files                                          |
 | Error suppression         | `require-ticket-for-error-suppression`: off; enable it explicitly in Cypress specs and support files                       |
 | Snapshot suppression      | `require-ticket-for-snapshot-suppression`: off; enable on selected Playwright configs                                      |
+| Serial groups             | `require-ticket-for-serial-groups`: off; enable on selected Playwright test files                                          |
 
 Tags have no built-in meaning. Configure `customStates` for tags that need ticket markers, or
 `knownTags` for spelling checks alone. Other tags remain allowed. See [custom tag policies](docs/configuration.md#tag-names).

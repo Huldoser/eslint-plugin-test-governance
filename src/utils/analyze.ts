@@ -230,6 +230,7 @@ export interface Analysis {
   subjects: Subject[];
   /** Direct Cypress handlers that unconditionally suppress uncaught application errors. */
   errorSuppressions: { node: TSESTree.CallExpression; comments: Comment[] }[];
+  serialGroups: { node: TSESTree.CallExpression; comments: Comment[] }[];
   /** Statically readable native retry counts, collected even when retry ticketing is off. */
   retryCounts: { node: Node; count: number; wholeFile: boolean }[];
   /** Markers that are not in the comment block of any test, describe or runtime call. */
@@ -2061,6 +2062,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
   const subjects: Subject[] = [];
   const retryCounts: Analysis['retryCounts'] = [];
   const errorSuppressions: Analysis['errorSuppressions'] = [];
+  const serialGroups: Analysis['serialGroups'] = [];
   const cypressReassigned =
     framework.name === 'cypress' &&
     sourceCode
@@ -2152,6 +2154,14 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     states,
   );
   const comments = allComments.filter((comment) => !commentedOut.comments.has(comment));
+  const recordSerialGroup = (call: TSESTree.CallExpression): void => {
+    serialGroups.push({
+      node: call,
+      comments: commentBlock(sourceCode, anchorOf(call), options.allowBlankLine).filter(
+        (comment) => !commentedOut.comments.has(comment),
+      ),
+    });
+  };
   const regions = disableRegions(comments, states);
   // A region's marker covers every test up to its `eslint-enable`, so it is never the own marker of the first.
   const regionComments = new Set(regions.map((r) => r.comment));
@@ -2739,9 +2749,13 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     const { path } = callee;
     // `test.describe.configure(...)`, or `describe.configure(...)` with `const { describe } = test`.
     const configure =
-      path.join('.') === 'describe.configure' || (callee.root === DESCRIBE && path.join('.') === 'configure');
+      (path.length === 2 && path[0] === 'describe' && path[1] === 'configure') ||
+      (callee.root === DESCRIBE && path.length === 1 && path[0] === 'configure');
     if (framework.retryCall === 'describe.configure' && configure) {
-      const count = detailsOf(sourceCode, call, 0).entries.findLast(([key]) => key === 'retries');
+      const { entries } = detailsOf(sourceCode, call, 0);
+      const mode = entries.findLast(([key]) => key === 'mode');
+      if (mode && staticText(sourceCode, mode[1]) === 'serial') recordSerialGroup(call);
+      const count = entries.findLast(([key]) => key === 'retries');
       return { subject: retrySubject(call, count?.[1], 'configure') };
     }
     const declaration = declarationOf(callee);
@@ -2764,7 +2778,15 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
         return { subject, infos: infoNames(param, STEP_INFO_METHODS, subject) };
       }
     }
-    const { kind, members } = declaration;
+    const { kind, members, written: declarationMembers } = declaration;
+    if (
+      framework.playwright &&
+      kind === 'describe' &&
+      declarationMembers[0] === 'serial' &&
+      (declarationMembers.length === 1 || (declarationMembers.length === 2 && declarationMembers[1] === 'only'))
+    ) {
+      recordSerialGroup(call);
+    }
     // A describe's body gets no test context: node:test passes one that can't skip.
     const declared = declares(declaration, args);
     const bodyInfo = kind === 'describe' ? [] : bodyInfos(args, path, declared);
@@ -2964,6 +2986,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     subjects,
     retryCounts,
     errorSuppressions,
+    serialGroups,
     detachedMarkers,
     idleRegionMarkers,
     commentedOutTests: commentedOut.found,
