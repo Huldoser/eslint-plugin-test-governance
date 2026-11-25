@@ -187,6 +187,7 @@ function spec({ header, block }: Spec, lines: number): string {
 /** The fastest of `runs` lints of `code`, counting only the time spent in the plugin's rules. */
 async function ruleTime(options: GovernanceOptions, code: string, runs: number): Promise<number> {
   const config = configure(options);
+  config.rules['test-governance/require-ticket-for-serial-groups'] = 'error';
   config.rules['test-governance/require-ticket-for-snapshot-suppression'] = 'error';
   config.rules['test-governance/limit-retries'] = 'error';
   config.rules['test-governance/require-ticket-for-error-suppression'] = 'error';

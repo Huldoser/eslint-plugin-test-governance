@@ -25,6 +25,7 @@ checks that reference locally; your team still needs to review the issue and dec
 | Track lint exceptions              | [`comments.ticketedDisables`](rules/require-ticket-in-comments.md#tickets-for-selected-lint-suppressions)         | Connects selected lint suppressions to follow-up work. A ticket does not establish that disabling the rule is safe.                            |
 | Track blanket error suppression    | [`require-ticket-for-error-suppression`](rules/require-ticket-for-error-suppression.md)                           | Makes a broad Cypress exception traceable. The rule checks only the documented handler forms and does not assess their safety.                 |
 | Track disabled snapshot assertions | [Snapshot suppression](rules/require-ticket-for-snapshot-suppression.md)                                          | Requires a ticket where a Playwright project opts out of snapshot comparisons.                                                                 |
+| Track serial groups                | [Serial groups](rules/require-ticket-for-serial-groups.md)                                                        | Requires a ticket where a Playwright suite opts into skipping later tests after a failure and retrying the group together.                     |
 
 `fail`, `slow` and `retry` states are opt-in. Expected failures, extra execution time and retries can
 be intentional runner settings; enable their ticket requirements when your team treats them as
