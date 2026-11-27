@@ -232,7 +232,7 @@ export interface Analysis {
   errorSuppressions: { node: TSESTree.CallExpression; comments: Comment[] }[];
   serialGroups: { node: TSESTree.CallExpression; comments: Comment[] }[];
   /** Statically readable native retry counts, collected even when retry ticketing is off. */
-  retryCounts: { node: Node; count: number; wholeFile: boolean }[];
+  retryCounts: { node: Node; count: number | undefined; wholeFile: boolean }[];
   /** Markers that are not in the comment block of any test, describe or runtime call. */
   detachedMarkers: StateMarker[];
   /** Markers of `eslint-disable` regions that cover tests, none of them in the marker's state. */
@@ -1770,6 +1770,34 @@ export function snapshotSuppressions(
   return [...found].map(([node, comments]) => ({ node, comments }));
 }
 
+/** Match one spec filename, optionally searched across directories with a leading double star. */
+const NAMED_SPEC = /^(?:\*\*\/)?(?:[^/*?{}[\]()!\\]+\/)*[^/*?{}[\]()!\\]+\.(?:spec|test)\.[cm]?[jt]sx?$/u;
+
+export function specExclusions(
+  sourceCode: SourceCode,
+  options: ResolvedOptions,
+): { node: Node; comments: Comment[] }[] {
+  const anchors = new Set<Node>();
+  if (options.framework.name === 'playwright')
+    visitRunnerConfig(sourceCode, options.framework, (key, property) => {
+      if (key !== 'testIgnore') return;
+      const value = unwrap(property);
+      const array = value.type === 'ArrayExpression';
+      for (const entry of array ? value.elements : [value]) {
+        if (!entry) continue;
+        const literal = unwrap(entry);
+        if (
+          literal.type === 'Literal' &&
+          typeof literal.value === 'string' &&
+          NAMED_SPEC.test(literal.value) &&
+          !options.allowedSpecExclusions.has(literal.value)
+        )
+          anchors.add(array ? entry : property.parent);
+      }
+    });
+  return [...anchors].map((node) => ({ node, comments: commentBlock(sourceCode, node, options.allowBlankLine) }));
+}
+
 function retryOptionKeys(framework: Framework): ReadonlySet<string> {
   if (framework.name === 'vitest') return VITEST_RETRY_COUNT_KEYS;
   if (framework.name === 'bun') return NO_RETRY_COUNT_KEYS;
@@ -2078,7 +2106,14 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
     if (node === undefined) return;
     const own = unwrap(node);
     const value = constantValue(sourceCode, own) ?? own;
-    if (seen.includes(value)) return;
+    const unreadable = (): void => {
+      if (options.reportUnreadableRetries)
+        retryCounts.push({ node: own, count: undefined, wholeFile: scope === 'file' });
+    };
+    if (seen.includes(value)) {
+      unreadable();
+      return;
+    }
     const path = [...seen, value];
     if (value.type === 'Literal' && typeof value.value === 'number') {
       retryCounts.push({ node: own, count: value.value, wholeFile: scope === 'file' });
@@ -2090,7 +2125,7 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
           count: value.operator === '-' ? -argument.value : argument.value,
           wholeFile: scope === 'file',
         });
-      }
+      } else unreadable();
     } else if (value.type === 'ConditionalExpression') {
       const condition = booleanOf(sourceCode, value.test);
       if (condition !== false) recordRetryCounts(value.consequent, keys, path, scope);
@@ -2118,7 +2153,11 @@ function runAnalysis(sourceCode: SourceCode, options: ResolvedOptions): Analysis
       for (const [key, count] of entries) {
         if (keys.has(key)) recordRetryCounts(count, undefined, path);
       }
-    }
+    } else if (
+      !(value.type === 'Literal' && (value.value === null || typeof value.value === 'boolean')) &&
+      !(value.type === 'Identifier' && value.name === 'undefined' && declaredWhere(sourceCode, value) === 'global')
+    )
+      unreadable();
   };
   if (options.checkConfigRetries && ['playwright', 'vitest', 'cypress', 'webdriverio'].includes(framework.name)) {
     visitRunnerConfig(sourceCode, framework, (key, property) => {

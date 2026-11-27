@@ -178,3 +178,44 @@ it('keeps limit-retries off in every preset and independent of retry tickets', (
     'test-governance/require-ticket',
   ]);
 });
+
+runRule('limit-retries with unreadable counts', limitRetries, {
+  valid: [
+    ...withOptions({ reportUnreadableRetries: true, checkConfigRetries: true }, [
+      'export default { retries: ci ? 2 : undefined };',
+      'export default { retries: false ? readCount() : null };',
+      'export default { metadata: { retries: readCount() } };',
+    ]),
+    ...withOptions({ framework: 'cypress', reportUnreadableRetries: true, checkConfigRetries: true }, [
+      'export default { retries: {runMode:true, openMode:false} };',
+    ]),
+  ],
+  invalid: [
+    ...withOptions({ reportUnreadableRetries: true, checkConfigRetries: true }, [
+      {
+        code: 'export default { retries: ci ? readCount() : 4 };',
+        errors: [{ messageId: 'unreadableRetries' }, excessive(4)],
+      },
+      { code: 'test.describe.configure({retries: -importedCount});', errors: [{ messageId: 'unreadableRetries' }] },
+      {
+        code: 'const count = ci ? count : 0; export default { retries: count };',
+        errors: [{ messageId: 'unreadableRetries' }],
+      },
+    ]),
+    ...withOptions({ framework: 'jest', reportUnreadableRetries: true }, [
+      {
+        code: "import {budget} from './config.js'; jest.retryTimes(budget);",
+        errors: [{ messageId: 'unreadableRetries' }],
+      },
+    ]),
+    ...withOptions({ framework: 'vitest', reportUnreadableRetries: true }, [
+      {
+        code: "test('order', {retry:{count: readCount(), delay: readDelay()}}, () => {});",
+        errors: [{ messageId: 'unreadableRetries' }],
+      },
+    ]),
+    ...withOptions({ framework: 'webdriverio', reportUnreadableRetries: true, checkConfigRetries: true }, [
+      { code: 'export const config = {specFileRetries: readCount()};', errors: [{ messageId: 'unreadableRetries' }] },
+    ]),
+  ],
+});

@@ -75,6 +75,10 @@ export interface GovernanceOptions {
   maxRetries?: number;
   /** Include supported runner config exports in `limit-retries`. Defaults to `false`. */
   checkConfigRetries?: boolean;
+  /** Report explicit retry counts that the ceiling rule cannot evaluate. Defaults to `false`. */
+  reportUnreadableRetries?: boolean;
+  /** Exact testIgnore entries reserved for permanent suite routing. Defaults to `[]`. */
+  allowedSpecExclusions?: string[];
   /** Require a ticket for conditional skips such as `test.skip(browserName === 'webkit')`. */
   requireTicketForConditional?: boolean;
   /** Accept a ticket prefix in readable Playwright or node:test runtime skip reasons when no marker or annotation supplies one. */
@@ -140,6 +144,8 @@ export interface ResolvedOptions {
   knownTags: string[];
   maxRetries: number;
   checkConfigRetries: boolean;
+  reportUnreadableRetries: boolean;
+  allowedSpecExclusions: ReadonlySet<string>;
   requireTicketForConditional: boolean;
   ticketsFromReasons: boolean;
   requireReasonForConditional: boolean;
@@ -422,6 +428,8 @@ export function compileOptions(options: GovernanceOptions): ResolvedOptions {
     knownTags: options.knownTags ?? [],
     maxRetries: options.maxRetries ?? 2,
     checkConfigRetries: options.checkConfigRetries ?? false,
+    reportUnreadableRetries: options.reportUnreadableRetries ?? false,
+    allowedSpecExclusions: new Set(options.allowedSpecExclusions),
     requireTicketForConditional: options.requireTicketForConditional ?? false,
     ticketsFromReasons: options.ticketsFromReasons ?? false,
     requireReasonForConditional: options.requireReasonForConditional ?? false,

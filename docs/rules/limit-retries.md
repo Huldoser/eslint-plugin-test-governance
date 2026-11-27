@@ -173,16 +173,30 @@ For example, `{ retries: 3, ...(-0 && { retries: 1 }) }` keeps the retry count a
 TypeScript assertions, non-null assertions and `satisfies` around native retry calls preserve detection.
 
 Imported values, mutable variables, arithmetic expressions and function results are not evaluated.
-An unknown count is left alone; a clean lint run does not prove it meets the maximum. The rule
+By default an unknown count is left alone; a clean lint run does not prove it meets the maximum. The rule
 does not resolve inherited settings across files, command-line flags, or options supplied by a tag
 definition. Config factories with multiple merged arguments, imported configs, arbitrary helper
 calls, async config functions and functions with other statements are outside config support.
 Config code is never executed. Assertion polling is outside this rule's scope.
 
+Set `reportUnreadableRetries: true` to report an explicit count that cannot be verified.
+For example, a shared budget imported from another module then needs review even if the runtime value is low.
+The diagnostic has the severity of `limit-retries`. Reachable conditional branches are checked separately.
+The same recognized retry locations and config-file selection apply. An unrecognized config factory or an
+unknown spread that conceals the retry property remains outside the check.
+
+<!-- example: invalid settings={"framework":"jest","reportUnreadableRetries":true} -->
+
+```js
+import { budget } from './retry-policy.js';
+jest.retryTimes(budget);
+```
+
 ## Options
 
 Set these in [`configure()`](../configuration.md#options), not in the rule's option array:
 
+- `reportUnreadableRetries`: report explicit retry counts that cannot be verified, default `false`.
 - `maxRetries`: the largest permitted retry count, default `2`.
 - `checkConfigRetries`: include supported runner config exports, default `false`.
 - `framework` and `testFunctions`: which native calls belong to your test runner.
