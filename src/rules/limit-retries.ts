@@ -10,6 +10,7 @@ export default createRule({
     },
     schema: [],
     messages: {
+      unreadableRetries: 'Cannot verify that this retry count meets the configured maximum of {{max}}.',
       excessiveSpecFileRetries:
         'This whole spec file can retry {{count}} times, exceeding the configured maximum of {{max}}.',
       excessiveRetries: 'This retry count of {{count}} exceeds the configured maximum of {{max}}.',
@@ -18,8 +19,11 @@ export default createRule({
   create(context, analysis, options) {
     const reported = new Set<number>();
     for (const { node, count, wholeFile } of analysis.retryCounts) {
-      if (count > options.maxRetries && !reported.has(node.range[0])) {
-        reported.add(node.range[0]);
+      if (reported.has(node.range[0])) continue;
+      reported.add(node.range[0]);
+      if (count === undefined) {
+        context.report({ node, messageId: 'unreadableRetries', data: { max: options.maxRetries } });
+      } else if (count > options.maxRetries) {
         context.report({
           node,
           messageId: wholeFile ? 'excessiveSpecFileRetries' : 'excessiveRetries',

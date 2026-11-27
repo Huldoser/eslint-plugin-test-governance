@@ -253,3 +253,36 @@ it('the serial groups recipe requires tickets only on selected specs', async () 
   const [outside] = await eslint.lintText(code, { filePath: 'app.js' });
   assert.deepEqual(outside.messages, []);
 });
+
+it('enforces the README ticket project and removes stale alias markers across Jest and Playwright', async () => {
+  const eslint = new ESLint({
+    overrideConfigFile: true,
+    overrideConfig: documentedConfig('README.md', 'shared-jest-playwright'),
+  });
+  for (const filePath of ['unit/orders.js', 'e2e/orders.js']) {
+    const lint = async (source: string) =>
+      (await eslint.lintText(source, { filePath }))[0].messages.map((m) => m.ruleId);
+    const alias = 'const parked = test.skip;';
+    const call = "parked('orders', () => {});";
+    assert.deepEqual(await lint([alias, call].join('\n')), ['test-governance/require-ticket']);
+    const tracked = [alias, '// SKIP: TRADE-123', call].join('\n');
+    assert.deepEqual(await lint(tracked), []);
+    assert.deepEqual(await lint(tracked.replace('TRADE-123', 'OTHER-123')), ['test-governance/require-ticket']);
+    assert.deepEqual(await lint(tracked.replace('test.skip', 'test')), ['test-governance/no-orphaned-marker']);
+  }
+});
+
+it('applies the exclusion recipe only to selected configs and permits a routed setup file', async () => {
+  const eslint = new ESLint({
+    overrideConfigFile: true,
+    overrideConfig: documentedConfig('docs/rules/require-ticket-for-spec-exclusion.md', 'spec-exclusions'),
+  });
+  const source = "export default {testIgnore:['global-setup.spec.js','order.spec.js']};";
+  const [config] = await eslint.lintText(source, { filePath: 'playwright.config.mjs' });
+  assert.deepEqual(
+    config.messages.map((m) => m.ruleId),
+    ['test-governance/require-ticket-for-spec-exclusion'],
+  );
+  const [other] = await eslint.lintText(source, { filePath: 'application.js' });
+  assert.deepEqual(other.messages, []);
+});

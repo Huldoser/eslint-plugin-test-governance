@@ -12,7 +12,7 @@ export function checkCommentTickets(
   context: Readonly<TSESLint.RuleContext<keyof typeof commentTicketMessages | 'missingTicket', []>>,
   declarations: readonly { node: TSESTree.Node; comments: TSESTree.Comment[] }[],
   options: ResolvedOptions,
-  keyword: 'SUPPRESS' | 'SERIAL',
+  keyword: 'SUPPRESS' | 'SERIAL' | 'EXCLUDE',
 ): void {
   const matcher = options.commentTicket;
   const markerPattern = new RegExp(`^\\s*\\*?\\s*${keyword}\\s*:`, 'i');

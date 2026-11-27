@@ -15,6 +15,7 @@ body:
         - require-ticket-for-commented-out-tests
         - require-ticket-for-serial-groups
         - require-ticket-for-snapshot-suppression
+        - require-ticket-for-spec-exclusion
         - limit-retries
         - require-ticket-for-error-suppression
     validations:

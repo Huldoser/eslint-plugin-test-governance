@@ -8,17 +8,49 @@ Require tracking tickets for disabled tests and TODO/FIXME comments with ESLint.
 Jest, Vitest, Mocha, Cypress, WebdriverIO, `node:test`, Jasmine and Bun. Custom tag policies and retry tracking
 are optional.
 
-A skipped test can leave a gap long after its original justification is forgotten. Requiring a
-ticket beside the exception gives reviewers a way to find the work needed to restore the test:
+A Jest test can be skipped through an alias. The plugin reports the missing ticket here:
 
-<!-- example: valid -->
+<!-- example: invalid settings={"framework":"jest"} -->
+
+```js
+const parked = test.skip;
+parked('cancels an open order', () => {});
+```
+
+Adding the ticket makes the same test pass lint:
+
+<!-- example: valid settings={"framework":"jest"} -->
+
+```js
+const parked = test.skip;
+// SKIP: TRADE-123
+parked('cancels an open order', () => {});
+```
+
+When the test is enabled again, the leftover marker is reported:
+
+<!-- example: invalid settings={"framework":"jest"} -->
 
 ```js
 // SKIP: TRADE-123
-test.skip('cancels an open order', () => {});
+test('cancels an open order', () => {});
 ```
 
-Removing the skip leaves a stale marker, which the plugin reports too. Tickets can also come from
+Jest unit tests and Playwright browser tests can share one ticket policy:
+
+<!-- config: shared-jest-playwright -->
+
+```js
+import testGovernance from 'eslint-plugin-test-governance';
+
+const policy = { ticket: { preset: 'jira', projects: ['TRADE'] } };
+export default [
+  { files: ['unit/**/*.js'], ...testGovernance.configure({ framework: 'jest', ...policy }) },
+  { files: ['e2e/**/*.js'], ...testGovernance.configure({ framework: 'playwright', ...policy }) },
+];
+```
+
+Tickets can also come from
 [Playwright annotations or Vitest metadata](docs/configuration.md#tickets-from-annotations).
 Ticket formats are checked locally; the plugin does not verify that an issue exists or is open.
 Use it when your team allows tracked exceptions. Teams that prohibit all skips should keep their
@@ -130,7 +162,7 @@ For mixed suites, give each framework its own `files` pattern. See
 
 ## Rules
 
-For opt-in configuration policies, see [retry ceilings](docs/rules/limit-retries.md#runner-configuration-files)
+For opt-in configuration policies, see [retry ceilings](docs/rules/limit-retries.md#runner-configuration-files), [named spec exclusions](docs/rules/require-ticket-for-spec-exclusion.md),
 and [Playwright snapshot exceptions](docs/rules/require-ticket-for-snapshot-suppression.md).
 For a runnable CI example, see the [quarantine recipe](docs/troubleshooting.md#run-quarantined-playwright-tests-separately).
 
@@ -149,6 +181,7 @@ All framework configs use the severities in [Defaults](#defaults).
 | [require-ticket-for-error-suppression](docs/rules/require-ticket-for-error-suppression.md)       | Require a ticket for blanket Cypress error suppression               |
 | [require-ticket-for-serial-groups](docs/rules/require-ticket-for-serial-groups.md)               | Require a ticket for Playwright serial groups                        |
 | [require-ticket-for-snapshot-suppression](docs/rules/require-ticket-for-snapshot-suppression.md) | Require a ticket for Playwright snapshot suppression                 |
+| [require-ticket-for-spec-exclusion](docs/rules/require-ticket-for-spec-exclusion.md)             | Require a ticket for excluded Playwright spec files                  |
 | [require-ticket-in-comments](docs/rules/require-ticket-in-comments.md)                           | Require FIXME and TODO comments in test files to start with a ticket |
 
 <!-- end auto-generated rules list -->
@@ -175,6 +208,7 @@ when your team also needs to account for conditional skips, tags, retries or sup
 | Runner config retries     | unchecked; opt in with `checkConfigRetries: true` on selected runner config files                                          |
 | Error suppression         | `require-ticket-for-error-suppression`: off; enable it explicitly in Cypress specs and support files                       |
 | Snapshot suppression      | `require-ticket-for-snapshot-suppression`: off; enable on selected Playwright configs                                      |
+| Named spec exclusions     | `require-ticket-for-spec-exclusion`: off on all frameworks                                                                 |
 | Serial groups             | `require-ticket-for-serial-groups`: off; enable on selected Playwright test files                                          |
 
 Tags have no built-in meaning. Configure `customStates` for tags that need ticket markers, or

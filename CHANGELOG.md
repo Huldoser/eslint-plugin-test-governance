@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Require tickets for named Playwright spec exclusions in selected runner configs with an opt-in rule.
+- Report unreadable retry counts when strict checking is enabled on the retry ceiling rule.
+
 ## [0.19.0] - 2026-11-25
 
 ### Added
