@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-11-27
+
 ### Added
 
 - Require tickets for named Playwright spec exclusions in selected runner configs with an opt-in rule.
@@ -790,7 +792,8 @@ First release.
 - Support for ESLint 9 and 10 flat config, JavaScript and TypeScript test files, `.extend()`
   fixtures, describe blocks, runtime skips and tags in titles or the `tag` option.
 
-[Unreleased]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/Huldoser/eslint-plugin-test-governance/compare/v0.16.0...v0.17.0
