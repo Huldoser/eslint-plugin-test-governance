@@ -262,9 +262,10 @@ it('enforces the README ticket project and removes stale alias markers across Je
   for (const filePath of ['unit/orders.js', 'e2e/orders.js']) {
     const lint = async (source: string) =>
       (await eslint.lintText(source, { filePath }))[0].messages.map((m) => m.ruleId);
-    const skipped = "const parked = test.skip;\nparked('orders', () => {});";
-    assert.deepEqual(await lint(skipped), ['test-governance/require-ticket']);
-    const tracked = skipped.replace('\n', '\n// SKIP: TRADE-123\n');
+    const alias = 'const parked = test.skip;';
+    const call = "parked('orders', () => {});";
+    assert.deepEqual(await lint([alias, call].join('\n')), ['test-governance/require-ticket']);
+    const tracked = [alias, '// SKIP: TRADE-123', call].join('\n');
     assert.deepEqual(await lint(tracked), []);
     assert.deepEqual(await lint(tracked.replace('TRADE-123', 'OTHER-123')), ['test-governance/require-ticket']);
     assert.deepEqual(await lint(tracked.replace('test.skip', 'test')), ['test-governance/no-orphaned-marker']);
